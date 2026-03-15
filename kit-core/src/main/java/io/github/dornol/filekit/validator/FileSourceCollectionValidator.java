@@ -2,6 +2,10 @@ package io.github.dornol.filekit.validator;
 
 import java.util.Collection;
 
+/**
+ * Validates a {@link Collection} of {@link FileSource} against the {@link ValidFile} constraint.
+ * Validation fails if any element in the collection fails.
+ */
 public class FileSourceCollectionValidator extends AbstractFileValidator<Collection<FileSource>> {
 
     private final FileValidationHelper helper;

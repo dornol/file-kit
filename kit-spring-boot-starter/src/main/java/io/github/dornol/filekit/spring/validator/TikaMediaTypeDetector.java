@@ -6,6 +6,12 @@ import org.apache.tika.Tika;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * {@link MediaTypeDetector} implementation using Apache Tika for accurate MIME type detection.
+ *
+ * <p>Auto-registered by {@link io.github.dornol.filekit.spring.autoconfigure.FileKitAutoConfiguration}
+ * when Apache Tika is present on the classpath.</p>
+ */
 public class TikaMediaTypeDetector implements MediaTypeDetector {
 
     private final Tika tika = new Tika();

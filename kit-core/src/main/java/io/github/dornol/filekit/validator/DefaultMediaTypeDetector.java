@@ -5,6 +5,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLConnection;
 
+/**
+ * Default {@link MediaTypeDetector} implementation using Java's built-in
+ * {@link URLConnection#guessContentTypeFromStream(InputStream)} and
+ * {@link URLConnection#guessContentTypeFromName(String)}.
+ *
+ * <p>This detector requires no external dependencies but has limited
+ * accuracy compared to Apache Tika. It is used as a fallback when
+ * no other detector is available.</p>
+ */
 public class DefaultMediaTypeDetector implements MediaTypeDetector {
 
     private static final String DEFAULT_MEDIA_TYPE = "application/octet-stream";

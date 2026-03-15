@@ -3,6 +3,9 @@ package io.github.dornol.filekit.spring.validator;
 import io.github.dornol.filekit.validator.FileValidationHelper;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Validates a single {@link MultipartFile} against the {@link ValidMultipartFile} constraint.
+ */
 public class MultipartFileValidator extends AbstractMultipartFileValidator<MultipartFile> {
 
     private final FileValidationHelper helper;

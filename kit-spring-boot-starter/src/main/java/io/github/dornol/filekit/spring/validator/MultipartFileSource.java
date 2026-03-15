@@ -6,6 +6,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * Adapter that wraps a Spring {@link MultipartFile} as a {@link FileSource}.
+ *
+ * <p>This allows the core validation logic (which works with {@code FileSource})
+ * to be used with Spring's multipart file handling.</p>
+ */
 public class MultipartFileSource implements FileSource {
 
     private final MultipartFile multipartFile;

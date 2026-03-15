@@ -3,6 +3,10 @@ package io.github.dornol.filekit.spring.validator;
 import io.github.dornol.filekit.validator.FileValidationHelper;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Validates a {@code MultipartFile[]} against the {@link ValidMultipartFile} constraint.
+ * Validation fails if any element in the array fails.
+ */
 public class MultipartFileArrayValidator extends AbstractMultipartFileValidator<MultipartFile[]> {
 
     private final FileValidationHelper helper;

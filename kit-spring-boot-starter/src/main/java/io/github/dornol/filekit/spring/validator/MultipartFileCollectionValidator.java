@@ -5,6 +5,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
 
+/**
+ * Validates a {@code Collection<MultipartFile>} against the {@link ValidMultipartFile} constraint.
+ * Validation fails if any element in the collection fails.
+ */
 public class MultipartFileCollectionValidator extends AbstractMultipartFileValidator<Collection<MultipartFile>> {
 
     private final FileValidationHelper helper;

@@ -1,5 +1,8 @@
 package io.github.dornol.filekit.validator;
 
+/**
+ * Validates a single {@link FileSource} against the {@link ValidFile} constraint.
+ */
 public class FileSourceValidator extends AbstractFileValidator<FileSource> {
 
     private final FileValidationHelper helper;

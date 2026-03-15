@@ -1,5 +1,9 @@
 package io.github.dornol.filekit.validator;
 
+/**
+ * Validates an array of {@link FileSource} against the {@link ValidFile} constraint.
+ * Validation fails if any element in the array fails.
+ */
 public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]> {
 
     private final FileValidationHelper helper;
