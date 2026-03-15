@@ -4,6 +4,7 @@ import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileCollectionValidator;
@@ -88,6 +89,13 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public ChecksumCalculator checksumCalculator() {
+        log.info("file-kit: Registering Sha256ChecksumCalculator");
+        return new Sha256ChecksumCalculator();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnBean(FileStorage.class)
     public FileStorageResolver fileStorageResolver(List<FileStorage> storages) {
         log.info("file-kit: Registering FileStorageResolver with {} storage(s)", storages.size());
@@ -96,8 +104,7 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnBean({ChecksumCalculator.class, FileMetadataRepository.class,
-            FileFormatExtractor.class, FileStorageResolver.class})
+    @ConditionalOnBean({FileMetadataRepository.class, FileFormatExtractor.class, FileStorageResolver.class})
     public FileUploadService fileUploadService(ChecksumCalculator checksumCalculator,
                                                FileMetadataRepository metadataRepository,
                                                FileFormatExtractor formatExtractor,

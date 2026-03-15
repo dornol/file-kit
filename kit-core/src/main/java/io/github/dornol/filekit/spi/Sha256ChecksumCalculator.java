@@ -1,13 +1,12 @@
-package io.github.dornol.filekit.example.infra;
-
-import io.github.dornol.filekit.spi.ChecksumCalculator;
-import org.springframework.stereotype.Component;
+package io.github.dornol.filekit.spi;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-@Component
+/**
+ * Default {@link ChecksumCalculator} implementation using SHA-256.
+ */
 public class Sha256ChecksumCalculator implements ChecksumCalculator {
 
     @Override
