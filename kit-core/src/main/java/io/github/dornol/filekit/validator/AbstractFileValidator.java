@@ -9,8 +9,8 @@ public abstract class AbstractFileValidator<T> implements ConstraintValidator<Va
 
     private final BaseFileValidationSupport<T> support;
 
-    protected AbstractFileValidator(MessageConverter messageConverter) {
-        this.support = new BaseFileValidationSupport<>(messageConverter, this);
+    protected AbstractFileValidator() {
+        this.support = new BaseFileValidationSupport<>(this);
     }
 
     @Override

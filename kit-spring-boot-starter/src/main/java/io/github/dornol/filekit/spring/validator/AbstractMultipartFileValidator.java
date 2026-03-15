@@ -2,7 +2,6 @@ package io.github.dornol.filekit.spring.validator;
 
 import io.github.dornol.filekit.validator.BaseFileValidationSupport;
 import io.github.dornol.filekit.validator.FileValidationCallbacks;
-import io.github.dornol.filekit.validator.MessageConverter;
 import io.github.dornol.filekit.validator.SafeMediaType;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
@@ -13,8 +12,8 @@ public abstract class AbstractMultipartFileValidator<T> implements ConstraintVal
 
     private final BaseFileValidationSupport<T> support;
 
-    protected AbstractMultipartFileValidator(MessageConverter messageConverter) {
-        this.support = new BaseFileValidationSupport<>(messageConverter, this);
+    protected AbstractMultipartFileValidator() {
+        this.support = new BaseFileValidationSupport<>(this);
     }
 
     @Override

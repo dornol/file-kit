@@ -6,8 +6,7 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
 
     private final FileValidationHelper helper;
 
-    public FileSourceCollectionValidator(FileValidationHelper helper, MessageConverter messageConverter) {
-        super(messageConverter);
+    public FileSourceCollectionValidator(FileValidationHelper helper) {
         this.helper = helper;
     }
 

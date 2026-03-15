@@ -4,8 +4,7 @@ public class FileSourceValidator extends AbstractFileValidator<FileSource> {
 
     private final FileValidationHelper helper;
 
-    public FileSourceValidator(FileValidationHelper helper, MessageConverter messageConverter) {
-        super(messageConverter);
+    public FileSourceValidator(FileValidationHelper helper) {
         this.helper = helper;
     }
 

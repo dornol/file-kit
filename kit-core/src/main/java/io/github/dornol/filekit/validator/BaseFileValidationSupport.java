@@ -7,13 +7,11 @@ import java.util.Set;
 
 public class BaseFileValidationSupport<T> {
 
-    private final MessageConverter messageConverter;
     private final FileValidationCallbacks<T> callbacks;
     private Set<SafeMediaType> allowedMediaTypes;
     private long maxSize;
 
-    public BaseFileValidationSupport(MessageConverter messageConverter, FileValidationCallbacks<T> callbacks) {
-        this.messageConverter = messageConverter;
+    public BaseFileValidationSupport(FileValidationCallbacks<T> callbacks) {
         this.callbacks = callbacks;
     }
 
@@ -70,9 +68,7 @@ public class BaseFileValidationSupport<T> {
 
     private void applyConstraintViolation(ConstraintValidatorContext context, String messageKey) {
         context.disableDefaultConstraintViolation();
-        context.buildConstraintViolationWithTemplate(
-                messageConverter.convert(messageKey)
-        ).addConstraintViolation();
+        context.buildConstraintViolationWithTemplate("{" + messageKey + "}").addConstraintViolation();
     }
 
 }
