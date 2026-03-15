@@ -76,22 +76,22 @@ That's it. No configuration class needed.
 
 ## File Storage
 
-file-kit provides a pluggable storage abstraction. Implement the SPI interfaces and a `FileStorage`, and the upload/download flow is auto-configured.
+file-kit provides a pluggable storage abstraction. Implement the SPI interfaces and register a `FileStorage` bean, and the upload/download flow is auto-configured.
 
-### 1. Define a storage type
+### What you need to provide
+
+| Interface | Description | Default |
+|-----------|-------------|---------|
+| `ChecksumCalculator` | Computes content checksum for deduplication | `Sha256ChecksumCalculator` (auto-registered) |
+| `FileFormatExtractor` | Detects MIME type and extension from content | None — you must provide |
+| `FileMetadataRepository` | Persists and queries file metadata | None — you must provide |
+| `FileStorage` | Stores and loads file content | Built-in: `LocalFileStorage`, `InMemoryFileStorage` |
+
+### Minimal setup
+
+`ChecksumCalculator` is auto-registered (SHA-256). You only need to provide `FileFormatExtractor`, `FileMetadataRepository`, and at least one `FileStorage`:
 
 ```java
-public enum StorageType { LOCAL, S3 }
-```
-
-### 2. Implement the SPI interfaces
-
-```java
-@Component
-public class MyChecksumCalculator implements ChecksumCalculator {
-    public String checksum(byte[] bytes) { /* SHA-256, MD5, etc. */ }
-}
-
 @Component
 public class MyFileFormatExtractor implements FileFormatExtractor {
     public FileFormat extract(InputStream inputStream) { /* detect MIME & extension */ }
@@ -105,19 +105,160 @@ public class MyFileMetadataRepository implements FileMetadataRepository {
 }
 ```
 
-### 3. Implement FileStorage
+### Built-in storage implementations
+
+#### LocalFileStorage
+
+Stores files on the local filesystem with configurable directory layout:
 
 ```java
-@Component
-public class LocalFileStorage implements FileStorage {
-    public Enum<?> getStorageType() { return StorageType.LOCAL; }
-    public FileLocation upload(FileUploadCommand command) { /* write to disk */ }
-    public InputStream load(FileMetadata metadata) { /* read from disk */ }
-    public String resolveUri(FileMetadata metadata) { /* return download URL */ }
+public enum StorageType { LOCAL }
+
+@Bean
+public FileStorage localStorage() {
+    return new LocalFileStorage(Path.of("/data/files"), StorageType.LOCAL);
 }
 ```
 
-### 4. Use the auto-configured services
+Directory layout is controlled by `ObjectKeyStrategy`:
+
+| Strategy | Example path | Use case |
+|----------|-------------|----------|
+| `ObjectKeyStrategy.flat()` | `key.png` | Simple, small-scale |
+| `ObjectKeyStrategy.dateBased()` | `2026/03/15/key.png` | Date-based organization |
+| `ObjectKeyStrategy.hashPrefixed(2)` | `73/3e/key.png` | Large-scale, avoids filesystem bottlenecks |
+
+```java
+@Bean
+public FileStorage localStorage() {
+    return new LocalFileStorage(
+            Path.of("/data/files"),
+            StorageType.LOCAL,
+            ObjectKeyStrategy.hashPrefixed(2));
+}
+```
+
+#### InMemoryFileStorage
+
+Stores files in memory. Useful for testing and prototyping:
+
+```java
+@Bean
+public FileStorage memoryStorage() {
+    return new InMemoryFileStorage(StorageType.LOCAL);
+}
+```
+
+### Custom storage (S3, GCS, etc.)
+
+Implement `FileStorage` to integrate with any storage backend:
+
+```java
+public enum StorageType { S3 }
+
+@Component
+public class S3FileStorage implements FileStorage {
+
+    private final S3Client s3;
+
+    @Override
+    public Enum<?> getStorageType() { return StorageType.S3; }
+
+    @Override
+    public FileLocation upload(FileUploadCommand command) {
+        String objectKey = command.key() + "." + command.extension();
+        s3.putObject(
+                PutObjectRequest.builder()
+                        .bucket(command.bucket())
+                        .key(objectKey)
+                        .contentType(command.mimeType())
+                        .build(),
+                RequestBody.fromBytes(command.content()));
+        return new FileLocation(command.bucket(), objectKey, StorageType.S3);
+    }
+
+    @Override
+    public InputStream load(FileMetadata metadata) {
+        return s3.getObject(GetObjectRequest.builder()
+                .bucket(metadata.location().bucket())
+                .key(metadata.location().objectKey())
+                .build());
+    }
+
+    @Override
+    public String resolveUri(FileMetadata metadata) {
+        return "https://" + metadata.location().bucket()
+                + ".s3.amazonaws.com/" + metadata.location().objectKey();
+    }
+}
+```
+
+### Multiple storage backends
+
+Register multiple `FileStorage` beans to support different backends simultaneously. The `FileStorageResolver` routes to the correct one based on `storageType`:
+
+```java
+public enum StorageType { LOCAL, S3 }
+
+@Bean
+public FileStorage localStorage() {
+    return new LocalFileStorage(Path.of("/data/files"), StorageType.LOCAL);
+}
+
+@Bean
+public FileStorage s3Storage() {
+    return new S3FileStorage(s3Client); // your implementation
+}
+```
+
+Upload to a specific storage:
+
+```java
+// Store on local disk
+uploadService.upload(file, StorageType.LOCAL, "uploads");
+
+// Store on S3
+uploadService.upload(file, StorageType.S3, "my-s3-bucket");
+```
+
+Download is automatic — `FileMetadata` records which storage was used:
+
+```java
+// Automatically reads from the correct storage
+downloadService.download(fileKey);
+```
+
+This also works for scaling local storage across multiple volumes:
+
+```java
+public enum StorageType { DISK1, DISK2 }
+
+@Bean
+public FileStorage disk1() {
+    return new LocalFileStorage(Path.of("/data"), StorageType.DISK1);
+}
+
+@Bean
+public FileStorage disk2() {
+    return new LocalFileStorage(Path.of("/data2"), StorageType.DISK2);
+}
+```
+
+### Upload / download flow
+
+**Upload:**
+1. Read file bytes, compute checksum
+2. If a file with the same checksum already exists, return the existing metadata (deduplication)
+3. Detect file format (MIME type, extension)
+4. Delegate to `FileStorage.upload()` for physical storage
+5. Save and return `FileMetadata`
+
+**Download:**
+1. Look up `FileMetadata` by file key
+2. Resolve the correct `FileStorage` from `metadata.location().storageType()`
+3. Load and return the file content
+
+### Controller example
 
 ```java
 @RestController
@@ -143,22 +284,15 @@ public class FileController {
 }
 ```
 
-### Upload flow
-
-1. Read file bytes, compute checksum
-2. If a file with the same checksum already exists, return the existing metadata (deduplication)
-3. Detect file format (MIME type, extension)
-4. Delegate to `FileStorage.upload()` for physical storage
-5. Save and return `FileMetadata`
-
 ### Auto-configured beans
 
 The following beans are registered automatically when their dependencies are present:
 
 | Bean | Condition |
 |------|-----------|
+| `ChecksumCalculator` | Always (SHA-256 default, overridable) |
 | `FileStorageResolver` | At least one `FileStorage` bean |
-| `FileUploadService` | `ChecksumCalculator` + `FileMetadataRepository` + `FileFormatExtractor` + `FileStorageResolver` |
+| `FileUploadService` | `FileMetadataRepository` + `FileFormatExtractor` + `FileStorageResolver` |
 | `FileDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
 | `SpringDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
 
