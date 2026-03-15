@@ -21,7 +21,7 @@ dependencies {
     compileOnly(libs.jakarta.validation.api)
     compileOnly(libs.jspecify)
     compileOnly(libs.spring.web)
-    compileOnly(libs.tika.core)
+    compileOnly(libs.spring.boot.autoconfigure)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
@@ -50,11 +50,11 @@ mavenPublishing {
     signAllPublications()
     publishToMavenCentral()
 
-    coordinates("io.github.dornol", "file-kit-spring", project.version.toString())
+    coordinates("io.github.dornol", "file-kit-spring-boot-starter", project.version.toString())
 
     pom {
-        name = "file-kit-spring"
-        description = "Spring adapters for file-kit - MultipartFile validation, HTTP download helpers"
+        name = "file-kit-spring-boot-starter"
+        description = "Spring Boot starter for file-kit - auto-configured MultipartFile validation"
         url = "https://github.com/dornol/file-kit/"
 
         licenses {

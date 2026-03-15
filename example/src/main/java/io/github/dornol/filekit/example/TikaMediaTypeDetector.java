@@ -1,5 +1,6 @@
-package io.github.dornol.filekit.validator;
+package io.github.dornol.filekit.example;
 
+import io.github.dornol.filekit.validator.MediaTypeDetector;
 import org.apache.tika.Tika;
 
 import java.io.IOException;

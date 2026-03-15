@@ -16,7 +16,7 @@ java {
 }
 
 dependencies {
-    implementation(project(":kit-spring"))
+    implementation(project(":kit-spring-boot-starter"))
     implementation(libs.tika.core)
 
     implementation("org.springframework.boot:spring-boot-starter-web")

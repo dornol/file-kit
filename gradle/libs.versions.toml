@@ -20,6 +20,7 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 hibernate-validator = { module = "org.hibernate:hibernate-validator", version.ref = "hibernate-validator" }
 spring-web = { module = "org.springframework:spring-web", version.ref = "spring-web" }
+spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot" }
 tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 
 [plugins]

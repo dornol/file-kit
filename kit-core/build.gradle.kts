@@ -18,7 +18,6 @@ dependencies {
     compileOnly(libs.slf4j.api)
     compileOnly(libs.jakarta.validation.api)
     compileOnly(libs.jspecify)
-    compileOnly(libs.tika.core)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
