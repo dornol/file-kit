@@ -10,7 +10,6 @@ import java.io.InputStream;
  * or any other detection mechanism.</p>
  *
  * @see DefaultMediaTypeDetector
- * @see io.github.dornol.filekit.spring.validator.TikaMediaTypeDetector
  */
 public interface MediaTypeDetector {
 

@@ -28,7 +28,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Target({TYPE, METHOD, FIELD, PARAMETER})
 @Retention(RUNTIME)
-@Constraint(validatedBy = {})
+@Constraint(validatedBy = {FileSourceValidator.class, FileSourceArrayValidator.class, FileSourceCollectionValidator.class})
 @Documented
 public @interface ValidFile {
     String message() default "Invalid file";

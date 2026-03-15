@@ -3,7 +3,7 @@ slf4j = "2.0.17"
 jakarta-validation = "3.1.1"
 jspecify = "1.0.0"
 junit = "5.10.0"
-hibernate-validator = "7.0.5.Final"
+hibernate-validator = "8.0.2.Final"
 vanniktech-publish = "0.34.0"
 spring-boot = "4.0.3"
 spring-dependency-management = "1.1.7"
@@ -18,7 +18,7 @@ jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
-hibernate-validator = { module = "org.hibernate:hibernate-validator", version.ref = "hibernate-validator" }
+hibernate-validator = { module = "org.hibernate.validator:hibernate-validator", version.ref = "hibernate-validator" }
 spring-web = { module = "org.springframework:spring-web", version.ref = "spring-web" }
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot" }
 tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }

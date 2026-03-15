@@ -10,8 +10,7 @@ import java.util.Set;
  * Helper that performs individual file validation checks against a {@link FileSource}.
  *
  * <p>Used by both core validators ({@link FileSourceValidator}) and
- * Spring validators ({@link io.github.dornol.filekit.spring.validator.MultipartFileValidator})
- * to share validation logic.</p>
+ * Spring validators to share validation logic.</p>
  */
 public class FileValidationHelper {
 
@@ -21,6 +20,56 @@ public class FileValidationHelper {
 
     public FileValidationHelper(MediaTypeDetector detector) {
         this.detector = detector;
+    }
+
+    /**
+     * Validates both media type and extension in a single pass, detecting MIME type only once.
+     *
+     * @param value   the file to check
+     * @param allowed set of allowed media types
+     * @return {@code null} if valid, or the message key for the failed check
+     */
+    public String validateMediaTypeAndExtension(FileSource value, Set<SafeMediaType> allowed) {
+        String originalFilename = value.getOriginalFilename();
+
+        String detected;
+        try {
+            detected = detector.detect(originalFilename, value.getInputStream());
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to detect media type", e);
+        }
+
+        // Check media type
+        boolean typeValid = false;
+        for (SafeMediaType type : allowed) {
+            if (detected.equals(type.getMediaType())) {
+                typeValid = true;
+                break;
+            }
+        }
+        if (!typeValid) {
+            log.warn("Detected media type '{}' is not in the allowed list: {}", detected, allowed);
+            return "file-kit.validation.unsupported-media-type";
+        }
+
+        // Check extension
+        if (originalFilename == null) {
+            return "file-kit.validation.invalid-extension";
+        }
+        String extension = getExtension(originalFilename).toLowerCase();
+        if (extension.isEmpty()) {
+            log.debug("File has no extension: '{}'", originalFilename);
+            return "file-kit.validation.invalid-extension";
+        }
+
+        for (SafeMediaType safe : allowed) {
+            if (safe.getMediaType().equalsIgnoreCase(detected) && safe.getExtensions().contains(extension)) {
+                return null;
+            }
+        }
+
+        log.debug("Extension '{}' does not match detected media type '{}'", extension, detected);
+        return "file-kit.validation.invalid-extension";
     }
 
     /**
@@ -90,7 +139,7 @@ public class FileValidationHelper {
             return false;
         }
 
-        if (name.equals("..") || name.contains("/") || name.contains("\\")) {
+        if (name.contains("..") || name.contains("/") || name.contains("\\")) {
             log.warn("Potentially dangerous filename detected: '{}'", name);
             return false;
         }

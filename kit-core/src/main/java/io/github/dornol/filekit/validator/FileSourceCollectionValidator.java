@@ -20,16 +20,6 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
     }
 
     @Override
-    public boolean isValidMediaType(Collection<FileSource> value) {
-        for (FileSource file : value) {
-            if (!helper.isValidMediaType(file, getAllowedMediaTypes())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    @Override
     public boolean isFileEmpty(Collection<FileSource> value) {
         for (FileSource file : value) {
             if (helper.isFileEmpty(file)) {
@@ -60,12 +50,13 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
     }
 
     @Override
-    public boolean isValidExtension(Collection<FileSource> value) {
+    public String validateMediaTypeAndExtension(Collection<FileSource> value) {
         for (FileSource file : value) {
-            if (!helper.isValidExtension(file, getAllowedMediaTypes())) {
-                return false;
+            String result = helper.validateMediaTypeAndExtension(file, getAllowedMediaTypes());
+            if (result != null) {
+                return result;
             }
         }
-        return true;
+        return null;
     }
 }

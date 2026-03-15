@@ -20,11 +20,6 @@ public class MultipartFileValidator extends AbstractMultipartFileValidator<Multi
     }
 
     @Override
-    public boolean isValidMediaType(MultipartFile value) {
-        return helper.isValidMediaType(new MultipartFileSource(value), getAllowedMediaTypes());
-    }
-
-    @Override
     public boolean isFileEmpty(MultipartFile value) {
         return helper.isFileEmpty(new MultipartFileSource(value));
     }
@@ -40,7 +35,7 @@ public class MultipartFileValidator extends AbstractMultipartFileValidator<Multi
     }
 
     @Override
-    public boolean isValidExtension(MultipartFile value) {
-        return helper.isValidExtension(new MultipartFileSource(value), getAllowedMediaTypes());
+    public String validateMediaTypeAndExtension(MultipartFile value) {
+        return helper.validateMediaTypeAndExtension(new MultipartFileSource(value), getAllowedMediaTypes());
     }
 }

@@ -17,11 +17,6 @@ public class FileSourceValidator extends AbstractFileValidator<FileSource> {
     }
 
     @Override
-    public boolean isValidMediaType(FileSource value) {
-        return helper.isValidMediaType(value, getAllowedMediaTypes());
-    }
-
-    @Override
     public boolean isFileEmpty(FileSource value) {
         return helper.isFileEmpty(value);
     }
@@ -37,7 +32,7 @@ public class FileSourceValidator extends AbstractFileValidator<FileSource> {
     }
 
     @Override
-    public boolean isValidExtension(FileSource value) {
-        return helper.isValidExtension(value, getAllowedMediaTypes());
+    public String validateMediaTypeAndExtension(FileSource value) {
+        return helper.validateMediaTypeAndExtension(value, getAllowedMediaTypes());
     }
 }

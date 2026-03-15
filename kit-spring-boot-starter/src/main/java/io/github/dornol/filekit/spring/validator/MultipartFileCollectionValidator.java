@@ -23,16 +23,6 @@ public class MultipartFileCollectionValidator extends AbstractMultipartFileValid
     }
 
     @Override
-    public boolean isValidMediaType(Collection<MultipartFile> value) {
-        for (MultipartFile file : value) {
-            if (!helper.isValidMediaType(new MultipartFileSource(file), getAllowedMediaTypes())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    @Override
     public boolean isFileEmpty(Collection<MultipartFile> value) {
         for (MultipartFile file : value) {
             if (helper.isFileEmpty(new MultipartFileSource(file))) {
@@ -63,12 +53,13 @@ public class MultipartFileCollectionValidator extends AbstractMultipartFileValid
     }
 
     @Override
-    public boolean isValidExtension(Collection<MultipartFile> value) {
+    public String validateMediaTypeAndExtension(Collection<MultipartFile> value) {
         for (MultipartFile file : value) {
-            if (!helper.isValidExtension(new MultipartFileSource(file), getAllowedMediaTypes())) {
-                return false;
+            String result = helper.validateMediaTypeAndExtension(new MultipartFileSource(file), getAllowedMediaTypes());
+            if (result != null) {
+                return result;
             }
         }
-        return true;
+        return null;
     }
 }

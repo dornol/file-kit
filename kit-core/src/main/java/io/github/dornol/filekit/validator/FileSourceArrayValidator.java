@@ -18,16 +18,6 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
     }
 
     @Override
-    public boolean isValidMediaType(FileSource[] value) {
-        for (FileSource file : value) {
-            if (!helper.isValidMediaType(file, getAllowedMediaTypes())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    @Override
     public boolean isFileEmpty(FileSource[] value) {
         for (FileSource file : value) {
             if (helper.isFileEmpty(file)) {
@@ -58,12 +48,13 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
     }
 
     @Override
-    public boolean isValidExtension(FileSource[] value) {
+    public String validateMediaTypeAndExtension(FileSource[] value) {
         for (FileSource file : value) {
-            if (!helper.isValidExtension(file, getAllowedMediaTypes())) {
-                return false;
+            String result = helper.validateMediaTypeAndExtension(file, getAllowedMediaTypes());
+            if (result != null) {
+                return result;
             }
         }
-        return true;
+        return null;
     }
 }
