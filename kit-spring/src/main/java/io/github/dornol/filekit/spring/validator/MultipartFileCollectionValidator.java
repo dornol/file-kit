@@ -1,0 +1,72 @@
+package io.github.dornol.filekit.spring.validator;
+
+import io.github.dornol.filekit.validator.FileSourceValidatorHelper;
+import io.github.dornol.filekit.validator.MessageConverter;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Collection;
+
+public class MultipartFileCollectionValidator extends AbstractSpringFileValidator<Collection<MultipartFile>> {
+
+    private final FileSourceValidatorHelper helper;
+
+    public MultipartFileCollectionValidator(FileSourceValidatorHelper helper, MessageConverter messageConverter) {
+        super(messageConverter);
+        this.helper = helper;
+    }
+
+    @Override
+    public boolean isValidationNotRequired(Collection<MultipartFile> value) {
+        return value.isEmpty();
+    }
+
+    @Override
+    public boolean isValidMediaType(Collection<MultipartFile> value) {
+        for (MultipartFile file : value) {
+            if (!helper.isValidMediaType(new MultipartFileSource(file), getAllowedMediaTypes())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean isFileEmpty(Collection<MultipartFile> value) {
+        for (MultipartFile file : value) {
+            if (helper.isFileEmpty(new MultipartFileSource(file))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isFileSizeExceeded(Collection<MultipartFile> value) {
+        for (MultipartFile file : value) {
+            if (helper.isFileSizeExceeded(new MultipartFileSource(file), getMaxSize())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isValidFilename(Collection<MultipartFile> value) {
+        for (MultipartFile file : value) {
+            if (!helper.isValidFilename(new MultipartFileSource(file))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean isValidExtension(Collection<MultipartFile> value) {
+        for (MultipartFile file : value) {
+            if (!helper.isValidExtension(new MultipartFileSource(file), getAllowedMediaTypes())) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
