@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.spring.download;
 
 import io.github.dornol.filekit.domain.FileMetadata;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -34,9 +35,9 @@ public final class FileResponseBuilder {
 
     private final String filename;
     private final FileFetchAction action;
-    private String contentType;
-    private Long contentLength;
-    private Duration cacheDuration;
+    private @Nullable String contentType;
+    private @Nullable Long contentLength;
+    private @Nullable Duration cacheDuration;
 
     private FileResponseBuilder(String filename, FileFetchAction action) {
         this.filename = filename;

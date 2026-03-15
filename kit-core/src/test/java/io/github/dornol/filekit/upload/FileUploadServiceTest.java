@@ -147,4 +147,29 @@ class FileUploadServiceTest {
         verify(metadataRepository, never()).save(any());
     }
 
+    @Test
+    void upload_withCallback_wrapsCheckedExceptionInFileStorageException() throws Exception {
+        byte[] content = "hello".getBytes();
+        FileFormat format = new FileFormat("text/plain", "txt", "text");
+        FileLocation location = new FileLocation("bucket", "key", StorageType.LOCAL);
+
+        when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+        when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+        when(checksumCalculator.checksum(content)).thenReturn("abc123");
+        when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
+        when(formatExtractor.extract(any())).thenReturn(format);
+        when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+        when(fileStorage.upload(any())).thenReturn(location);
+
+        UploadCallback callback = mock(UploadCallback.class);
+        doThrow(new Exception("checked error")).when(callback).onUploaded(any());
+
+        FileStorageException ex = assertThrows(FileStorageException.class,
+                () -> service.upload(fileSource, StorageType.LOCAL, "bucket", callback));
+
+        assertEquals(FileStorageException.CALLBACK_FAILED, ex.getMessageKey());
+        assertNotNull(ex.getCause());
+        verify(fileStorage).delete(any());
+    }
+
 }

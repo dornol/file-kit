@@ -13,8 +13,12 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import java.io.UncheckedIOException;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocalFileStorageTest {
@@ -91,6 +95,49 @@ class LocalFileStorageTest {
         assertTrue(location.objectKey().matches("\\d{4}/\\d{2}/\\d{2}/key2\\.jpg"));
         Path expected = tempDir.resolve("media").resolve(location.objectKey());
         assertTrue(Files.exists(expected));
+    }
+
+    @Test
+    void delete_removesFile() {
+        FileUploadCommand command = new FileUploadCommand(
+                "del-key", "f.txt", "data".getBytes(), "text/plain", "txt", "bucket");
+        storage.upload(command);
+
+        Path filePath = tempDir.resolve("bucket/del-key.txt");
+        assertTrue(Files.exists(filePath));
+
+        FileMetadata metadata = new FileMetadata("del-key", "f.txt", 4, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("bucket", "del-key.txt", StorageType.LOCAL));
+        storage.delete(metadata);
+
+        assertFalse(Files.exists(filePath));
+    }
+
+    @Test
+    void delete_nonExistentFile_doesNotThrow() {
+        FileMetadata metadata = new FileMetadata("no-key", "f.txt", 0, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("bucket", "no-key.txt", StorageType.LOCAL));
+        storage.delete(metadata); // should not throw
+    }
+
+    @Test
+    void load_nonExistentFile_throws() {
+        FileMetadata metadata = new FileMetadata("missing", "f.txt", 0, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("bucket", "missing.txt", StorageType.LOCAL));
+        assertThrows(UncheckedIOException.class, () -> storage.load(metadata));
+    }
+
+    @Test
+    void resolveUri_returnsFileUri() {
+        FileMetadata metadata = new FileMetadata("key1", "f.txt", 0, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("bucket", "key1.txt", StorageType.LOCAL));
+        String uri = storage.resolveUri(metadata);
+        assertTrue(uri.startsWith("file:"));
+        assertTrue(uri.contains("bucket/key1.txt"));
     }
 
     @Test

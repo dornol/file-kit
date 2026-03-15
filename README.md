@@ -244,6 +244,16 @@ public FileStorage disk2() {
 }
 ```
 
+### Transactional upload with callback
+
+Run business logic after upload — if it fails, the file is automatically deleted:
+
+```java
+uploadService.upload(file, StorageType.LOCAL, "uploads", metadata -> {
+    businessService.process(metadata);  // throws → file rolled back
+});
+```
+
 ### Upload / download flow
 
 **Upload:**
@@ -251,12 +261,32 @@ public FileStorage disk2() {
 2. If a file with the same checksum already exists, return the existing metadata (deduplication)
 3. Detect file format (MIME type, extension)
 4. Delegate to `FileStorage.upload()` for physical storage
-5. Save and return `FileMetadata`
+5. Run callback (if provided) — on failure, delete from storage and throw
+6. Save and return `FileMetadata`
 
 **Download:**
 1. Look up `FileMetadata` by file key
 2. Resolve the correct `FileStorage` from `metadata.location().storageType()`
 3. Load and return the file content
+
+### FileResponseBuilder
+
+Utility for building download/inline HTTP responses with proper Content-Disposition (RFC 5987, Korean filename support):
+
+```java
+// Download
+return FileResponseBuilder.download(metadata).body(resource);
+
+// Inline preview with cache
+return FileResponseBuilder.inline(metadata)
+        .cache(Duration.ofHours(1))
+        .body(resource);
+
+// Custom filename + content type
+return FileResponseBuilder.download("report.xlsx")
+        .contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        .body(resource);
+```
 
 ### Controller example
 
@@ -277,8 +307,7 @@ public class FileController {
     @GetMapping("/files/{fileKey}/download")
     public ResponseEntity<Resource> download(@PathVariable String fileKey) {
         DownloadResult result = downloadService.download(fileKey);
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(result.metadata().format().mimeType()))
+        return FileResponseBuilder.download(result.metadata())
                 .body(new InputStreamResource(result.content()));
     }
 }
@@ -306,7 +335,9 @@ The following beans are registered automatically when their dependencies are pre
 | Filename | Rejects null, blank, too-long (>200 chars), and path traversal patterns |
 | Extension | Verifies that file extension matches the detected content type |
 
-## Custom Validation Messages
+## Error Messages
+
+### Validation messages
 
 file-kit uses Jakarta Validation's standard message interpolation. Add a `ValidationMessages.properties` to your classpath:
 
@@ -317,6 +348,21 @@ file-kit.validation.file-too-large=File size exceeded
 file-kit.validation.invalid-filename=Invalid filename
 file-kit.validation.invalid-extension=Invalid file extension
 ```
+
+### Storage error messages
+
+Storage operations throw `FileStorageException` with a `messageKey` for i18n:
+
+```properties
+file-kit.storage.file-not-found=File not found
+file-kit.storage.storage-not-found=Unregistered storage type
+file-kit.storage.upload-failed=File upload failed
+file-kit.storage.download-failed=File download failed
+file-kit.storage.delete-failed=File deletion failed
+file-kit.storage.callback-failed=Post-upload processing failed, file has been deleted
+```
+
+Use `exception.getMessageKey()` to look up the localized message in your application.
 
 ## Media Type Detection
 
@@ -352,6 +398,23 @@ boolean validName = helper.isValidFilename(source);
 ```
 
 Or use `@ValidFile` with Jakarta Validation and `FileSourceValidator`.
+
+## Running the Example
+
+The `example` module is a full Spring Boot app with JPA (PostgreSQL), S3 (MinIO), and a web UI.
+
+```bash
+# Start PostgreSQL + MinIO
+cd example
+docker compose up -d
+
+# Run the app
+./gradlew :example:bootRun
+```
+
+Open `http://localhost:8880` — upload files to LOCAL or S3, view the file list, and download.
+
+MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 
 ## Requirements
 

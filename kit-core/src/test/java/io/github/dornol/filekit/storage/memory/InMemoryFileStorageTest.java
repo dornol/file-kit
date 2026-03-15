@@ -95,6 +95,26 @@ class InMemoryFileStorageTest {
     }
 
     @Test
+    void delete_removesFile() {
+        storage.upload(new FileUploadCommand("k1", "a.txt", "a".getBytes(), "text/plain", "txt", "b"));
+        assertEquals(1, storage.size());
+
+        FileMetadata metadata = new FileMetadata("k1", "a.txt", 1, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("b", "k1.txt", StorageType.MEM));
+        storage.delete(metadata);
+        assertEquals(0, storage.size());
+    }
+
+    @Test
+    void delete_nonExistentFile_doesNotThrow() {
+        FileMetadata metadata = new FileMetadata("no", "x.txt", 0, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("b", "no.txt", StorageType.MEM));
+        storage.delete(metadata); // should be silent
+    }
+
+    @Test
     void resolveUri_returnsMemoryScheme() {
         FileMetadata metadata = new FileMetadata("key1", "f.txt", 5, "chk",
                 new FileFormat("text/plain", "txt", "text"),

@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
+import io.github.dornol.filekit.spi.ChecksumCalculator;
+import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileCollectionValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileValidator;
@@ -32,6 +34,28 @@ class FileKitAutoConfigurationTest {
             assertThat(context).hasSingleBean(MultipartFileArrayValidator.class);
             assertThat(context).hasSingleBean(MultipartFileCollectionValidator.class);
         });
+    }
+
+    // ── ChecksumCalculator auto-registration ───────────────────────
+
+    @Test
+    void registersDefaultChecksumCalculator() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ChecksumCalculator.class);
+            assertThat(context.getBean(ChecksumCalculator.class))
+                    .isInstanceOf(Sha256ChecksumCalculator.class);
+        });
+    }
+
+    @Test
+    void userDefinedChecksumCalculator_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomChecksumConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ChecksumCalculator.class);
+                    assertThat(context.getBean(ChecksumCalculator.class))
+                            .isSameAs(context.getBean("customChecksum"));
+                });
     }
 
     // ── Tika detection (Tika is on test classpath) ──────────────────
@@ -118,6 +142,14 @@ class FileKitAutoConfigurationTest {
         @Bean
         MultipartFileValidator customValidator(FileValidationHelper helper) {
             return new MultipartFileValidator(helper);
+        }
+    }
+
+    @Configuration
+    static class CustomChecksumConfig {
+        @Bean
+        ChecksumCalculator customChecksum() {
+            return bytes -> "custom";
         }
     }
 
