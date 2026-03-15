@@ -16,29 +16,56 @@ import org.jspecify.annotations.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 /**
  * Orchestrates the file upload flow: checksum deduplication, format detection,
  * storage delegation, and metadata persistence.
+ *
+ * <p><strong>Thread safety / TOCTOU note:</strong> The checksum-based deduplication
+ * ({@code findByChecksum → save}) is not atomic. Under concurrent uploads of the
+ * same file, both threads may pass the dedup check and store the file twice.
+ * If strict uniqueness is required, enforce a unique constraint on the checksum
+ * column in your {@link FileMetadataRepository} implementation.</p>
  *
  * @see FileStorage
  * @see FileMetadataRepository
  */
 public class FileUploadService {
 
+    private static final Logger log = Logger.getLogger(FileUploadService.class.getName());
+
     private final ChecksumCalculator checksumCalculator;
     private final FileMetadataRepository metadataRepository;
     private final FileFormatExtractor formatExtractor;
     private final FileStorageResolver storageResolver;
+    private final long maxUploadSize;
 
+    /**
+     * Creates an upload service with no file size limit.
+     */
     public FileUploadService(ChecksumCalculator checksumCalculator,
                              FileMetadataRepository metadataRepository,
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver) {
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, 0);
+    }
+
+    /**
+     * Creates an upload service with a maximum upload size.
+     *
+     * @param maxUploadSize maximum file size in bytes (0 = unlimited)
+     */
+    public FileUploadService(ChecksumCalculator checksumCalculator,
+                             FileMetadataRepository metadataRepository,
+                             FileFormatExtractor formatExtractor,
+                             FileStorageResolver storageResolver,
+                             long maxUploadSize) {
         this.checksumCalculator = checksumCalculator;
         this.metadataRepository = metadataRepository;
         this.formatExtractor = formatExtractor;
         this.storageResolver = storageResolver;
+        this.maxUploadSize = maxUploadSize;
     }
 
     /**
@@ -67,11 +94,17 @@ public class FileUploadService {
 
     private FileMetadata doUpload(FileSource fileSource, Enum<?> storageType, String bucket,
                                   @Nullable UploadCallback callback) throws IOException {
+        if (maxUploadSize > 0 && fileSource.getSize() > maxUploadSize) {
+            throw new FileStorageException(FileStorageException.FILE_TOO_LARGE,
+                    "File size " + fileSource.getSize() + " exceeds maximum allowed size " + maxUploadSize);
+        }
+
         byte[] bytes = fileSource.getInputStream().readAllBytes();
 
         String checksum = checksumCalculator.checksum(bytes);
         FileMetadata existing = metadataRepository.findByChecksum(checksum);
         if (existing != null) {
+            log.info("Duplicate file detected (checksum=" + checksum + "), returning existing metadata: " + existing.key());
             return existing;
         }
 
@@ -109,7 +142,10 @@ public class FileUploadService {
             }
         }
 
-        return metadataRepository.save(metadata);
+        FileMetadata saved = metadataRepository.save(metadata);
+        log.info("File uploaded: key=" + saved.key() + ", size=" + saved.size()
+                + ", bucket=" + bucket + ", storageType=" + storageType);
+        return saved;
     }
 
 }

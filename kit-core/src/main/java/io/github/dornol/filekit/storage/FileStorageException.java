@@ -48,4 +48,7 @@ public class FileStorageException extends RuntimeException {
     /** Business callback failed after upload; file has been rolled back. */
     public static final String CALLBACK_FAILED = "file-kit.storage.callback-failed";
 
+    /** File exceeds the configured maximum upload size. */
+    public static final String FILE_TOO_LARGE = "file-kit.storage.file-too-large";
+
 }

@@ -44,7 +44,7 @@ class FileDownloadServiceTest {
     @Test
     void download_returnsResultWithStream() {
         InputStream content = new ByteArrayInputStream("hello".getBytes());
-        when(metadataRepository.findByKey("file-key")).thenReturn(metadata);
+        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
         when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
         when(fileStorage.load(metadata)).thenReturn(content);
 
@@ -57,14 +57,15 @@ class FileDownloadServiceTest {
 
     @Test
     void download_throwsWhenFileNotFound() {
-        when(metadataRepository.findByKey("missing")).thenReturn(null);
+        when(metadataRepository.getByKey("missing")).thenThrow(
+                new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found: missing"));
 
         assertThrows(FileStorageException.class, () -> service.download("missing"));
     }
 
     @Test
     void resolveUri_returnsUri() {
-        when(metadataRepository.findByKey("file-key")).thenReturn(metadata);
+        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
         when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
         when(fileStorage.resolveUri(metadata)).thenReturn("https://example.com/file");
 
@@ -74,7 +75,8 @@ class FileDownloadServiceTest {
 
     @Test
     void resolveUri_throwsWhenFileNotFound() {
-        when(metadataRepository.findByKey("missing")).thenReturn(null);
+        when(metadataRepository.getByKey("missing")).thenThrow(
+                new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found: missing"));
 
         assertThrows(FileStorageException.class, () -> service.resolveUri("missing"));
     }

@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -182,55 +184,99 @@ class FileValidationHelperTest {
         }
     }
 
-    // ── isValidExtension ────────────────────────────────────────────
+    // ── Batch validation methods ────────────────────────────────────
 
     @Nested
-    class IsValidExtension {
+    class BatchValidation {
 
         private final Set<SafeMediaType> allowed = Set.of(TestMediaType.JPEG, TestMediaType.PNG);
 
         @Test
-        void returnsTrueForMatchingExtension() {
-            TestFileSource file = new TestFileSource("photo.jpg", new byte[1]);
-            assertTrue(helper.isValidExtension(file, allowed));
+        void isAnyFileEmpty_returnsTrueWhenOneEmpty() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("a.jpg", new byte[1]),
+                    new TestFileSource("b.jpg", new byte[0])
+            );
+            assertTrue(helper.isAnyFileEmpty(files));
         }
 
         @Test
-        void returnsTrueForAlternateExtension() {
-            TestFileSource file = new TestFileSource("photo.jpeg", new byte[1]);
-            assertTrue(helper.isValidExtension(file, allowed));
+        void isAnyFileEmpty_returnsFalseWhenNoneEmpty() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("a.jpg", new byte[1]),
+                    new TestFileSource("b.jpg", new byte[2])
+            );
+            assertFalse(helper.isAnyFileEmpty(files));
         }
 
         @Test
-        void returnsFalseForMismatchedExtension() {
-            // File detected as image/jpeg but extension is .png
-            TestFileSource file = new TestFileSource("photo.jpg", new byte[1]);
-            Set<SafeMediaType> pngOnly = Set.of(TestMediaType.PNG);
-            assertFalse(helper.isValidExtension(file, pngOnly));
+        void isAnyFileEmpty_returnsFalseForEmptyList() {
+            assertFalse(helper.isAnyFileEmpty(List.of()));
         }
 
         @Test
-        void returnsFalseForNoExtension() {
-            TestFileSource file = new TestFileSource("photo", new byte[1]);
-            assertFalse(helper.isValidExtension(file, allowed));
+        void isAnyFileSizeExceeded_returnsTrueWhenOneExceeds() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("a.jpg", new byte[10]),
+                    new TestFileSource("b.jpg", new byte[200])
+            );
+            assertTrue(helper.isAnyFileSizeExceeded(files, 100));
         }
 
         @Test
-        void returnsFalseForNullFilename() {
-            TestFileSource file = new TestFileSource(null, new byte[1]);
-            assertFalse(helper.isValidExtension(file, allowed));
+        void isAnyFileSizeExceeded_returnsFalseWhenNoneExceed() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("a.jpg", new byte[50]),
+                    new TestFileSource("b.jpg", new byte[50])
+            );
+            assertFalse(helper.isAnyFileSizeExceeded(files, 100));
         }
 
         @Test
-        void returnsFalseForDotAtEnd() {
-            TestFileSource file = new TestFileSource("photo.", new byte[1]);
-            assertFalse(helper.isValidExtension(file, allowed));
+        void isAllValidFilenames_returnsTrueWhenAllValid() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("photo.jpg", new byte[1]),
+                    new TestFileSource("image.png", new byte[1])
+            );
+            assertTrue(helper.isAllValidFilenames(files));
         }
 
         @Test
-        void caseInsensitiveExtension() {
-            TestFileSource file = new TestFileSource("photo.JPG", new byte[1]);
-            assertTrue(helper.isValidExtension(file, allowed));
+        void isAllValidFilenames_returnsFalseWhenOneInvalid() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("photo.jpg", new byte[1]),
+                    new TestFileSource("../evil.jpg", new byte[1])
+            );
+            assertFalse(helper.isAllValidFilenames(files));
+        }
+
+        @Test
+        void isAllValidFilenames_returnsTrueForEmptyList() {
+            assertTrue(helper.isAllValidFilenames(List.of()));
+        }
+
+        @Test
+        void validateAllMediaTypeAndExtension_returnsNullWhenAllValid() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("a.jpg", new byte[1]),
+                    new TestFileSource("b.png", new byte[1])
+            );
+            assertNull(helper.validateAllMediaTypeAndExtension(files, allowed));
+        }
+
+        @Test
+        void validateAllMediaTypeAndExtension_returnsErrorForFirstInvalid() {
+            List<TestFileSource> files = List.of(
+                    new TestFileSource("a.jpg", new byte[1]),
+                    new TestFileSource("b.pdf", new byte[1])
+            );
+            assertEquals("file-kit.validation.unsupported-media-type",
+                    helper.validateAllMediaTypeAndExtension(files, allowed));
+        }
+
+        @Test
+        void validateAllMediaTypeAndExtension_returnsNullForEmptyList() {
+            assertNull(helper.validateAllMediaTypeAndExtension(List.of(), allowed));
         }
     }
 

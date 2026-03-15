@@ -41,10 +41,14 @@ class FileUploadServiceTest {
 
     FileUploadService service;
 
+    FileUploadService serviceLimited;
+
     @BeforeEach
     void setUp() {
         service = new FileUploadService(checksumCalculator, metadataRepository,
                 formatExtractor, storageResolver);
+        serviceLimited = new FileUploadService(checksumCalculator, metadataRepository,
+                formatExtractor, storageResolver, 10);
     }
 
     @Test
@@ -170,6 +174,56 @@ class FileUploadServiceTest {
         assertEquals(FileStorageException.CALLBACK_FAILED, ex.getMessageKey());
         assertNotNull(ex.getCause());
         verify(fileStorage).delete(any());
+    }
+
+    @Test
+    void upload_fileTooLarge_throws() {
+        when(fileSource.getSize()).thenReturn(100L);
+
+        FileStorageException ex = assertThrows(FileStorageException.class,
+                () -> serviceLimited.upload(fileSource, StorageType.LOCAL, "my-bucket"));
+
+        assertEquals(FileStorageException.FILE_TOO_LARGE, ex.getMessageKey());
+    }
+
+    @Test
+    void upload_fileWithinLimit_succeeds() throws IOException {
+        byte[] content = "hello".getBytes();
+        FileFormat format = new FileFormat("text/plain", "txt", "text");
+        FileLocation location = new FileLocation("bucket", "key", StorageType.LOCAL);
+
+        when(fileSource.getSize()).thenReturn(5L);
+        when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+        when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+        when(checksumCalculator.checksum(content)).thenReturn("abc123");
+        when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
+        when(formatExtractor.extract(any())).thenReturn(format);
+        when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+        when(fileStorage.upload(any())).thenReturn(location);
+        when(metadataRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FileMetadata result = serviceLimited.upload(fileSource, StorageType.LOCAL, "bucket");
+        assertNotNull(result);
+    }
+
+    @Test
+    void upload_unlimitedSize_allowsLargeFiles() throws IOException {
+        byte[] content = "hello".getBytes();
+        FileFormat format = new FileFormat("text/plain", "txt", "text");
+        FileLocation location = new FileLocation("bucket", "key", StorageType.LOCAL);
+
+        when(fileSource.getSize()).thenReturn(Long.MAX_VALUE);
+        when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+        when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+        when(checksumCalculator.checksum(content)).thenReturn("abc123");
+        when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
+        when(formatExtractor.extract(any())).thenReturn(format);
+        when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+        when(fileStorage.upload(any())).thenReturn(location);
+        when(metadataRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FileMetadata result = service.upload(fileSource, StorageType.LOCAL, "bucket");
+        assertNotNull(result);
     }
 
 }

@@ -3,6 +3,8 @@ package io.github.dornol.filekit.validator;
 import io.github.dornol.filekit.domain.FileSource;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
+
 /**
  * Validates an array of {@link FileSource} against the {@link ValidFile} constraint.
  * Validation fails if any element in the array fails.
@@ -22,42 +24,21 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
 
     @Override
     public boolean isFileEmpty(FileSource[] value) {
-        for (FileSource file : value) {
-            if (helper.isFileEmpty(file)) {
-                return true;
-            }
-        }
-        return false;
+        return helper.isAnyFileEmpty(Arrays.asList(value));
     }
 
     @Override
     public boolean isFileSizeExceeded(FileSource[] value) {
-        for (FileSource file : value) {
-            if (helper.isFileSizeExceeded(file, getMaxSize())) {
-                return true;
-            }
-        }
-        return false;
+        return helper.isAnyFileSizeExceeded(Arrays.asList(value), getMaxSize());
     }
 
     @Override
     public boolean isValidFilename(FileSource[] value) {
-        for (FileSource file : value) {
-            if (!helper.isValidFilename(file)) {
-                return false;
-            }
-        }
-        return true;
+        return helper.isAllValidFilenames(Arrays.asList(value));
     }
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(FileSource[] value) {
-        for (FileSource file : value) {
-            String result = helper.validateMediaTypeAndExtension(file, getAllowedMediaTypes());
-            if (result != null) {
-                return result;
-            }
-        }
-        return null;
+        return helper.validateAllMediaTypeAndExtension(Arrays.asList(value), getAllowedMediaTypes());
     }
 }

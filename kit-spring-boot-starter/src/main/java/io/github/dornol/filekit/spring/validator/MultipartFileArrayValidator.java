@@ -1,8 +1,12 @@
 package io.github.dornol.filekit.spring.validator;
 
+import io.github.dornol.filekit.domain.FileSource;
 import io.github.dornol.filekit.validator.FileValidationHelper;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Validates a {@code MultipartFile[]} against the {@link ValidMultipartFile} constraint.
@@ -23,42 +27,25 @@ public class MultipartFileArrayValidator extends AbstractMultipartFileValidator<
 
     @Override
     public boolean isFileEmpty(MultipartFile[] value) {
-        for (MultipartFile file : value) {
-            if (helper.isFileEmpty(new MultipartFileSource(file))) {
-                return true;
-            }
-        }
-        return false;
+        return helper.isAnyFileEmpty(toSources(value));
     }
 
     @Override
     public boolean isFileSizeExceeded(MultipartFile[] value) {
-        for (MultipartFile file : value) {
-            if (helper.isFileSizeExceeded(new MultipartFileSource(file), getMaxSize())) {
-                return true;
-            }
-        }
-        return false;
+        return helper.isAnyFileSizeExceeded(toSources(value), getMaxSize());
     }
 
     @Override
     public boolean isValidFilename(MultipartFile[] value) {
-        for (MultipartFile file : value) {
-            if (!helper.isValidFilename(new MultipartFileSource(file))) {
-                return false;
-            }
-        }
-        return true;
+        return helper.isAllValidFilenames(toSources(value));
     }
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(MultipartFile[] value) {
-        for (MultipartFile file : value) {
-            String result = helper.validateMediaTypeAndExtension(new MultipartFileSource(file), getAllowedMediaTypes());
-            if (result != null) {
-                return result;
-            }
-        }
-        return null;
+        return helper.validateAllMediaTypeAndExtension(toSources(value), getAllowedMediaTypes());
+    }
+
+    private static List<FileSource> toSources(MultipartFile[] files) {
+        return Arrays.stream(files).map(MultipartFileSource::new).map(FileSource.class::cast).toList();
     }
 }

@@ -40,7 +40,7 @@ public final class FileResponseBuilder {
     private @Nullable Duration cacheDuration;
 
     private FileResponseBuilder(String filename, FileFetchAction action) {
-        this.filename = filename;
+        this.filename = filename.replaceAll("[\\p{Cntrl}]", "");
         this.action = action;
     }
 
@@ -125,7 +125,8 @@ public final class FileResponseBuilder {
      */
     public ResponseEntity.BodyBuilder toResponseBuilder() {
         ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition());
+                .header(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition())
+                .header("X-Content-Type-Options", "nosniff");
 
         if (contentType != null) {
             builder.header(HttpHeaders.CONTENT_TYPE, contentType);
@@ -151,15 +152,10 @@ public final class FileResponseBuilder {
     }
 
     private String buildContentDisposition() {
+        // ASCII-only fallback: replace non-printable/non-ASCII chars with underscore
         String fallback = filename.replaceAll("[^\\x20-\\x7E]", "_");
-
-        String encoded;
-        try {
-            encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8)
-                    .replace("+", "%20");
-        } catch (Exception e) {
-            encoded = fallback;
-        }
+        String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                .replace("+", "%20");
 
         return String.format(Locale.ROOT,
                 "%s; filename=\"%s\"; filename*=UTF-8''%s",

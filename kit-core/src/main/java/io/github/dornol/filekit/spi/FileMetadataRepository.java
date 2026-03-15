@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.spi;
 
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.storage.FileStorageException;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -36,5 +37,21 @@ public interface FileMetadataRepository {
      * @return the saved metadata
      */
     FileMetadata save(FileMetadata metadata);
+
+    /**
+     * Finds metadata by key, throwing {@link FileStorageException} if not found.
+     *
+     * @param key unique file key
+     * @return matching metadata (never null)
+     * @throws FileStorageException if no metadata exists for the given key
+     */
+    default FileMetadata getByKey(String key) {
+        FileMetadata metadata = findByKey(key);
+        if (metadata == null) {
+            throw new FileStorageException(FileStorageException.FILE_NOT_FOUND,
+                    "File not found: " + key);
+        }
+        return metadata;
+    }
 
 }

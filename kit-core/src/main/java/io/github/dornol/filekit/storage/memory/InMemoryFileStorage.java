@@ -14,8 +14,11 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * In-memory {@link FileStorage} implementation for testing and prototyping.
  *
- * <p>Stores file content in a {@link ConcurrentHashMap}. All data is lost
- * when the JVM shuts down.</p>
+ * <p><strong>Warning:</strong> This implementation is NOT suitable for production use.
+ * All data is lost when the JVM shuts down, and there is no size limit on stored files,
+ * which can lead to {@link OutOfMemoryError} under heavy load.</p>
+ *
+ * <p>Stores file content in a {@link ConcurrentHashMap}.</p>
  *
  * <pre>{@code
  * // In tests
@@ -44,24 +47,23 @@ public class InMemoryFileStorage implements FileStorage {
 
     @Override
     public FileLocation upload(FileUploadCommand command) {
-        String objectKey = command.bucket() + "/" + command.key() + "." + command.extension();
-        store.put(objectKey, command.content().clone());
-        return new FileLocation(command.bucket(), command.key() + "." + command.extension(), storageType);
+        String objectKey = command.key() + "." + command.extension();
+        store.put(buildStoreKey(command.bucket(), objectKey), command.content().clone());
+        return new FileLocation(command.bucket(), objectKey, storageType);
     }
 
     @Override
     public void delete(FileMetadata metadata) {
-        String objectKey = metadata.location().bucket() + "/" + metadata.location().objectKey();
-        store.remove(objectKey);
+        store.remove(buildStoreKey(metadata));
     }
 
     @Override
     public InputStream load(FileMetadata metadata) {
-        String objectKey = metadata.location().bucket() + "/" + metadata.location().objectKey();
-        byte[] data = store.get(objectKey);
+        String storeKey = buildStoreKey(metadata);
+        byte[] data = store.get(storeKey);
         if (data == null) {
             throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
-                    "File not found in memory store: " + objectKey);
+                    "File not found in memory store: " + storeKey);
         }
         return new ByteArrayInputStream(data);
     }
@@ -83,6 +85,14 @@ public class InMemoryFileStorage implements FileStorage {
      */
     public void clear() {
         store.clear();
+    }
+
+    private static String buildStoreKey(FileMetadata metadata) {
+        return buildStoreKey(metadata.location().bucket(), metadata.location().objectKey());
+    }
+
+    private static String buildStoreKey(String bucket, String objectKey) {
+        return bucket + "/" + objectKey;
     }
 
 }

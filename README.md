@@ -102,6 +102,7 @@ public class MyFileMetadataRepository implements FileMetadataRepository {
     public FileMetadata findByChecksum(String checksum) { /* query DB */ }
     public FileMetadata findByKey(String key) { /* query DB */ }
     public FileMetadata save(FileMetadata metadata) { /* insert DB */ }
+    // getByKey(key) is provided as a default method — throws FileStorageException if not found
 }
 ```
 
@@ -175,6 +176,14 @@ public class S3FileStorage implements FileStorage {
                         .build(),
                 RequestBody.fromBytes(command.content()));
         return new FileLocation(command.bucket(), objectKey, StorageType.S3);
+    }
+
+    @Override
+    public void delete(FileMetadata metadata) {
+        s3.deleteObject(DeleteObjectRequest.builder()
+                .bucket(metadata.location().bucket())
+                .key(metadata.location().objectKey())
+                .build());
     }
 
     @Override
@@ -360,6 +369,7 @@ file-kit.storage.upload-failed=File upload failed
 file-kit.storage.download-failed=File download failed
 file-kit.storage.delete-failed=File deletion failed
 file-kit.storage.callback-failed=Post-upload processing failed, file has been deleted
+file-kit.storage.file-too-large=File size exceeds the maximum allowed
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.
@@ -415,6 +425,42 @@ docker compose up -d
 Open `http://localhost:8880` — upload files to LOCAL or S3, view the file list, and download.
 
 MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
+
+## Security Considerations
+
+### Bucket name restrictions
+
+Bucket names are validated to contain only alphanumeric characters, dots, hyphens, and underscores (`[a-zA-Z0-9._-]+`). Path traversal patterns like `../../etc` are rejected.
+
+### File size limits
+
+Configure a maximum upload size to prevent memory exhaustion:
+
+```yaml
+# application.yml
+file-kit:
+  max-upload-size: 52428800  # 50 MB, 0 = unlimited (default)
+```
+
+Or when using `kit-core` directly:
+
+```java
+new FileUploadService(checksumCalculator, metadataRepository,
+        formatExtractor, storageResolver, 50 * 1024 * 1024);
+```
+
+### Checksum deduplication and concurrency (TOCTOU)
+
+The checksum-based deduplication (`findByChecksum` → `save`) is not atomic. Under concurrent uploads of the same file, duplicate entries may be stored. If strict uniqueness is required, enforce a unique constraint on the checksum column in your `FileMetadataRepository` implementation.
+
+### Download authorization
+
+file-kit does **not** handle download authorization. Access control (e.g., verifying that the requesting user owns the file) is the application's responsibility. Wrap `FileDownloadService` or `SpringDownloadService` calls with your own authorization logic.
+
+### Thread safety
+
+- `FileUploadService`, `FileDownloadService`, and `LocalFileStorage` are thread-safe and can be used as singletons.
+- `InMemoryFileStorage` is thread-safe (backed by `ConcurrentHashMap`) but is **not recommended for production** — it has no size limits and all data is lost on restart.
 
 ## Requirements
 

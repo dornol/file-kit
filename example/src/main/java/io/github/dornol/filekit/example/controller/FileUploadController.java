@@ -23,6 +23,8 @@ import java.util.Map;
 @Validated
 public class FileUploadController {
 
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+
     private final FileUploadService fileUploadService;
 
     public FileUploadController(FileUploadService fileUploadService) {
@@ -32,7 +34,7 @@ public class FileUploadController {
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> upload(
             @RequestParam("file")
-            @ValidMultipartFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
+            @ValidMultipartFile(value = AllowedMediaType.class, maxSize = MAX_FILE_SIZE)
             MultipartFile file,
             @RequestParam(value = "storageType", defaultValue = "LOCAL") StorageType storageType
     ) throws IOException {
@@ -53,7 +55,7 @@ public class FileUploadController {
     @PostMapping("/upload-multiple")
     public ResponseEntity<Map<String, Object>> uploadMultiple(
             @RequestParam("files")
-            @ValidMultipartFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
+            @ValidMultipartFile(value = AllowedMediaType.class, maxSize = MAX_FILE_SIZE)
             MultipartFile[] files,
             @RequestParam(value = "storageType", defaultValue = "LOCAL") StorageType storageType
     ) throws IOException {

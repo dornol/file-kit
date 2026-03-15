@@ -2,6 +2,7 @@ package io.github.dornol.filekit.example.infra;
 
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
+import io.github.dornol.filekit.storage.FileStorageException;
 import org.apache.tika.Tika;
 import org.apache.tika.mime.MimeType;
 import org.apache.tika.mime.MimeTypeException;
@@ -24,7 +25,8 @@ public class TikaFileFormatExtractor implements FileFormatExtractor {
             String extension = resolveExtension(mimeType);
             return new FileFormat(mimeType, extension, primaryType);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
+                    "Failed to detect file format", e);
         }
     }
 

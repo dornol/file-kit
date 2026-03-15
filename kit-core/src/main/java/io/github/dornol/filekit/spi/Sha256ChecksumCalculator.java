@@ -16,7 +16,7 @@ public class Sha256ChecksumCalculator implements ChecksumCalculator {
             byte[] hash = digest.digest(bytes);
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
         }
     }
 

@@ -2,7 +2,6 @@ package io.github.dornol.filekit.spring.download;
 
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
-import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.spring.storage.SpringFileStorage;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
@@ -28,7 +27,7 @@ public class SpringDownloadService {
     }
 
     public Resource loadResource(String fileKey) {
-        FileMetadata metadata = findMetadataOrThrow(fileKey);
+        FileMetadata metadata = metadataRepository.getByKey(fileKey);
         FileStorage storage = storageResolver.resolve(metadata.location().storageType());
 
         if (storage instanceof SpringFileStorage springStorage) {
@@ -36,15 +35,6 @@ public class SpringDownloadService {
         }
 
         return new InputStreamResource(storage.load(metadata));
-    }
-
-    private FileMetadata findMetadataOrThrow(String fileKey) {
-        FileMetadata metadata = metadataRepository.findByKey(fileKey);
-        if (metadata == null) {
-            throw new FileStorageException(FileStorageException.FILE_NOT_FOUND,
-                    "File not found: " + fileKey);
-        }
-        return metadata;
     }
 
 }

@@ -88,6 +88,26 @@ class FileResponseBuilderTest {
     }
 
     @Test
+    void download_setsNosniffHeader() {
+        ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                .body("data");
+
+        assertThat(response.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
+    }
+
+    @Test
+    void download_crlfInFilename_stripped() {
+        ResponseEntity<String> response = FileResponseBuilder.download("malicious\r\nX-Injected: true")
+                .contentType("text/plain")
+                .body("data");
+
+        String cd = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+        assertThat(cd).doesNotContain("\r");
+        assertThat(cd).doesNotContain("\n");
+        assertThat(cd).contains("malicious");
+    }
+
+    @Test
     void toResponseBuilder_returnsBodyBuilder() {
         ResponseEntity.BodyBuilder builder = FileResponseBuilder.download("file.txt")
                 .contentType("text/plain")

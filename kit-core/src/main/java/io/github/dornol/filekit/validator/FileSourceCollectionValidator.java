@@ -24,42 +24,21 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
 
     @Override
     public boolean isFileEmpty(Collection<FileSource> value) {
-        for (FileSource file : value) {
-            if (helper.isFileEmpty(file)) {
-                return true;
-            }
-        }
-        return false;
+        return helper.isAnyFileEmpty(value);
     }
 
     @Override
     public boolean isFileSizeExceeded(Collection<FileSource> value) {
-        for (FileSource file : value) {
-            if (helper.isFileSizeExceeded(file, getMaxSize())) {
-                return true;
-            }
-        }
-        return false;
+        return helper.isAnyFileSizeExceeded(value, getMaxSize());
     }
 
     @Override
     public boolean isValidFilename(Collection<FileSource> value) {
-        for (FileSource file : value) {
-            if (!helper.isValidFilename(file)) {
-                return false;
-            }
-        }
-        return true;
+        return helper.isAllValidFilenames(value);
     }
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(Collection<FileSource> value) {
-        for (FileSource file : value) {
-            String result = helper.validateMediaTypeAndExtension(file, getAllowedMediaTypes());
-            if (result != null) {
-                return result;
-            }
-        }
-        return null;
+        return helper.validateAllMediaTypeAndExtension(value, getAllowedMediaTypes());
     }
 }

@@ -47,7 +47,7 @@ class SpringDownloadServiceTest {
         Resource expected = mock(Resource.class);
         SpringFileStorage springStorage = mock(SpringFileStorage.class);
 
-        when(metadataRepository.findByKey("file-key")).thenReturn(metadata);
+        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
         when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(springStorage);
         when(springStorage.loadResource(metadata)).thenReturn(expected);
 
@@ -61,7 +61,7 @@ class SpringDownloadServiceTest {
         InputStream content = new ByteArrayInputStream("hello".getBytes());
         FileStorage plainStorage = mock(FileStorage.class);
 
-        when(metadataRepository.findByKey("file-key")).thenReturn(metadata);
+        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
         when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(plainStorage);
         when(plainStorage.load(metadata)).thenReturn(content);
 
@@ -72,7 +72,8 @@ class SpringDownloadServiceTest {
 
     @Test
     void loadResource_throwsWhenFileNotFound() {
-        when(metadataRepository.findByKey("missing")).thenReturn(null);
+        when(metadataRepository.getByKey("missing")).thenThrow(
+                new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found: missing"));
 
         assertThatThrownBy(() -> service.loadResource("missing"))
                 .isInstanceOf(FileStorageException.class);

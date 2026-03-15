@@ -18,6 +18,7 @@ import io.github.dornol.filekit.validator.FileValidationHelper;
 import io.github.dornol.filekit.validator.MediaTypeDetector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -50,10 +51,10 @@ public class FileKitAutoConfiguration {
     public MediaTypeDetector mediaTypeDetector() {
         try {
             Class.forName("org.apache.tika.Tika");
-            log.info("file-kit: Registering TikaMediaTypeDetector (Apache Tika detected on classpath)");
+            log.info("Registering TikaMediaTypeDetector (Apache Tika detected on classpath)");
             return new TikaMediaTypeDetector();
         } catch (ClassNotFoundException e) {
-            log.warn("file-kit: Registering DefaultMediaTypeDetector (Java URLConnection-based). "
+            log.warn("Registering DefaultMediaTypeDetector (Java URLConnection-based). "
                     + "For better accuracy, add Apache Tika to your classpath.");
             return new DefaultMediaTypeDetector();
         }
@@ -62,35 +63,32 @@ public class FileKitAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public FileValidationHelper fileValidationHelper(MediaTypeDetector detector) {
-        log.info("file-kit: Registering FileValidationHelper with {}", detector.getClass().getSimpleName());
+        log.debug("Registering FileValidationHelper with {}", detector.getClass().getSimpleName());
         return new FileValidationHelper(detector);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public MultipartFileValidator multipartFileValidator(FileValidationHelper helper) {
-        log.debug("file-kit: Registering MultipartFileValidator");
         return new MultipartFileValidator(helper);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public MultipartFileArrayValidator multipartFileArrayValidator(FileValidationHelper helper) {
-        log.debug("file-kit: Registering MultipartFileArrayValidator");
         return new MultipartFileArrayValidator(helper);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public MultipartFileCollectionValidator multipartFileCollectionValidator(FileValidationHelper helper) {
-        log.debug("file-kit: Registering MultipartFileCollectionValidator");
         return new MultipartFileCollectionValidator(helper);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public ChecksumCalculator checksumCalculator() {
-        log.info("file-kit: Registering Sha256ChecksumCalculator");
+        log.debug("Registering default Sha256ChecksumCalculator");
         return new Sha256ChecksumCalculator();
     }
 
@@ -98,7 +96,7 @@ public class FileKitAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnBean(FileStorage.class)
     public FileStorageResolver fileStorageResolver(List<FileStorage> storages) {
-        log.info("file-kit: Registering FileStorageResolver with {} storage(s)", storages.size());
+        log.info("Registering FileStorageResolver with {} storage(s)", storages.size());
         return new FileStorageResolver(storages);
     }
 
@@ -108,10 +106,11 @@ public class FileKitAutoConfiguration {
     public FileUploadService fileUploadService(ChecksumCalculator checksumCalculator,
                                                FileMetadataRepository metadataRepository,
                                                FileFormatExtractor formatExtractor,
-                                               FileStorageResolver storageResolver) {
-        log.info("file-kit: Registering FileUploadService");
+                                               FileStorageResolver storageResolver,
+                                               @Value("${file-kit.max-upload-size:0}") long maxUploadSize) {
+        log.info("Registering FileUploadService (maxUploadSize={})", maxUploadSize == 0 ? "unlimited" : maxUploadSize);
         return new FileUploadService(checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver);
+                storageResolver, maxUploadSize);
     }
 
     @Bean
@@ -119,7 +118,7 @@ public class FileKitAutoConfiguration {
     @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
     public FileDownloadService fileDownloadService(FileMetadataRepository metadataRepository,
                                                    FileStorageResolver storageResolver) {
-        log.info("file-kit: Registering FileDownloadService");
+        log.info("Registering FileDownloadService");
         return new FileDownloadService(metadataRepository, storageResolver);
     }
 
@@ -128,7 +127,7 @@ public class FileKitAutoConfiguration {
     @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
     public SpringDownloadService springDownloadService(FileMetadataRepository metadataRepository,
                                                        FileStorageResolver storageResolver) {
-        log.info("file-kit: Registering SpringDownloadService");
+        log.info("Registering SpringDownloadService");
         return new SpringDownloadService(metadataRepository, storageResolver);
     }
 

@@ -13,7 +13,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import java.io.UncheckedIOException;
+import io.github.dornol.filekit.storage.FileStorageException;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -127,7 +127,7 @@ class LocalFileStorageTest {
         FileMetadata metadata = new FileMetadata("missing", "f.txt", 0, "chk",
                 new FileFormat("text/plain", "txt", "text"),
                 new FileLocation("bucket", "missing.txt", StorageType.LOCAL));
-        assertThrows(UncheckedIOException.class, () -> storage.load(metadata));
+        assertThrows(FileStorageException.class, () -> storage.load(metadata));
     }
 
     @Test
@@ -143,6 +143,56 @@ class LocalFileStorageTest {
     @Test
     void getStorageType_returnsConfiguredType() {
         assertEquals(StorageType.LOCAL, storage.getStorageType());
+    }
+
+    @Test
+    void upload_pathTraversalInBucket_rejected() {
+        assertThrows(IllegalArgumentException.class, () ->
+                new FileUploadCommand("key", "f.txt", "data".getBytes(),
+                        "text/plain", "txt", "../../etc"));
+    }
+
+    @Test
+    void upload_pathTraversalInObjectKey_rejected() {
+        // key that escapes baseDir: baseDir/bucket/../../escape.txt -> baseDir/../escape.txt
+        FileUploadCommand command = new FileUploadCommand(
+                "../../escape", "f.txt", "data".getBytes(),
+                "text/plain", "txt", "bucket");
+        assertThrows(FileStorageException.class, () -> storage.upload(command));
+    }
+
+    @Test
+    void upload_errorMessageDoesNotExposeInternalPath() {
+        FileUploadCommand command = new FileUploadCommand(
+                "../../../escape", "f.txt", "data".getBytes(),
+                "text/plain", "txt", "bucket");
+        FileStorageException ex = assertThrows(FileStorageException.class,
+                () -> storage.upload(command));
+        assertFalse(ex.getMessage().contains(tempDir.toString()),
+                "Error message should not contain internal path");
+    }
+
+    @Test
+    void load_symlinkOutsideBaseDir_rejected() throws IOException {
+        // Create a file outside baseDir
+        Path outsideFile = Files.createTempFile("outside", ".txt");
+        Files.writeString(outsideFile, "secret");
+
+        // Create a symlink inside baseDir pointing outside
+        Path bucketDir = tempDir.resolve("bucket");
+        Files.createDirectories(bucketDir);
+        Path symlink = bucketDir.resolve("evil.txt");
+        Files.createSymbolicLink(symlink, outsideFile);
+
+        FileMetadata metadata = new FileMetadata("evil", "evil.txt", 6, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("bucket", "evil.txt", StorageType.LOCAL));
+
+        assertThrows(FileStorageException.class, () -> storage.load(metadata));
+
+        // Cleanup
+        Files.deleteIfExists(symlink);
+        Files.deleteIfExists(outsideFile);
     }
 
 }

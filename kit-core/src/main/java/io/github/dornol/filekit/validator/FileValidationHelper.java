@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -58,7 +59,7 @@ public class FileValidationHelper {
         if (originalFilename == null) {
             return "file-kit.validation.invalid-extension";
         }
-        String extension = getExtension(originalFilename).toLowerCase();
+        String extension = getExtension(originalFilename).toLowerCase(Locale.ENGLISH);
         if (extension.isEmpty()) {
             log.debug("File has no extension: '{}'", originalFilename);
             return "file-kit.validation.invalid-extension";
@@ -149,43 +150,58 @@ public class FileValidationHelper {
         return true;
     }
 
+    // --- Batch validation methods for array/collection validators ---
+
     /**
-     * Validates that the file extension matches the detected content type
-     * within the allowed media type set.
-     *
-     * @param value   the file to check
-     * @param allowed set of allowed media types to match against
-     * @return {@code true} if the extension is consistent with the detected type
+     * Returns {@code true} if any file in the iterable is empty.
      */
-    public boolean isValidExtension(FileSource value, Set<SafeMediaType> allowed) {
-        String originalFilename = value.getOriginalFilename();
-        if (originalFilename == null) {
-            return false;
-        }
-
-        String extension = getExtension(originalFilename).toLowerCase();
-        if (extension.isEmpty()) {
-            log.debug("File has no extension: '{}'", originalFilename);
-            return false;
-        }
-
-        String detectedMime;
-        try {
-            detectedMime = detector.detect(originalFilename, value.getInputStream());
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to detect media type", e);
-        }
-
-        for (SafeMediaType safe : allowed) {
-            if (safe.getMediaType().equalsIgnoreCase(detectedMime)) {
-                if (safe.getExtensions().contains(extension)) {
-                    return true;
-                }
+    public boolean isAnyFileEmpty(Iterable<? extends FileSource> files) {
+        for (FileSource file : files) {
+            if (isFileEmpty(file)) {
+                return true;
             }
         }
-
-        log.debug("Extension '{}' does not match detected media type '{}'", extension, detectedMime);
         return false;
+    }
+
+    /**
+     * Returns {@code true} if any file in the iterable exceeds the given maximum size.
+     */
+    public boolean isAnyFileSizeExceeded(Iterable<? extends FileSource> files, long maxSize) {
+        for (FileSource file : files) {
+            if (isFileSizeExceeded(file, maxSize)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns {@code true} if all filenames in the iterable are valid.
+     */
+    public boolean isAllValidFilenames(Iterable<? extends FileSource> files) {
+        for (FileSource file : files) {
+            if (!isValidFilename(file)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Validates media type and extension for each file.
+     *
+     * @return {@code null} if all valid, or the message key for the first failed check
+     */
+    public @Nullable String validateAllMediaTypeAndExtension(Iterable<? extends FileSource> files,
+                                                              Set<SafeMediaType> allowed) {
+        for (FileSource file : files) {
+            String result = validateMediaTypeAndExtension(file, allowed);
+            if (result != null) {
+                return result;
+            }
+        }
+        return null;
     }
 
     private static String getExtension(String filename) {
