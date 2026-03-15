@@ -12,6 +12,7 @@ spring-boot = "4.0.3"
 spring-dependency-management = "1.1.7"
 spring-web = "6.2.7"
 tika = "3.1.0"
+aws-sdk = "2.31.51"
 
 [libraries]
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
@@ -29,6 +30,8 @@ spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-aut
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-test", version.ref = "spring-boot" }
 tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
+aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
+aws-sdk-s3 = { module = "software.amazon.awssdk:s3" }
 
 [plugins]
 vanniktech-publish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktech-publish" }
