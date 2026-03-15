@@ -1,5 +1,8 @@
 package io.github.dornol.filekit.validator;
 
+import io.github.dornol.filekit.domain.FileSource;
+import org.jspecify.annotations.Nullable;
+
 /**
  * Validates a single {@link FileSource} against the {@link ValidFile} constraint.
  */
@@ -32,7 +35,7 @@ public class FileSourceValidator extends AbstractFileValidator<FileSource> {
     }
 
     @Override
-    public String validateMediaTypeAndExtension(FileSource value) {
+    public @Nullable String validateMediaTypeAndExtension(FileSource value) {
         return helper.validateMediaTypeAndExtension(value, getAllowedMediaTypes());
     }
 }

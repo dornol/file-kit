@@ -2,6 +2,7 @@ package io.github.dornol.filekit.validator;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
 
@@ -30,7 +31,7 @@ public abstract class AbstractFileValidator<T> implements ConstraintValidator<Va
     }
 
     @Override
-    public boolean isValid(T value, ConstraintValidatorContext context) {
+    public boolean isValid(@Nullable T value, ConstraintValidatorContext context) {
         return support.isValid(value, context);
     }
 

@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.validator;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -21,6 +23,6 @@ public interface MediaTypeDetector {
      * @return the detected MIME type string (e.g. {@code "image/png"})
      * @throws IOException if reading the stream fails
      */
-    String detect(String filename, InputStream inputStream) throws IOException;
+    String detect(@Nullable String filename, @Nullable InputStream inputStream) throws IOException;
 
 }

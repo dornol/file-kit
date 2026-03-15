@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.validator;
 
+import io.github.dornol.filekit.domain.FileSource;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +31,7 @@ public class FileValidationHelper {
      * @param allowed set of allowed media types
      * @return {@code null} if valid, or the message key for the failed check
      */
-    public String validateMediaTypeAndExtension(FileSource value, Set<SafeMediaType> allowed) {
+    public @Nullable String validateMediaTypeAndExtension(FileSource value, Set<SafeMediaType> allowed) {
         String originalFilename = value.getOriginalFilename();
 
         String detected;

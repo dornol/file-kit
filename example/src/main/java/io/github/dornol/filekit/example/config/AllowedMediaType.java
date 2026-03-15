@@ -1,4 +1,4 @@
-package io.github.dornol.filekit.example;
+package io.github.dornol.filekit.example.config;
 
 import io.github.dornol.filekit.validator.SafeMediaType;
 

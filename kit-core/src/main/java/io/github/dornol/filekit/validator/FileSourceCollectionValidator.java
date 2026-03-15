@@ -1,5 +1,8 @@
 package io.github.dornol.filekit.validator;
 
+import io.github.dornol.filekit.domain.FileSource;
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collection;
 
 /**
@@ -50,7 +53,7 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
     }
 
     @Override
-    public String validateMediaTypeAndExtension(Collection<FileSource> value) {
+    public @Nullable String validateMediaTypeAndExtension(Collection<FileSource> value) {
         for (FileSource file : value) {
             String result = helper.validateMediaTypeAndExtension(file, getAllowedMediaTypes());
             if (result != null) {

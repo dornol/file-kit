@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.validator;
 
+import io.github.dornol.filekit.domain.FileSource;
+
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 

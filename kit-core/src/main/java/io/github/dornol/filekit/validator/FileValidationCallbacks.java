@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.validator;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Callback interface that defines individual file validation checks.
  *
@@ -29,6 +31,6 @@ public interface FileValidationCallbacks<T> {
      * @param value the value to validate
      * @return {@code null} if valid, or the message key for the failed check
      */
-    String validateMediaTypeAndExtension(T value);
+    @Nullable String validateMediaTypeAndExtension(T value);
 
 }

@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.validator;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,7 +21,7 @@ public class DefaultMediaTypeDetector implements MediaTypeDetector {
     private static final String DEFAULT_MEDIA_TYPE = "application/octet-stream";
 
     @Override
-    public String detect(String filename, InputStream inputStream) throws IOException {
+    public String detect(@Nullable String filename, @Nullable InputStream inputStream) throws IOException {
         String detected = null;
 
         if (inputStream != null) {

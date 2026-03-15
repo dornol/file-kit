@@ -1,6 +1,6 @@
 package io.github.dornol.filekit.spring.validator;
 
-import io.github.dornol.filekit.validator.FileSource;
+import io.github.dornol.filekit.domain.FileSource;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;

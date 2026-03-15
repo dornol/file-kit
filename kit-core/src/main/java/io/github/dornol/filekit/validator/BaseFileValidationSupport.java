@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.validator;
 
 import jakarta.validation.ConstraintValidatorContext;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +72,7 @@ public class BaseFileValidationSupport<T> {
      * @param context the constraint validator context
      * @return {@code true} if the value passes all checks
      */
-    public boolean isValid(T value, ConstraintValidatorContext context) {
+    public boolean isValid(@Nullable T value, ConstraintValidatorContext context) {
         if (value == null || callbacks.isValidationNotRequired(value)) {
             return true;
         }

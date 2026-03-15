@@ -1,4 +1,6 @@
-package io.github.dornol.filekit.validator;
+package io.github.dornol.filekit.domain;
+
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,7 +21,7 @@ public interface FileSource {
      *
      * @return the original filename, or {@code null} if not available
      */
-    String getOriginalFilename();
+    @Nullable String getOriginalFilename();
 
     /**
      * Returns an {@link InputStream} to read the file content.

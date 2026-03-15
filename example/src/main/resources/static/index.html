@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>file-kit validation test</title>
+    <title>file-kit example</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 40px 20px; }
@@ -15,23 +15,24 @@
         .card .desc { color: #888; font-size: 13px; margin-bottom: 16px; }
         label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; }
         input[type="file"] { display: block; width: 100%; padding: 8px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
+        input[type="text"] { display: block; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
         button { background: #111; color: #fff; border: none; padding: 10px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; }
         button:hover { background: #333; }
         button:disabled { background: #999; cursor: not-allowed; }
         .result { margin-top: 16px; padding: 12px; border-radius: 6px; font-size: 13px; font-family: monospace; white-space: pre-wrap; word-break: break-all; display: none; }
         .result.success { display: block; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
         .result.error { display: block; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-        .allowed { font-size: 12px; color: #888; margin-bottom: 12px; }
+        .download-link { display: inline-block; margin-top: 8px; color: #2563eb; text-decoration: underline; font-size: 13px; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>file-kit validation test</h1>
-    <p class="subtitle">JPEG, PNG, GIF, PDF / max 10MB</p>
+    <h1>file-kit example</h1>
+    <p class="subtitle">Upload &amp; Download — JPEG, PNG, GIF, PDF / max 10MB</p>
 
     <div class="card">
         <h2>Single File Upload</h2>
-        <p class="desc">POST /upload</p>
+        <p class="desc">POST /upload → validates, stores, returns download link</p>
         <form id="singleForm">
             <label for="singleFile">File</label>
             <input type="file" id="singleFile" name="file">
@@ -49,6 +50,17 @@
             <button type="submit">Upload</button>
         </form>
         <div id="multiResult" class="result"></div>
+    </div>
+
+    <div class="card">
+        <h2>Download by File Key</h2>
+        <p class="desc">GET /files/{fileKey}/download</p>
+        <form id="downloadForm">
+            <label for="fileKey">File Key</label>
+            <input type="text" id="fileKey" placeholder="paste file key from upload response">
+            <button type="submit">Download</button>
+        </form>
+        <div id="downloadResult" class="result"></div>
     </div>
 </div>
 
@@ -77,8 +89,18 @@
             try {
                 const res = await fetch(url, { method: 'POST', body: formData });
                 const data = await res.json();
-                resultEl.textContent = JSON.stringify(data, null, 2);
+                let text = JSON.stringify(data, null, 2);
+                resultEl.textContent = text;
                 resultEl.className = res.ok ? 'result success' : 'result error';
+
+                if (res.ok && data.downloadUrl) {
+                    const link = document.createElement('a');
+                    link.href = data.downloadUrl;
+                    link.className = 'download-link';
+                    link.textContent = 'Download file';
+                    resultEl.appendChild(document.createElement('br'));
+                    resultEl.appendChild(link);
+                }
             } catch (err) {
                 resultEl.textContent = err.message;
                 resultEl.className = 'result error';
@@ -91,6 +113,14 @@
 
     uploadForm('singleForm', '/upload', 'singleFile', 'singleResult', 'file');
     uploadForm('multiForm', '/upload-multiple', 'multiFiles', 'multiResult', 'files');
+
+    document.getElementById('downloadForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const fileKey = document.getElementById('fileKey').value.trim();
+        if (fileKey) {
+            window.location.href = '/files/' + encodeURIComponent(fileKey) + '/download';
+        }
+    });
 </script>
 </body>
 </html>

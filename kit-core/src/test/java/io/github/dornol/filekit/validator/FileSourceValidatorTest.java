@@ -1,5 +1,6 @@
 package io.github.dornol.filekit.validator;
 
+import io.github.dornol.filekit.domain.FileSource;
 import jakarta.validation.ConstraintValidatorContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

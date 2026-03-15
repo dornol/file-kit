@@ -1,5 +1,8 @@
 package io.github.dornol.filekit.validator;
 
+import io.github.dornol.filekit.domain.FileSource;
+import org.jspecify.annotations.Nullable;
+
 /**
  * Validates an array of {@link FileSource} against the {@link ValidFile} constraint.
  * Validation fails if any element in the array fails.
@@ -48,7 +51,7 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
     }
 
     @Override
-    public String validateMediaTypeAndExtension(FileSource[] value) {
+    public @Nullable String validateMediaTypeAndExtension(FileSource[] value) {
         for (FileSource file : value) {
             String result = helper.validateMediaTypeAndExtension(file, getAllowedMediaTypes());
             if (result != null) {

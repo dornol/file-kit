@@ -1,13 +1,13 @@
 # file-kit
 
-A lightweight Java library for file validation. Validates uploaded files by media type, file size, filename safety, and extension-content consistency.
+A lightweight Java library for file validation, upload, and download. Validates uploaded files by media type, file size, filename safety, and extension-content consistency. Provides a pluggable storage abstraction for uploading and downloading files with checksum-based deduplication.
 
 ## Modules
 
 | Module | Artifact | Description |
 |--------|----------|-------------|
-| `kit-core` | `io.github.dornol:file-kit-core` | Pure Java validation logic. No framework dependency. |
-| `kit-spring-boot-starter` | `io.github.dornol:file-kit-spring-boot-starter` | Spring Boot auto-configuration with `@ValidMultipartFile` annotation. |
+| `kit-core` | `io.github.dornol:file-kit-core` | Pure Java validation, upload/download logic. No framework dependency. |
+| `kit-spring-boot-starter` | `io.github.dornol:file-kit-spring-boot-starter` | Spring Boot auto-configuration with `@ValidMultipartFile` and storage integration. |
 
 ## Quick Start (Spring Boot)
 
@@ -69,18 +69,98 @@ public class FileUploadController {
         // file is validated - safe to process
         return ResponseEntity.ok("Uploaded: " + file.getOriginalFilename());
     }
-
-    @PostMapping("/upload-multiple")
-    public ResponseEntity<?> uploadMultiple(
-            @RequestParam("files")
-            @ValidMultipartFile(value = AllowedMediaType.class, maxSize = 5 * 1024 * 1024)
-            MultipartFile[] files) {
-        return ResponseEntity.ok("Uploaded " + files.length + " files");
-    }
 }
 ```
 
 That's it. No configuration class needed.
+
+## File Storage
+
+file-kit provides a pluggable storage abstraction. Implement the SPI interfaces and a `FileStorage`, and the upload/download flow is auto-configured.
+
+### 1. Define a storage type
+
+```java
+public enum StorageType { LOCAL, S3 }
+```
+
+### 2. Implement the SPI interfaces
+
+```java
+@Component
+public class MyChecksumCalculator implements ChecksumCalculator {
+    public String checksum(byte[] bytes) { /* SHA-256, MD5, etc. */ }
+}
+
+@Component
+public class MyFileFormatExtractor implements FileFormatExtractor {
+    public FileFormat extract(InputStream inputStream) { /* detect MIME & extension */ }
+}
+
+@Component
+public class MyFileMetadataRepository implements FileMetadataRepository {
+    public FileMetadata findByChecksum(String checksum) { /* query DB */ }
+    public FileMetadata findByKey(String key) { /* query DB */ }
+    public FileMetadata save(FileMetadata metadata) { /* insert DB */ }
+}
+```
+
+### 3. Implement FileStorage
+
+```java
+@Component
+public class LocalFileStorage implements FileStorage {
+    public Enum<?> getStorageType() { return StorageType.LOCAL; }
+    public FileLocation upload(FileUploadCommand command) { /* write to disk */ }
+    public InputStream load(FileMetadata metadata) { /* read from disk */ }
+    public String resolveUri(FileMetadata metadata) { /* return download URL */ }
+}
+```
+
+### 4. Use the auto-configured services
+
+```java
+@RestController
+public class FileController {
+
+    private final FileUploadService uploadService;
+    private final FileDownloadService downloadService;
+
+    @PostMapping("/upload")
+    public ResponseEntity<?> upload(@RequestParam MultipartFile file) throws IOException {
+        FileMetadata metadata = uploadService.upload(
+                new MultipartFileSource(file), StorageType.LOCAL, "my-bucket");
+        return ResponseEntity.ok(Map.of("fileKey", metadata.key()));
+    }
+
+    @GetMapping("/files/{fileKey}/download")
+    public ResponseEntity<Resource> download(@PathVariable String fileKey) {
+        DownloadResult result = downloadService.download(fileKey);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(result.metadata().format().mimeType()))
+                .body(new InputStreamResource(result.content()));
+    }
+}
+```
+
+### Upload flow
+
+1. Read file bytes, compute checksum
+2. If a file with the same checksum already exists, return the existing metadata (deduplication)
+3. Detect file format (MIME type, extension)
+4. Delegate to `FileStorage.upload()` for physical storage
+5. Save and return `FileMetadata`
+
+### Auto-configured beans
+
+The following beans are registered automatically when their dependencies are present:
+
+| Bean | Condition |
+|------|-----------|
+| `FileStorageResolver` | At least one `FileStorage` bean |
+| `FileUploadService` | `ChecksumCalculator` + `FileMetadataRepository` + `FileFormatExtractor` + `FileStorageResolver` |
+| `FileDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
+| `SpringDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
 
 ## Validation Checks
 

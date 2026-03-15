@@ -1,4 +1,4 @@
-package io.github.dornol.filekit.example;
+package io.github.dornol.filekit.example.config;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;

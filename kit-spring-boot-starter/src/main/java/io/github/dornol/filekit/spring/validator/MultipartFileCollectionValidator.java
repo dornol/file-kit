@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.spring.validator;
 
 import io.github.dornol.filekit.validator.FileValidationHelper;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
@@ -53,7 +54,7 @@ public class MultipartFileCollectionValidator extends AbstractMultipartFileValid
     }
 
     @Override
-    public String validateMediaTypeAndExtension(Collection<MultipartFile> value) {
+    public @Nullable String validateMediaTypeAndExtension(Collection<MultipartFile> value) {
         for (MultipartFile file : value) {
             String result = helper.validateMediaTypeAndExtension(new MultipartFileSource(file), getAllowedMediaTypes());
             if (result != null) {
