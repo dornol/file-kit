@@ -1,4 +1,4 @@
-package io.github.dornol.filekit.example;
+package io.github.dornol.filekit.spring.validator;
 
 import io.github.dornol.filekit.validator.MediaTypeDetector;
 import org.apache.tika.Tika;

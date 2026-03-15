@@ -22,6 +22,7 @@ dependencies {
     compileOnly(libs.jspecify)
     compileOnly(libs.spring.web)
     compileOnly(libs.spring.boot.autoconfigure)
+    compileOnly(libs.tika.core)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
