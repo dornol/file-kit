@@ -32,6 +32,8 @@ class FileStorageExceptionTest {
         assertEquals("file-kit.storage.download-failed", FileStorageException.DOWNLOAD_FAILED);
         assertEquals("file-kit.storage.delete-failed", FileStorageException.DELETE_FAILED);
         assertEquals("file-kit.storage.callback-failed", FileStorageException.CALLBACK_FAILED);
+        assertEquals("file-kit.storage.file-too-large", FileStorageException.FILE_TOO_LARGE);
+        assertEquals("file-kit.storage.invalid-filename", FileStorageException.INVALID_FILENAME);
     }
 
 }

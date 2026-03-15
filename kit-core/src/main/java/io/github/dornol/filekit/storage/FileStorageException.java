@@ -51,4 +51,7 @@ public class FileStorageException extends RuntimeException {
     /** File exceeds the configured maximum upload size. */
     public static final String FILE_TOO_LARGE = "file-kit.storage.file-too-large";
 
+    /** Filename is invalid (too long, contains path traversal characters, etc.). */
+    public static final String INVALID_FILENAME = "file-kit.storage.invalid-filename";
+
 }

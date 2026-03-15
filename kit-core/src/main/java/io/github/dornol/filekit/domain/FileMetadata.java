@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.domain;
 
+import java.util.Objects;
+
 /**
  * Metadata describing a stored file.
  *
@@ -18,4 +20,14 @@ public record FileMetadata(
         FileFormat format,
         FileLocation location
 ) {
+    public FileMetadata {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(name, "name");
+        if (size < 0) {
+            throw new IllegalArgumentException("size must not be negative: " + size);
+        }
+        Objects.requireNonNull(checksum, "checksum");
+        Objects.requireNonNull(format, "format");
+        Objects.requireNonNull(location, "location");
+    }
 }

@@ -15,6 +15,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -61,10 +62,10 @@ public class FileUploadService {
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver,
                              long maxUploadSize) {
-        this.checksumCalculator = checksumCalculator;
-        this.metadataRepository = metadataRepository;
-        this.formatExtractor = formatExtractor;
-        this.storageResolver = storageResolver;
+        this.checksumCalculator = Objects.requireNonNull(checksumCalculator, "checksumCalculator");
+        this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
+        this.formatExtractor = Objects.requireNonNull(formatExtractor, "formatExtractor");
+        this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
         this.maxUploadSize = maxUploadSize;
     }
 
@@ -94,9 +95,25 @@ public class FileUploadService {
 
     private FileMetadata doUpload(FileSource fileSource, Enum<?> storageType, String bucket,
                                   @Nullable UploadCallback callback) throws IOException {
+        Objects.requireNonNull(fileSource, "fileSource");
+        Objects.requireNonNull(storageType, "storageType");
+        Objects.requireNonNull(bucket, "bucket");
+
         if (maxUploadSize > 0 && fileSource.getSize() > maxUploadSize) {
             throw new FileStorageException(FileStorageException.FILE_TOO_LARGE,
                     "File size " + fileSource.getSize() + " exceeds maximum allowed size " + maxUploadSize);
+        }
+
+        String originalFilename = fileSource.getOriginalFilename();
+        if (originalFilename != null) {
+            if (originalFilename.length() > 200) {
+                throw new FileStorageException(FileStorageException.INVALID_FILENAME,
+                        "Filename exceeds 200 characters");
+            }
+            if (originalFilename.contains("..") || originalFilename.contains("/") || originalFilename.contains("\\")) {
+                throw new FileStorageException(FileStorageException.INVALID_FILENAME,
+                        "Filename contains illegal characters: " + originalFilename);
+            }
         }
 
         byte[] bytes = fileSource.getInputStream().readAllBytes();
@@ -123,9 +140,10 @@ public class FileUploadService {
         FileStorage storage = storageResolver.resolve(storageType);
         FileLocation location = storage.upload(command);
 
+        String name = originalFilename != null ? originalFilename : key + "." + format.extension();
         FileMetadata metadata = new FileMetadata(
                 key,
-                fileSource.getOriginalFilename(),
+                name,
                 bytes.length,
                 checksum,
                 format,

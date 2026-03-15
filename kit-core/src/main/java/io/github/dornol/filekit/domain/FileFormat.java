@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.domain;
 
+import java.util.Objects;
+
 /**
  * Detected format information for an uploaded file.
  *
@@ -12,4 +14,9 @@ public record FileFormat(
         String extension,
         String primaryType
 ) {
+    public FileFormat {
+        Objects.requireNonNull(mimeType, "mimeType");
+        Objects.requireNonNull(extension, "extension");
+        Objects.requireNonNull(primaryType, "primaryType");
+    }
 }

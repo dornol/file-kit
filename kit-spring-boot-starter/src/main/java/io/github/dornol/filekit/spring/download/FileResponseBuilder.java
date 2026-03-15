@@ -11,6 +11,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Utility for building file download/inline HTTP responses with proper headers.
@@ -40,6 +41,7 @@ public final class FileResponseBuilder {
     private @Nullable Duration cacheDuration;
 
     private FileResponseBuilder(String filename, FileFetchAction action) {
+        Objects.requireNonNull(filename, "filename");
         this.filename = filename.replaceAll("[\\p{Cntrl}]", "");
         this.action = action;
     }
@@ -103,6 +105,9 @@ public final class FileResponseBuilder {
      * @param contentLength file size in bytes
      */
     public FileResponseBuilder contentLength(long contentLength) {
+        if (contentLength < 0) {
+            throw new IllegalArgumentException("contentLength must not be negative: " + contentLength);
+        }
         this.contentLength = contentLength;
         return this;
     }
@@ -113,6 +118,7 @@ public final class FileResponseBuilder {
      * @param duration cache duration
      */
     public FileResponseBuilder cache(Duration duration) {
+        Objects.requireNonNull(duration, "duration");
         this.cacheDuration = duration;
         return this;
     }
