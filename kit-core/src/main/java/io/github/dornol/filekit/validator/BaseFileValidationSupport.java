@@ -10,7 +10,7 @@ public class BaseFileValidationSupport<T> {
     private final MessageConverter messageConverter;
     private final FileValidationCallbacks<T> callbacks;
     private Set<SafeMediaType> allowedMediaTypes;
-    private Long maxSize;
+    private long maxSize;
 
     public BaseFileValidationSupport(MessageConverter messageConverter, FileValidationCallbacks<T> callbacks) {
         this.messageConverter = messageConverter;
@@ -64,7 +64,7 @@ public class BaseFileValidationSupport<T> {
         return allowedMediaTypes;
     }
 
-    public Long getMaxSize() {
+    public long getMaxSize() {
         return maxSize;
     }
 

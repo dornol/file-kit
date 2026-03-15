@@ -1,16 +1,16 @@
 package io.github.dornol.filekit.spring.validator;
 
-import io.github.dornol.filekit.validator.FileSourceValidatorHelper;
+import io.github.dornol.filekit.validator.FileValidationHelper;
 import io.github.dornol.filekit.validator.MessageConverter;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
 
-public class MultipartFileCollectionValidator extends AbstractSpringFileValidator<Collection<MultipartFile>> {
+public class MultipartFileCollectionValidator extends AbstractMultipartFileValidator<Collection<MultipartFile>> {
 
-    private final FileSourceValidatorHelper helper;
+    private final FileValidationHelper helper;
 
-    public MultipartFileCollectionValidator(FileSourceValidatorHelper helper, MessageConverter messageConverter) {
+    public MultipartFileCollectionValidator(FileValidationHelper helper, MessageConverter messageConverter) {
         super(messageConverter);
         this.helper = helper;
     }

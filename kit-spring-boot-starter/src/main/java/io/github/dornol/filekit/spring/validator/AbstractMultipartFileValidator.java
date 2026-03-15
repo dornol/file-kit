@@ -9,16 +9,16 @@ import jakarta.validation.ConstraintValidatorContext;
 
 import java.util.Set;
 
-public abstract class AbstractSpringFileValidator<T> implements ConstraintValidator<SpringValidFile, T>, FileValidationCallbacks<T> {
+public abstract class AbstractMultipartFileValidator<T> implements ConstraintValidator<ValidMultipartFile, T>, FileValidationCallbacks<T> {
 
     private final BaseFileValidationSupport<T> support;
 
-    protected AbstractSpringFileValidator(MessageConverter messageConverter) {
+    protected AbstractMultipartFileValidator(MessageConverter messageConverter) {
         this.support = new BaseFileValidationSupport<>(messageConverter, this);
     }
 
     @Override
-    public void initialize(SpringValidFile constraintAnnotation) {
+    public void initialize(ValidMultipartFile constraintAnnotation) {
         ConstraintValidator.super.initialize(constraintAnnotation);
         support.init(constraintAnnotation.value(), constraintAnnotation.maxSize());
     }
@@ -32,7 +32,7 @@ public abstract class AbstractSpringFileValidator<T> implements ConstraintValida
         return support.getAllowedMediaTypes();
     }
 
-    protected Long getMaxSize() {
+    protected long getMaxSize() {
         return support.getMaxSize();
     }
 

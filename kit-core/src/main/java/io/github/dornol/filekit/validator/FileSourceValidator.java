@@ -2,9 +2,9 @@ package io.github.dornol.filekit.validator;
 
 public class FileSourceValidator extends AbstractFileValidator<FileSource> {
 
-    private final FileSourceValidatorHelper helper;
+    private final FileValidationHelper helper;
 
-    public FileSourceValidator(FileSourceValidatorHelper helper, MessageConverter messageConverter) {
+    public FileSourceValidator(FileValidationHelper helper, MessageConverter messageConverter) {
         super(messageConverter);
         this.helper = helper;
     }

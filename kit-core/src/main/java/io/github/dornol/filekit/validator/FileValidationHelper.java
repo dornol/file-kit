@@ -6,13 +6,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Set;
 
-public class FileSourceValidatorHelper {
+public class FileValidationHelper {
 
-    private static final Logger log = LoggerFactory.getLogger(FileSourceValidatorHelper.class);
+    private static final Logger log = LoggerFactory.getLogger(FileValidationHelper.class);
 
     private final MediaTypeDetector detector;
 
-    public FileSourceValidatorHelper(MediaTypeDetector detector) {
+    public FileValidationHelper(MediaTypeDetector detector) {
         this.detector = detector;
     }
 

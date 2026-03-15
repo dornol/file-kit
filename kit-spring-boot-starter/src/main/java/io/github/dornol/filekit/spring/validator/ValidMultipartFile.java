@@ -1,7 +1,6 @@
 package io.github.dornol.filekit.spring.validator;
 
 import io.github.dornol.filekit.validator.SafeMediaType;
-import io.github.dornol.filekit.validator.ValidFile;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -20,7 +19,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
         MultipartFileCollectionValidator.class
 })
 @Documented
-public @interface SpringValidFile {
+public @interface ValidMultipartFile {
     String message() default "Invalid file";
 
     long maxSize() default 0L;

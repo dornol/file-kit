@@ -3,7 +3,6 @@ package io.github.dornol.filekit.validator;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
-import java.util.HashSet;
 import java.util.Set;
 
 public abstract class AbstractFileValidator<T> implements ConstraintValidator<ValidFile, T>, FileValidationCallbacks<T> {
@@ -29,7 +28,7 @@ public abstract class AbstractFileValidator<T> implements ConstraintValidator<Va
         return support.getAllowedMediaTypes();
     }
 
-    protected Long getMaxSize() {
+    protected long getMaxSize() {
         return support.getMaxSize();
     }
 

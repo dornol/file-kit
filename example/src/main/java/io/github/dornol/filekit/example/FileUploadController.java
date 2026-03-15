@@ -1,6 +1,6 @@
 package io.github.dornol.filekit.example;
 
-import io.github.dornol.filekit.spring.validator.SpringValidFile;
+import io.github.dornol.filekit.spring.validator.ValidMultipartFile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,7 +18,7 @@ public class FileUploadController {
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> upload(
             @RequestParam("file")
-            @SpringValidFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
+            @ValidMultipartFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
             MultipartFile file
     ) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -32,7 +32,7 @@ public class FileUploadController {
     @PostMapping("/upload-multiple")
     public ResponseEntity<Map<String, Object>> uploadMultiple(
             @RequestParam("files")
-            @SpringValidFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
+            @ValidMultipartFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
             MultipartFile[] files
     ) {
         Map<String, Object> result = new LinkedHashMap<>();

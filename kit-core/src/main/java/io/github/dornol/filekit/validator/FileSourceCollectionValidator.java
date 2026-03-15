@@ -4,9 +4,9 @@ import java.util.Collection;
 
 public class FileSourceCollectionValidator extends AbstractFileValidator<Collection<FileSource>> {
 
-    private final FileSourceValidatorHelper helper;
+    private final FileValidationHelper helper;
 
-    public FileSourceCollectionValidator(FileSourceValidatorHelper helper, MessageConverter messageConverter) {
+    public FileSourceCollectionValidator(FileValidationHelper helper, MessageConverter messageConverter) {
         super(messageConverter);
         this.helper = helper;
     }
