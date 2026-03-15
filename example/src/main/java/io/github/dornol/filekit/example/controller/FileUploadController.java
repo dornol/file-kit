@@ -33,10 +33,11 @@ public class FileUploadController {
     public ResponseEntity<Map<String, Object>> upload(
             @RequestParam("file")
             @ValidMultipartFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
-            MultipartFile file
+            MultipartFile file,
+            @RequestParam(value = "storageType", defaultValue = "LOCAL") StorageType storageType
     ) throws IOException {
         FileMetadata metadata = fileUploadService.upload(
-                new MultipartFileSource(file), StorageType.LOCAL, "uploads");
+                new MultipartFileSource(file), storageType, "uploads");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", "success");
@@ -44,6 +45,7 @@ public class FileUploadController {
         result.put("filename", metadata.name());
         result.put("size", metadata.size());
         result.put("mimeType", metadata.format().mimeType());
+        result.put("storageType", metadata.location().storageType().name());
         result.put("downloadUrl", "/files/" + metadata.key() + "/download");
         return ResponseEntity.ok(result);
     }
@@ -52,16 +54,18 @@ public class FileUploadController {
     public ResponseEntity<Map<String, Object>> uploadMultiple(
             @RequestParam("files")
             @ValidMultipartFile(value = AllowedMediaType.class, maxSize = 10 * 1024 * 1024)
-            MultipartFile[] files
+            MultipartFile[] files,
+            @RequestParam(value = "storageType", defaultValue = "LOCAL") StorageType storageType
     ) throws IOException {
         List<Map<String, Object>> uploaded = new ArrayList<>();
         for (MultipartFile file : files) {
             FileMetadata metadata = fileUploadService.upload(
-                    new MultipartFileSource(file), StorageType.LOCAL, "uploads");
+                    new MultipartFileSource(file), storageType, "uploads");
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("fileKey", metadata.key());
             item.put("filename", metadata.name());
             item.put("size", metadata.size());
+            item.put("storageType", metadata.location().storageType().name());
             item.put("downloadUrl", "/files/" + metadata.key() + "/download");
             uploaded.add(item);
         }

@@ -8,3 +8,18 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 50MB
+  datasource:
+    url: jdbc:postgresql://localhost:5432/filekit
+    username: filekit
+    password: filekit
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+app:
+  s3:
+    endpoint: http://localhost:9000
+    region: us-east-1
+    access-key: minioadmin
+    secret-key: minioadmin

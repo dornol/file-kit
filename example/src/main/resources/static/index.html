@@ -49,6 +49,11 @@
         <form id="uploadForm">
             <label for="files">Files</label>
             <input type="file" id="files" name="files" multiple>
+            <label for="storageType">Storage</label>
+            <select id="storageType" style="display:block;width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+                <option value="LOCAL">LOCAL</option>
+                <option value="S3">S3 (MinIO)</option>
+            </select>
             <button type="submit">Upload</button>
         </form>
     </div>
@@ -94,12 +99,13 @@
                 return;
             }
 
-            let html = '<table><thead><tr><th>Filename</th><th>Size</th><th>Type</th><th></th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th>Filename</th><th>Size</th><th>Type</th><th>Storage</th><th></th></tr></thead><tbody>';
             for (const f of files) {
                 html += '<tr>'
                     + '<td class="filename">' + escapeHtml(f.filename) + '</td>'
                     + '<td class="size">' + formatSize(f.size) + '</td>'
                     + '<td class="mime">' + escapeHtml(f.mimeType) + '</td>'
+                    + '<td class="mime">' + escapeHtml(f.storageType || '') + '</td>'
                     + '<td><button class="dl-btn" onclick="downloadFile(\'' + f.fileKey + '\')">Download</button></td>'
                     + '</tr>';
             }
@@ -135,6 +141,7 @@
         btn.disabled = true;
         btn.textContent = 'Uploading...';
 
+        const storageType = document.getElementById('storageType').value;
         const formData = new FormData();
         if (input.files.length === 1) {
             formData.append('file', input.files[0]);
@@ -143,6 +150,7 @@
                 formData.append('files', file);
             }
         }
+        formData.append('storageType', storageType);
 
         const url = input.files.length === 1 ? '/upload' : '/upload-multiple';
 
