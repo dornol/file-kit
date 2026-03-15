@@ -10,10 +10,8 @@ import io.github.dornol.filekit.spring.validator.TikaMediaTypeDetector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * Spring Boot auto-configuration for file-kit.
@@ -33,24 +31,14 @@ public class FileKitAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(FileKitAutoConfiguration.class);
 
-    @Configuration
-    @ConditionalOnClass(name = "org.apache.tika.Tika")
-    @ConditionalOnMissingBean(MediaTypeDetector.class)
-    static class TikaDetectorConfiguration {
-
-        @Bean
-        public MediaTypeDetector tikaMediaTypeDetector() {
+    @Bean
+    @ConditionalOnMissingBean
+    public MediaTypeDetector mediaTypeDetector() {
+        try {
+            Class.forName("org.apache.tika.Tika");
             log.info("file-kit: Registering TikaMediaTypeDetector (Apache Tika detected on classpath)");
             return new TikaMediaTypeDetector();
-        }
-    }
-
-    @Configuration
-    @ConditionalOnMissingBean(MediaTypeDetector.class)
-    static class DefaultDetectorConfiguration {
-
-        @Bean
-        public MediaTypeDetector defaultMediaTypeDetector() {
+        } catch (ClassNotFoundException e) {
             log.warn("file-kit: Registering DefaultMediaTypeDetector (Java URLConnection-based). "
                     + "For better accuracy, add Apache Tika to your classpath.");
             return new DefaultMediaTypeDetector();

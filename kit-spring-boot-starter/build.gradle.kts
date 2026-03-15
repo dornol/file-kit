@@ -27,7 +27,15 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.slf4j.simple)
+    testImplementation(libs.jakarta.validation.api)
     testImplementation(libs.hibernate.validator)
+    testImplementation(libs.expressly)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.spring.web)
+    testImplementation(libs.spring.boot.autoconfigure)
+    testImplementation(libs.spring.boot.test)
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.tika.core)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

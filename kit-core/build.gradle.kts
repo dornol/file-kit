@@ -22,6 +22,8 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.slf4j.simple)
+    testImplementation(libs.jakarta.validation.api)
+    testImplementation(libs.mockito.core)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
