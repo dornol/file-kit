@@ -39,19 +39,19 @@ public class BaseFileValidationSupport<T> {
             return true;
         }
         if (!callbacks.isValidMediaType(value)) {
-            applyConstraintViolation(context, "file-kit.validation.file.not-supported");
+            applyConstraintViolation(context, "file-kit.validation.unsupported-media-type");
             return false;
         } else if (callbacks.isFileEmpty(value)) {
-            applyConstraintViolation(context, "file-kit.validation.file.empty");
+            applyConstraintViolation(context, "file-kit.validation.file-empty");
             return false;
         } else if (callbacks.isFileSizeExceeded(value)) {
-            applyConstraintViolation(context, "file-kit.validation.file.too-large");
+            applyConstraintViolation(context, "file-kit.validation.file-too-large");
             return false;
         } else if (!callbacks.isValidFilename(value)) {
-            applyConstraintViolation(context, "file-kit.validation.file.invalid-filename");
+            applyConstraintViolation(context, "file-kit.validation.invalid-filename");
             return false;
         } else if (!callbacks.isValidExtension(value)) {
-            applyConstraintViolation(context, "file-kit.validation.file.invalid-extension");
+            applyConstraintViolation(context, "file-kit.validation.invalid-extension");
             return false;
         }
 
