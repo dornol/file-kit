@@ -12,4 +12,8 @@ allprojects {
     repositories {
         mavenCentral()
     }
+
+    if (tasks.names.none { it == "prepareKotlinBuildScriptModel" }) {
+        tasks.register("prepareKotlinBuildScriptModel") {}
+    }
 }
