@@ -132,18 +132,14 @@ public class FileValidationHelper {
     public boolean isValidFilename(FileSource value) {
         String name = value.getOriginalFilename();
 
-        if (name == null || name.isBlank()) {
-            log.debug("Filename is null or blank");
-            return false;
-        }
-
-        if (name.length() > 200) {
-            log.debug("Filename exceeds 200 characters: length={}", name.length());
-            return false;
-        }
-
-        if (name.contains("..") || name.contains("/") || name.contains("\\")) {
-            log.warn("Potentially dangerous filename detected: '{}'", name);
+        if (!FilenameValidator.isSafe(name)) {
+            if (name != null && FilenameValidator.containsTraversalCharacters(name)) {
+                log.warn("Potentially dangerous filename detected: '{}'", name);
+            } else if (name != null && name.length() > FilenameValidator.MAX_FILENAME_LENGTH) {
+                log.debug("Filename exceeds {} characters: length={}", FilenameValidator.MAX_FILENAME_LENGTH, name.length());
+            } else {
+                log.debug("Filename is null or blank");
+            }
             return false;
         }
 

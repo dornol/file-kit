@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.domain;
 
+import io.github.dornol.filekit.validator.BucketNameValidator;
+
 import java.util.Objects;
 
 /**
@@ -18,8 +20,6 @@ public record FileLocation(
         Objects.requireNonNull(bucket, "bucket");
         Objects.requireNonNull(objectKey, "objectKey");
         Objects.requireNonNull(storageType, "storageType");
-        if (!bucket.matches("^[a-zA-Z0-9._-]+$")) {
-            throw new IllegalArgumentException("Invalid bucket name: " + bucket);
-        }
+        BucketNameValidator.validate(bucket);
     }
 }

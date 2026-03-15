@@ -5,14 +5,14 @@ import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileUploadCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * {@link FileStorage} implementation that stores files on the local filesystem.
@@ -34,7 +34,7 @@ import java.util.logging.Logger;
  */
 public class LocalFileStorage implements FileStorage {
 
-    private static final Logger log = Logger.getLogger(LocalFileStorage.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(LocalFileStorage.class);
 
     private final Path baseDir;
     private final Enum<?> storageType;
@@ -81,7 +81,7 @@ public class LocalFileStorage implements FileStorage {
             Files.createDirectories(target.getParent());
             Files.write(target, command.content());
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Failed to write file: " + target, e);
+            log.error("Failed to write file: {}", target, e);
             throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
                     "Failed to write file");
         }
@@ -94,7 +94,7 @@ public class LocalFileStorage implements FileStorage {
         try {
             Files.deleteIfExists(filePath);
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Failed to delete file: " + filePath, e);
+            log.error("Failed to delete file: {}", filePath, e);
             throw new FileStorageException(FileStorageException.DELETE_FAILED,
                     "Failed to delete file");
         }
@@ -107,7 +107,7 @@ public class LocalFileStorage implements FileStorage {
         try {
             return Files.newInputStream(filePath);
         } catch (IOException e) {
-            log.log(Level.SEVERE, "Failed to read file: " + filePath, e);
+            log.error("Failed to read file: {}", filePath, e);
             throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
                     "Failed to read file");
         }

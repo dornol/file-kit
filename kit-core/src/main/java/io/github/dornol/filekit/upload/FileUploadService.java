@@ -11,13 +11,15 @@ import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.FileUploadCommand;
+import io.github.dornol.filekit.validator.FilenameValidator;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.logging.Logger;
 
 /**
  * Orchestrates the file upload flow: checksum deduplication, format detection,
@@ -34,7 +36,7 @@ import java.util.logging.Logger;
  */
 public class FileUploadService {
 
-    private static final Logger log = Logger.getLogger(FileUploadService.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(FileUploadService.class);
 
     private final ChecksumCalculator checksumCalculator;
     private final FileMetadataRepository metadataRepository;
@@ -99,71 +101,79 @@ public class FileUploadService {
         Objects.requireNonNull(storageType, "storageType");
         Objects.requireNonNull(bucket, "bucket");
 
-        if (maxUploadSize > 0 && fileSource.getSize() > maxUploadSize) {
-            throw new FileStorageException(FileStorageException.FILE_TOO_LARGE,
-                    "File size " + fileSource.getSize() + " exceeds maximum allowed size " + maxUploadSize);
-        }
-
-        String originalFilename = fileSource.getOriginalFilename();
-        if (originalFilename != null) {
-            if (originalFilename.length() > 200) {
-                throw new FileStorageException(FileStorageException.INVALID_FILENAME,
-                        "Filename exceeds 200 characters");
-            }
-            if (originalFilename.contains("..") || originalFilename.contains("/") || originalFilename.contains("\\")) {
-                throw new FileStorageException(FileStorageException.INVALID_FILENAME,
-                        "Filename contains illegal characters: " + originalFilename);
-            }
-        }
+        validateFileSize(fileSource);
+        validateFilename(fileSource.getOriginalFilename());
 
         byte[] bytes = fileSource.getInputStream().readAllBytes();
 
-        String checksum = checksumCalculator.checksum(bytes);
-        FileMetadata existing = metadataRepository.findByChecksum(checksum);
+        FileMetadata existing = findDuplicate(bytes);
         if (existing != null) {
-            log.info("Duplicate file detected (checksum=" + checksum + "), returning existing metadata: " + existing.key());
             return existing;
         }
 
         FileFormat format = formatExtractor.extract(new ByteArrayInputStream(bytes));
-
         String key = UUID.randomUUID().toString();
-        FileUploadCommand command = new FileUploadCommand(
-                key,
-                fileSource.getOriginalFilename(),
-                bytes,
-                format.mimeType(),
-                format.extension(),
-                bucket
-        );
+        String checksum = checksumCalculator.checksum(bytes);
+        String name = fileSource.getOriginalFilename() != null
+                ? fileSource.getOriginalFilename()
+                : key + "." + format.extension();
 
         FileStorage storage = storageResolver.resolve(storageType);
-        FileLocation location = storage.upload(command);
+        FileLocation location = storage.upload(new FileUploadCommand(
+                key, fileSource.getOriginalFilename(), bytes,
+                format.mimeType(), format.extension(), bucket));
 
-        String name = originalFilename != null ? originalFilename : key + "." + format.extension();
-        FileMetadata metadata = new FileMetadata(
-                key,
-                name,
-                bytes.length,
-                checksum,
-                format,
-                location
-        );
+        FileMetadata metadata = new FileMetadata(key, name, bytes.length, checksum, format, location);
 
-        if (callback != null) {
-            try {
-                callback.onUploaded(metadata);
-            } catch (Exception e) {
-                storage.delete(metadata);
-                throw new FileStorageException(FileStorageException.CALLBACK_FAILED,
-                        "Upload callback failed, file has been deleted: " + metadata.key(), e);
-            }
-        }
+        executeCallback(callback, metadata, storage);
 
         FileMetadata saved = metadataRepository.save(metadata);
-        log.info("File uploaded: key=" + saved.key() + ", size=" + saved.size()
-                + ", bucket=" + bucket + ", storageType=" + storageType);
+        log.info("File uploaded: key={}, size={}, bucket={}, storageType={}", saved.key(), saved.size(), bucket, storageType);
         return saved;
+    }
+
+    private void validateFileSize(FileSource fileSource) {
+        if (maxUploadSize > 0 && fileSource.getSize() > maxUploadSize) {
+            throw new FileStorageException(FileStorageException.FILE_TOO_LARGE,
+                    "File size " + fileSource.getSize() + " exceeds maximum allowed size " + maxUploadSize);
+        }
+    }
+
+    private static void validateFilename(@Nullable String filename) {
+        if (filename == null) {
+            return;
+        }
+        if (filename.length() > FilenameValidator.MAX_FILENAME_LENGTH) {
+            throw new FileStorageException(FileStorageException.INVALID_FILENAME,
+                    "Filename exceeds " + FilenameValidator.MAX_FILENAME_LENGTH + " characters");
+        }
+        if (FilenameValidator.containsTraversalCharacters(filename)) {
+            throw new FileStorageException(FileStorageException.INVALID_FILENAME,
+                    "Filename contains illegal characters: " + filename);
+        }
+    }
+
+    private @Nullable FileMetadata findDuplicate(byte[] bytes) {
+        String checksum = checksumCalculator.checksum(bytes);
+        FileMetadata existing = metadataRepository.findByChecksum(checksum);
+        if (existing != null) {
+            log.info("Duplicate file detected (checksum={}), returning existing metadata: {}", checksum, existing.key());
+        }
+        return existing;
+    }
+
+    private static void executeCallback(@Nullable UploadCallback callback,
+                                        FileMetadata metadata, FileStorage storage) {
+        if (callback == null) {
+            return;
+        }
+        try {
+            callback.onUploaded(metadata);
+        } catch (Exception e) {
+            storage.delete(metadata);
+            throw new FileStorageException(FileStorageException.CALLBACK_FAILED,
+                    "Upload callback failed, file has been deleted: " + metadata.key(), e);
+        }
     }
 
 }
