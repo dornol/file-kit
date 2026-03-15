@@ -5,6 +5,7 @@ import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.spring.storage.SpringFileStorage;
 import io.github.dornol.filekit.storage.FileStorage;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.FileUploadCommand;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -74,7 +75,7 @@ class SpringDownloadServiceTest {
         when(metadataRepository.findByKey("missing")).thenReturn(null);
 
         assertThatThrownBy(() -> service.loadResource("missing"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(FileStorageException.class);
     }
 
 }

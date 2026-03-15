@@ -7,8 +7,11 @@ import io.github.dornol.filekit.domain.FileSource;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.storage.FileStorage;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.FileUploadCommand;
+import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -38,7 +41,32 @@ public class FileUploadService {
         this.storageResolver = storageResolver;
     }
 
+    /**
+     * Uploads a file: dedup check, format detection, storage, metadata save.
+     */
     public FileMetadata upload(FileSource fileSource, Enum<?> storageType, String bucket) throws IOException {
+        return doUpload(fileSource, storageType, bucket, null);
+    }
+
+    /**
+     * Uploads a file and runs a callback before persisting metadata.
+     *
+     * <p>If the callback throws, the uploaded file is deleted from storage
+     * and the exception is wrapped in a {@link RuntimeException} (or re-thrown as-is
+     * if it is already unchecked).</p>
+     *
+     * @param fileSource  the file to upload
+     * @param storageType storage backend to use
+     * @param bucket      target bucket
+     * @param callback    business logic to run after upload, before metadata save
+     */
+    public FileMetadata upload(FileSource fileSource, Enum<?> storageType, String bucket,
+                               UploadCallback callback) throws IOException {
+        return doUpload(fileSource, storageType, bucket, callback);
+    }
+
+    private FileMetadata doUpload(FileSource fileSource, Enum<?> storageType, String bucket,
+                                  @Nullable UploadCallback callback) throws IOException {
         byte[] bytes = fileSource.getInputStream().readAllBytes();
 
         String checksum = checksumCalculator.checksum(bytes);
@@ -59,7 +87,8 @@ public class FileUploadService {
                 bucket
         );
 
-        FileLocation location = storageResolver.resolve(storageType).upload(command);
+        FileStorage storage = storageResolver.resolve(storageType);
+        FileLocation location = storage.upload(command);
 
         FileMetadata metadata = new FileMetadata(
                 key,
@@ -69,6 +98,16 @@ public class FileUploadService {
                 format,
                 location
         );
+
+        if (callback != null) {
+            try {
+                callback.onUploaded(metadata);
+            } catch (Exception e) {
+                storage.delete(metadata);
+                throw new FileStorageException(FileStorageException.CALLBACK_FAILED,
+                        "Upload callback failed, file has been deleted: " + metadata.key(), e);
+            }
+        }
 
         return metadataRepository.save(metadata);
     }

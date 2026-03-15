@@ -111,6 +111,7 @@ class FileKitStorageAutoConfigurationTest {
                 @Override public FileLocation upload(FileUploadCommand command) {
                     return new FileLocation("bucket", command.key(), TestStorageType.LOCAL);
                 }
+                @Override public void delete(FileMetadata metadata) {}
                 @Override public InputStream load(FileMetadata metadata) {
                     return InputStream.nullInputStream();
                 }

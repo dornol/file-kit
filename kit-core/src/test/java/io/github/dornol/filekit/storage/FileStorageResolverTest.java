@@ -31,7 +31,7 @@ class FileStorageResolverTest {
         FileStorage localStorage = stubStorage(TestStorageType.LOCAL);
         FileStorageResolver resolver = new FileStorageResolver(List.of(localStorage));
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        FileStorageException ex = assertThrows(FileStorageException.class,
                 () -> resolver.resolve(TestStorageType.S3));
         assertNotNull(ex.getMessage());
     }
@@ -55,6 +55,9 @@ class FileStorageResolverTest {
             public FileLocation upload(FileUploadCommand command) {
                 return null;
             }
+
+            @Override
+            public void delete(FileMetadata metadata) {}
 
             @Override
             public InputStream load(FileMetadata metadata) {

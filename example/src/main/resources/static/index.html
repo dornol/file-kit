@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 40px 20px; }
-        .container { max-width: 640px; margin: 0 auto; }
+        .container { max-width: 720px; margin: 0 auto; }
         h1 { font-size: 24px; margin-bottom: 8px; }
         .subtitle { color: #666; margin-bottom: 32px; font-size: 14px; }
         .card { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -15,14 +15,27 @@
         .card .desc { color: #888; font-size: 13px; margin-bottom: 16px; }
         label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; }
         input[type="file"] { display: block; width: 100%; padding: 8px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
-        input[type="text"] { display: block; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
         button { background: #111; color: #fff; border: none; padding: 10px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; }
         button:hover { background: #333; }
         button:disabled { background: #999; cursor: not-allowed; }
-        .result { margin-top: 16px; padding: 12px; border-radius: 6px; font-size: 13px; font-family: monospace; white-space: pre-wrap; word-break: break-all; display: none; }
-        .result.success { display: block; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-        .result.error { display: block; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-        .download-link { display: inline-block; margin-top: 8px; color: #2563eb; text-decoration: underline; font-size: 13px; }
+
+        /* toast */
+        .toast { position: fixed; top: 24px; right: 24px; padding: 14px 20px; border-radius: 8px; font-size: 14px; color: #fff; z-index: 100; opacity: 0; transform: translateY(-12px); transition: opacity 0.3s, transform 0.3s; max-width: 400px; word-break: break-word; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background: #16a34a; }
+        .toast.error { background: #dc2626; }
+
+        /* table */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; padding: 10px 8px; border-bottom: 2px solid #e5e7eb; color: #555; font-weight: 600; }
+        td { padding: 10px 8px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafa; }
+        .empty-msg { color: #aaa; padding: 24px; text-align: center; font-size: 14px; }
+        .dl-btn { background: none; border: none; color: #2563eb; cursor: pointer; font-size: 13px; padding: 4px 8px; text-decoration: underline; }
+        .dl-btn:hover { color: #1d4ed8; }
+        .size { color: #888; }
+        .mime { color: #888; font-family: monospace; font-size: 12px; }
+        .filename { font-weight: 500; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -31,96 +44,131 @@
     <p class="subtitle">Upload &amp; Download — JPEG, PNG, GIF, PDF / max 10MB</p>
 
     <div class="card">
-        <h2>Single File Upload</h2>
-        <p class="desc">POST /upload → validates, stores, returns download link</p>
-        <form id="singleForm">
-            <label for="singleFile">File</label>
-            <input type="file" id="singleFile" name="file">
+        <h2>Upload</h2>
+        <p class="desc">Select one or more files to upload</p>
+        <form id="uploadForm">
+            <label for="files">Files</label>
+            <input type="file" id="files" name="files" multiple>
             <button type="submit">Upload</button>
         </form>
-        <div id="singleResult" class="result"></div>
     </div>
 
     <div class="card">
-        <h2>Multiple File Upload</h2>
-        <p class="desc">POST /upload-multiple</p>
-        <form id="multiForm">
-            <label for="multiFiles">Files</label>
-            <input type="file" id="multiFiles" name="files" multiple>
-            <button type="submit">Upload</button>
-        </form>
-        <div id="multiResult" class="result"></div>
-    </div>
-
-    <div class="card">
-        <h2>Download by File Key</h2>
-        <p class="desc">GET /files/{fileKey}/download</p>
-        <form id="downloadForm">
-            <label for="fileKey">File Key</label>
-            <input type="text" id="fileKey" placeholder="paste file key from upload response">
-            <button type="submit">Download</button>
-        </form>
-        <div id="downloadResult" class="result"></div>
+        <h2>Uploaded Files</h2>
+        <p class="desc" id="fileCount">Loading...</p>
+        <div id="fileList"></div>
     </div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
-    function uploadForm(formId, url, inputId, resultId, fieldName) {
-        document.getElementById(formId).addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const resultEl = document.getElementById(resultId);
-            const input = document.getElementById(inputId);
-            const btn = e.target.querySelector('button');
-
-            resultEl.className = 'result';
-            resultEl.style.display = 'none';
-            btn.disabled = true;
-            btn.textContent = 'Uploading...';
-
-            const formData = new FormData();
-            if (input.multiple) {
-                for (const file of input.files) {
-                    formData.append(fieldName, file);
-                }
-            } else {
-                formData.append(fieldName, input.files[0]);
-            }
-
-            try {
-                const res = await fetch(url, { method: 'POST', body: formData });
-                const data = await res.json();
-                let text = JSON.stringify(data, null, 2);
-                resultEl.textContent = text;
-                resultEl.className = res.ok ? 'result success' : 'result error';
-
-                if (res.ok && data.downloadUrl) {
-                    const link = document.createElement('a');
-                    link.href = data.downloadUrl;
-                    link.className = 'download-link';
-                    link.textContent = 'Download file';
-                    resultEl.appendChild(document.createElement('br'));
-                    resultEl.appendChild(link);
-                }
-            } catch (err) {
-                resultEl.textContent = err.message;
-                resultEl.className = 'result error';
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Upload';
-            }
-        });
+    // toast
+    let toastTimer;
+    function showToast(message, type) {
+        const el = document.getElementById('toast');
+        el.textContent = message;
+        el.className = 'toast ' + type + ' show';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
     }
 
-    uploadForm('singleForm', '/upload', 'singleFile', 'singleResult', 'file');
-    uploadForm('multiForm', '/upload-multiple', 'multiFiles', 'multiResult', 'files');
+    // format bytes
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
 
-    document.getElementById('downloadForm').addEventListener('submit', (e) => {
+    // load file list
+    async function loadFiles() {
+        const container = document.getElementById('fileList');
+        const countEl = document.getElementById('fileCount');
+        try {
+            const res = await fetch('/files');
+            const files = await res.json();
+            countEl.textContent = files.length + ' file(s)';
+
+            if (files.length === 0) {
+                container.innerHTML = '<p class="empty-msg">No files uploaded yet.</p>';
+                return;
+            }
+
+            let html = '<table><thead><tr><th>Filename</th><th>Size</th><th>Type</th><th></th></tr></thead><tbody>';
+            for (const f of files) {
+                html += '<tr>'
+                    + '<td class="filename">' + escapeHtml(f.filename) + '</td>'
+                    + '<td class="size">' + formatSize(f.size) + '</td>'
+                    + '<td class="mime">' + escapeHtml(f.mimeType) + '</td>'
+                    + '<td><button class="dl-btn" onclick="downloadFile(\'' + f.fileKey + '\')">Download</button></td>'
+                    + '</tr>';
+            }
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        } catch (err) {
+            countEl.textContent = 'Failed to load';
+            container.innerHTML = '<p class="empty-msg">Error loading file list.</p>';
+        }
+    }
+
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function downloadFile(fileKey) {
+        window.location.href = '/files/' + encodeURIComponent(fileKey) + '/download';
+    }
+
+    // upload
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const fileKey = document.getElementById('fileKey').value.trim();
-        if (fileKey) {
-            window.location.href = '/files/' + encodeURIComponent(fileKey) + '/download';
+        const input = document.getElementById('files');
+        const btn = e.target.querySelector('button');
+
+        if (!input.files.length) {
+            showToast('Please select at least one file.', 'error');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Uploading...';
+
+        const formData = new FormData();
+        if (input.files.length === 1) {
+            formData.append('file', input.files[0]);
+        } else {
+            for (const file of input.files) {
+                formData.append('files', file);
+            }
+        }
+
+        const url = input.files.length === 1 ? '/upload' : '/upload-multiple';
+
+        try {
+            const res = await fetch(url, { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (res.ok) {
+                const count = data.count || 1;
+                showToast(count + ' file(s) uploaded successfully.', 'success');
+                input.value = '';
+                loadFiles();
+            } else {
+                const errors = data.errors ? data.errors.join(', ') : (data.message || 'Upload failed');
+                showToast(errors, 'error');
+            }
+        } catch (err) {
+            showToast('Network error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Upload';
         }
     });
+
+    // initial load
+    loadFiles();
 </script>
 </body>
 </html>

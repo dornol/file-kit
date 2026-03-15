@@ -3,6 +3,7 @@ package io.github.dornol.filekit.storage.memory;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.storage.FileStorage;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileUploadCommand;
 
 import java.io.ByteArrayInputStream;
@@ -49,11 +50,18 @@ public class InMemoryFileStorage implements FileStorage {
     }
 
     @Override
+    public void delete(FileMetadata metadata) {
+        String objectKey = metadata.location().bucket() + "/" + metadata.location().objectKey();
+        store.remove(objectKey);
+    }
+
+    @Override
     public InputStream load(FileMetadata metadata) {
         String objectKey = metadata.location().bucket() + "/" + metadata.location().objectKey();
         byte[] data = store.get(objectKey);
         if (data == null) {
-            throw new IllegalArgumentException("File not found in memory store: " + objectKey);
+            throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
+                    "File not found in memory store: " + objectKey);
         }
         return new ByteArrayInputStream(data);
     }

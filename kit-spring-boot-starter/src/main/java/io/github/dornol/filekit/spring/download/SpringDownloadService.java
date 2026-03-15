@@ -2,6 +2,7 @@ package io.github.dornol.filekit.spring.download;
 
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.spring.storage.SpringFileStorage;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
@@ -40,7 +41,8 @@ public class SpringDownloadService {
     private FileMetadata findMetadataOrThrow(String fileKey) {
         FileMetadata metadata = metadataRepository.findByKey(fileKey);
         if (metadata == null) {
-            throw new IllegalArgumentException("File not found: " + fileKey);
+            throw new FileStorageException(FileStorageException.FILE_NOT_FOUND,
+                    "File not found: " + fileKey);
         }
         return metadata;
     }

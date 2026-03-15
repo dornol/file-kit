@@ -82,6 +82,18 @@ public class LocalFileStorage implements FileStorage {
     }
 
     @Override
+    public void delete(FileMetadata metadata) {
+        Path filePath = baseDir
+                .resolve(metadata.location().bucket())
+                .resolve(metadata.location().objectKey());
+        try {
+            Files.deleteIfExists(filePath);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to delete file: " + filePath, e);
+        }
+    }
+
+    @Override
     public InputStream load(FileMetadata metadata) {
         Path filePath = baseDir
                 .resolve(metadata.location().bucket())

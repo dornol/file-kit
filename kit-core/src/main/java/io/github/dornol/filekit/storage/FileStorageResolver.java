@@ -22,7 +22,7 @@ public class FileStorageResolver {
     public FileStorage resolve(Enum<?> storageType) {
         FileStorage storage = storageMap.get(storageType);
         if (storage == null) {
-            throw new IllegalArgumentException(
+            throw new FileStorageException(FileStorageException.STORAGE_NOT_FOUND,
                     "No FileStorage registered for storage type: " + storageType);
         }
         return storage;

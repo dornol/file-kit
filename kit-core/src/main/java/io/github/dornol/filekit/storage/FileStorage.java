@@ -33,6 +33,13 @@ public interface FileStorage {
     InputStream load(FileMetadata metadata);
 
     /**
+     * Deletes a file from storage.
+     *
+     * @param metadata metadata of the file to delete
+     */
+    void delete(FileMetadata metadata);
+
+    /**
      * Resolves a URI for accessing the file (e.g. a download URL).
      *
      * @param metadata metadata of the file

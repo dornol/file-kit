@@ -3,6 +3,7 @@ package io.github.dornol.filekit.storage.memory;
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileUploadCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,7 @@ class InMemoryFileStorageTest {
                 new FileFormat("text/plain", "txt", "text"),
                 new FileLocation("bucket", "missing.txt", StorageType.MEM));
 
-        assertThrows(IllegalArgumentException.class, () -> storage.load(metadata));
+        assertThrows(FileStorageException.class, () -> storage.load(metadata));
     }
 
     @Test

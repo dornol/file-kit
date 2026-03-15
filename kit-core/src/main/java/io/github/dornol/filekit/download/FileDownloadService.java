@@ -3,6 +3,7 @@ package io.github.dornol.filekit.download;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 
 import java.io.InputStream;
@@ -42,7 +43,8 @@ public class FileDownloadService {
     private FileMetadata findMetadataOrThrow(String fileKey) {
         FileMetadata metadata = metadataRepository.findByKey(fileKey);
         if (metadata == null) {
-            throw new IllegalArgumentException("File not found: " + fileKey);
+            throw new FileStorageException(FileStorageException.FILE_NOT_FOUND,
+                    "File not found: " + fileKey);
         }
         return metadata;
     }

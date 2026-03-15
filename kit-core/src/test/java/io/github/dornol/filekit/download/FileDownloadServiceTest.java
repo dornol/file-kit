@@ -5,6 +5,7 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +59,7 @@ class FileDownloadServiceTest {
     void download_throwsWhenFileNotFound() {
         when(metadataRepository.findByKey("missing")).thenReturn(null);
 
-        assertThrows(IllegalArgumentException.class, () -> service.download("missing"));
+        assertThrows(FileStorageException.class, () -> service.download("missing"));
     }
 
     @Test
@@ -75,7 +76,7 @@ class FileDownloadServiceTest {
     void resolveUri_throwsWhenFileNotFound() {
         when(metadataRepository.findByKey("missing")).thenReturn(null);
 
-        assertThrows(IllegalArgumentException.class, () -> service.resolveUri("missing"));
+        assertThrows(FileStorageException.class, () -> service.resolveUri("missing"));
     }
 
 }
