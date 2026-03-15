@@ -266,12 +266,14 @@ uploadService.upload(file, StorageType.LOCAL, "uploads", metadata -> {
 ### Upload / download flow
 
 **Upload:**
-1. Read file bytes, compute checksum
-2. If a file with the same checksum already exists, return the existing metadata (deduplication)
-3. Detect file format (MIME type, extension)
-4. Delegate to `FileStorage.upload()` for physical storage
-5. Run callback (if provided) — on failure, delete from storage and throw
-6. Save and return `FileMetadata`
+1. Validate file size against configured maximum
+2. Validate filename safety (length, path traversal)
+3. Read file bytes, compute checksum
+4. If a file with the same checksum already exists, return the existing metadata (deduplication)
+5. Detect file format (MIME type, extension)
+6. Delegate to `FileStorage.upload()` for physical storage
+7. Run callback (if provided) — on failure, delete from storage and throw
+8. Save and return `FileMetadata`
 
 **Download:**
 1. Look up `FileMetadata` by file key
@@ -341,7 +343,7 @@ The following beans are registered automatically when their dependencies are pre
 | Media type | Detects actual MIME type and compares against allowed set |
 | File empty | Rejects zero-byte files |
 | File size | Rejects files exceeding `maxSize` (in bytes) |
-| Filename | Rejects null, blank, too-long (>200 chars), and path traversal patterns |
+| Filename | Rejects null, blank, too-long (>200 chars), and path traversal patterns (`..`, `/`, `\`) |
 | Extension | Verifies that file extension matches the detected content type |
 
 ## Error Messages
@@ -370,6 +372,7 @@ file-kit.storage.download-failed=File download failed
 file-kit.storage.delete-failed=File deletion failed
 file-kit.storage.callback-failed=Post-upload processing failed, file has been deleted
 file-kit.storage.file-too-large=File size exceeds the maximum allowed
+file-kit.storage.invalid-filename=Invalid filename
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.
@@ -428,9 +431,22 @@ MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 
 ## Security Considerations
 
+### Input validation
+
+All domain records (`FileFormat`, `FileLocation`, `FileMetadata`) and command objects (`FileUploadCommand`) validate their constructor parameters. Null values for required fields are rejected immediately with `NullPointerException`, and invalid values (e.g., negative file size) throw `IllegalArgumentException`.
+
+### Filename safety
+
+The upload service validates filenames **before** reading file content:
+- Maximum length: 200 characters
+- Rejected patterns: `..` (path traversal), `/` and `\` (directory separator)
+- Null filenames are allowed — a generated name (`{key}.{extension}`) is used
+
+These checks are also performed by `@ValidFile` / `@ValidMultipartFile` annotation validators. The shared logic lives in `FilenameValidator` for consistency.
+
 ### Bucket name restrictions
 
-Bucket names are validated to contain only alphanumeric characters, dots, hyphens, and underscores (`[a-zA-Z0-9._-]+`). Path traversal patterns like `../../etc` are rejected.
+Bucket names are validated to contain only alphanumeric characters, dots, hyphens, and underscores (`[a-zA-Z0-9._-]+`). The validation is shared via `BucketNameValidator` and applied consistently in both `FileLocation` and `FileUploadCommand`.
 
 ### File size limits
 
