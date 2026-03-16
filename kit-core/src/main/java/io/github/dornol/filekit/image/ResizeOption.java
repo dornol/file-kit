@@ -21,6 +21,18 @@ public record ResizeOption(
 
     private static final float DEFAULT_QUALITY = 0.85f;
 
+    public ResizeOption {
+        if (targetWidth <= 0) {
+            throw new IllegalArgumentException("targetWidth must be positive: " + targetWidth);
+        }
+        if (targetHeight <= 0) {
+            throw new IllegalArgumentException("targetHeight must be positive: " + targetHeight);
+        }
+        if (quality < 0.0f || quality > 1.0f) {
+            throw new IllegalArgumentException("quality must be between 0.0 and 1.0: " + quality);
+        }
+    }
+
     /**
      * Creates a FIT resize option with default quality.
      */

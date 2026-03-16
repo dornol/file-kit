@@ -2,6 +2,8 @@ package io.github.dornol.filekit.storage;
 
 import io.github.dornol.filekit.validator.BucketNameValidator;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Objects;
@@ -19,7 +21,7 @@ import java.util.Objects;
  */
 public record FileUploadCommand(
         String key,
-        String originalFilename,
+        @Nullable String originalFilename,
         InputStream content,
         long contentLength,
         String mimeType,

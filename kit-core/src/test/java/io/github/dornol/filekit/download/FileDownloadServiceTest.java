@@ -95,4 +95,16 @@ class FileDownloadServiceTest {
         assertThrows(FileStorageException.class, () -> service.resolveUri("missing"));
     }
 
+    // ── Null fileKey validation ──────────────────────────────────────
+
+    @Test
+    void download_nullFileKey_throws() {
+        assertThrows(NullPointerException.class, () -> service.download(null));
+    }
+
+    @Test
+    void resolveUri_nullFileKey_throws() {
+        assertThrows(NullPointerException.class, () -> service.resolveUri(null));
+    }
+
 }

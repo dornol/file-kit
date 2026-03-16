@@ -15,7 +15,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.4'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.5'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -26,7 +26,7 @@ implementation 'org.apache.tika:tika-core:3.1.0'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.0.4</version>
+    <version>0.0.5</version>
 </dependency>
 ```
 
@@ -438,6 +438,9 @@ ResizeResult exact = resizer.resize(imageBytes, ResizeOption.exact(1920, 1080));
 // Custom: format conversion + quality
 ResizeOption option = new ResizeOption(800, 600, ScaleMode.FIT, "jpeg", 0.9f);
 ResizeResult converted = resizer.resize(imageBytes, option);
+
+// Note: width/height must be positive, quality must be 0.0-1.0
+// Invalid values throw IllegalArgumentException
 ```
 
 ### Scale modes
@@ -447,6 +450,8 @@ ResizeResult converted = resizer.resize(imageBytes, option);
 | `FIT` | Scale to fit within target dimensions, preserving aspect ratio. Result may be smaller than target. |
 | `COVER` | Scale to cover target dimensions, preserving aspect ratio. Result is cropped to exact target size. |
 | `EXACT` | Scale to exact target dimensions, ignoring aspect ratio. |
+
+`ResizeOption` validates its parameters at construction: `targetWidth` and `targetHeight` must be positive, and `quality` must be between 0.0 and 1.0 (inclusive).
 
 ### Custom implementation
 
@@ -559,7 +564,7 @@ MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 
 ### Input validation
 
-All domain records (`FileFormat`, `FileLocation`, `FileMetadata`) and command objects (`FileUploadCommand`) validate their constructor parameters. Null values for required fields are rejected immediately with `NullPointerException`, and invalid values (e.g., negative file size) throw `IllegalArgumentException`.
+All domain records (`FileFormat`, `FileLocation`, `FileMetadata`) and command objects (`FileUploadCommand`) validate their constructor parameters. Null values for required fields are rejected immediately with `NullPointerException`, and invalid values (e.g., negative file size) throw `IllegalArgumentException`. `FileUploadCommand.originalFilename` is explicitly `@Nullable` — when null, a generated name is used during upload.
 
 ### Streaming upload
 

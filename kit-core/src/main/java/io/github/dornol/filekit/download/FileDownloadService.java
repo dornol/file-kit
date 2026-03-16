@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.util.Objects;
 
 /**
  * Provides file download and URI resolution by file key.
@@ -25,6 +26,7 @@ public class FileDownloadService extends AbstractFileOperationService {
     }
 
     public DownloadResult download(String fileKey) {
+        Objects.requireNonNull(fileKey, "fileKey");
         FileMetadata metadata = metadataRepository.getByKey(fileKey);
         InputStream content = resolveStorage(metadata).load(metadata);
         log.info("File downloaded: key={}", fileKey);
@@ -32,6 +34,7 @@ public class FileDownloadService extends AbstractFileOperationService {
     }
 
     public String resolveUri(String fileKey) {
+        Objects.requireNonNull(fileKey, "fileKey");
         FileMetadata metadata = metadataRepository.getByKey(fileKey);
         return resolveStorage(metadata).resolveUri(metadata);
     }

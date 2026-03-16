@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ResizeOptionTest {
 
@@ -97,6 +98,58 @@ class ResizeOptionTest {
         void withMaxQuality() {
             ResizeOption option = new ResizeOption(100, 100, ScaleMode.FIT, "jpeg", 1.0f);
 
+            assertEquals(1.0f, option.quality(), 0.001f);
+        }
+    }
+
+    @Nested
+    class Validation {
+
+        @Test
+        void zeroWidth_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ResizeOption(0, 100, ScaleMode.FIT, null, 0.85f));
+        }
+
+        @Test
+        void negativeWidth_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ResizeOption(-1, 100, ScaleMode.FIT, null, 0.85f));
+        }
+
+        @Test
+        void zeroHeight_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ResizeOption(100, 0, ScaleMode.FIT, null, 0.85f));
+        }
+
+        @Test
+        void negativeHeight_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ResizeOption(100, -1, ScaleMode.FIT, null, 0.85f));
+        }
+
+        @Test
+        void qualityBelowZero_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ResizeOption(100, 100, ScaleMode.FIT, null, -0.1f));
+        }
+
+        @Test
+        void qualityAboveOne_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ResizeOption(100, 100, ScaleMode.FIT, null, 1.1f));
+        }
+
+        @Test
+        void boundaryQualityZero_allowed() {
+            ResizeOption option = new ResizeOption(100, 100, ScaleMode.FIT, null, 0.0f);
+            assertEquals(0.0f, option.quality(), 0.001f);
+        }
+
+        @Test
+        void boundaryQualityOne_allowed() {
+            ResizeOption option = new ResizeOption(100, 100, ScaleMode.FIT, null, 1.0f);
             assertEquals(1.0f, option.quality(), 0.001f);
         }
     }
