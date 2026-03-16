@@ -88,6 +88,11 @@ class FileSourceArrayValidatorTest {
     }
 
     @Test
+    void nullHelper_throws() {
+        assertThrows(NullPointerException.class, () -> new FileSourceArrayValidator(null));
+    }
+
+    @Test
     void isValidationNotRequired_trueForEmptyArray() {
         assertTrue(validator.isValidationNotRequired(new FileSource[0]));
     }

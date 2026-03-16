@@ -91,6 +91,11 @@ class FileSourceCollectionValidatorTest {
     }
 
     @Test
+    void nullHelper_throws() {
+        assertThrows(NullPointerException.class, () -> new FileSourceCollectionValidator(null));
+    }
+
+    @Test
     void isValidationNotRequired_trueForEmptyCollection() {
         assertTrue(validator.isValidationNotRequired(Collections.emptyList()));
     }

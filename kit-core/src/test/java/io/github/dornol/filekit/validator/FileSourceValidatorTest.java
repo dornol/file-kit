@@ -86,6 +86,11 @@ class FileSourceValidatorTest {
     }
 
     @Test
+    void nullHelper_throws() {
+        assertThrows(NullPointerException.class, () -> new FileSourceValidator(null));
+    }
+
+    @Test
     void isValidationNotRequired_alwaysFalse() {
         FileSource file = new TestFileSource("photo.jpg", new byte[100]);
         assertFalse(validator.isValidationNotRequired(file));

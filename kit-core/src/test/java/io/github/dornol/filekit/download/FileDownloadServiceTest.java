@@ -73,6 +73,20 @@ class FileDownloadServiceTest {
         assertEquals("https://example.com/file", uri);
     }
 
+    // ── Constructor validation ───────────────────────────────────────
+
+    @Test
+    void nullMetadataRepository_throws() {
+        assertThrows(NullPointerException.class,
+                () -> new FileDownloadService(null, storageResolver));
+    }
+
+    @Test
+    void nullStorageResolver_throws() {
+        assertThrows(NullPointerException.class,
+                () -> new FileDownloadService(metadataRepository, null));
+    }
+
     @Test
     void resolveUri_throwsWhenFileNotFound() {
         when(metadataRepository.getByKey("missing")).thenThrow(

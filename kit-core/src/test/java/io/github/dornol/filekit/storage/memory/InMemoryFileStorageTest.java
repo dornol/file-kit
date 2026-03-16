@@ -115,6 +115,26 @@ class InMemoryFileStorageTest {
     }
 
     @Test
+    void load_returnsIndependentStreams() throws IOException {
+        byte[] content = "stream-test".getBytes();
+        storage.upload(FileUploadCommand.ofBytes("k1", "f.txt", content, "text/plain", "txt", "b"));
+
+        FileMetadata metadata = new FileMetadata("k1", "f.txt", content.length, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("b", "k1.txt", StorageType.MEM));
+
+        // first load — consume the stream
+        try (InputStream is1 = storage.load(metadata)) {
+            assertArrayEquals(content, is1.readAllBytes());
+        }
+
+        // second load — should return a fresh stream with full content
+        try (InputStream is2 = storage.load(metadata)) {
+            assertArrayEquals(content, is2.readAllBytes());
+        }
+    }
+
+    @Test
     void resolveUri_returnsMemoryScheme() {
         FileMetadata metadata = new FileMetadata("key1", "f.txt", 5, "chk",
                 new FileFormat("text/plain", "txt", "text"),

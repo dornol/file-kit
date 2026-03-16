@@ -19,6 +19,13 @@ class FileValidationHelperTest {
         helper = new FileValidationHelper(new StubMediaTypeDetector());
     }
 
+    // ── Constructor ────────────────────────────────────────────────────
+
+    @Test
+    void nullDetector_throws() {
+        assertThrows(NullPointerException.class, () -> new FileValidationHelper(null));
+    }
+
     // ── isFileEmpty ──────────────────────────────────────────────────
 
     @Nested

@@ -97,6 +97,11 @@ class MultipartFileValidatorTest {
         verify(context).buildConstraintViolationWithTemplate("{file-kit.validation.invalid-extension}");
     }
 
+    @Test
+    void nullHelper_throws() {
+        assertThrows(NullPointerException.class, () -> new MultipartFileValidator(null));
+    }
+
     private static MultipartFile mockMultipartFile(String filename, byte[] content) throws IOException {
         MultipartFile file = mock(MultipartFile.class);
         when(file.getOriginalFilename()).thenReturn(filename);

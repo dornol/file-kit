@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -22,7 +23,7 @@ public class FileValidationHelper {
     private final MediaTypeDetector detector;
 
     public FileValidationHelper(MediaTypeDetector detector) {
-        this.detector = detector;
+        this.detector = Objects.requireNonNull(detector, "detector");
     }
 
     /**

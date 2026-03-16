@@ -90,6 +90,11 @@ class MultipartFileCollectionValidatorTest {
         verify(context).buildConstraintViolationWithTemplate("{file-kit.validation.file-too-large}");
     }
 
+    @Test
+    void nullHelper_throws() {
+        assertThrows(NullPointerException.class, () -> new MultipartFileCollectionValidator(null));
+    }
+
     private static MultipartFile mockMultipartFile(String filename, byte[] content) throws IOException {
         MultipartFile file = mock(MultipartFile.class);
         when(file.getOriginalFilename()).thenReturn(filename);
