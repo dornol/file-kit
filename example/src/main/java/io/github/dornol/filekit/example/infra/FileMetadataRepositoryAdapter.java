@@ -30,6 +30,11 @@ public class FileMetadataRepositoryAdapter implements FileMetadataRepository {
     }
 
     @Override
+    public void deleteByKey(String key) {
+        jpaRepository.deleteById(key);
+    }
+
+    @Override
     public FileMetadata save(FileMetadata metadata) {
         FileMetadataEntity entity = FileMetadataEntity.from(metadata);
         jpaRepository.save(entity);

@@ -376,6 +376,14 @@ class UploadDownloadIntegrationTest {
             return metadata;
         }
 
+        @Override
+        public void deleteByKey(String key) {
+            FileMetadata removed = byKey.remove(key);
+            if (removed != null) {
+                byChecksum.remove(removed.checksum());
+            }
+        }
+
         int count() {
             return byKey.size();
         }

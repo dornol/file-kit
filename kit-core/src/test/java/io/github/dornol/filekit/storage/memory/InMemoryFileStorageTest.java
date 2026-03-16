@@ -29,7 +29,7 @@ class InMemoryFileStorageTest {
 
     @Test
     void upload_storesAndReturnsLocation() {
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "key1", "photo.png", "hello".getBytes(),
                 "image/png", "png", "uploads");
 
@@ -44,7 +44,7 @@ class InMemoryFileStorageTest {
     @Test
     void load_returnsUploadedContent() throws IOException {
         byte[] content = "file-data".getBytes();
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "key1", "doc.txt", content, "text/plain", "txt", "bucket");
         storage.upload(command);
 
@@ -69,7 +69,7 @@ class InMemoryFileStorageTest {
     @Test
     void upload_clonesBytesToPreventMutation() throws IOException {
         byte[] content = "original".getBytes();
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "key1", "f.txt", content, "text/plain", "txt", "b");
         storage.upload(command);
 
@@ -86,8 +86,8 @@ class InMemoryFileStorageTest {
 
     @Test
     void clear_removesAllFiles() {
-        storage.upload(new FileUploadCommand("k1", "a.txt", "a".getBytes(), "text/plain", "txt", "b"));
-        storage.upload(new FileUploadCommand("k2", "b.txt", "b".getBytes(), "text/plain", "txt", "b"));
+        storage.upload(FileUploadCommand.ofBytes("k1", "a.txt", "a".getBytes(), "text/plain", "txt", "b"));
+        storage.upload(FileUploadCommand.ofBytes("k2", "b.txt", "b".getBytes(), "text/plain", "txt", "b"));
         assertEquals(2, storage.size());
 
         storage.clear();
@@ -96,7 +96,7 @@ class InMemoryFileStorageTest {
 
     @Test
     void delete_removesFile() {
-        storage.upload(new FileUploadCommand("k1", "a.txt", "a".getBytes(), "text/plain", "txt", "b"));
+        storage.upload(FileUploadCommand.ofBytes("k1", "a.txt", "a".getBytes(), "text/plain", "txt", "b"));
         assertEquals(1, storage.size());
 
         FileMetadata metadata = new FileMetadata("k1", "a.txt", 1, "chk",

@@ -2,6 +2,8 @@ package io.github.dornol.filekit.spi;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -35,6 +37,20 @@ class Sha256ChecksumCalculatorTest {
     void checksum_sameInputProducesSameOutput() {
         byte[] input = "consistent".getBytes();
         assertEquals(calculator.checksum(input), calculator.checksum(input));
+    }
+
+    @Test
+    void checksumStream_returnsCorrectSha256Hex() {
+        String result = calculator.checksum(new ByteArrayInputStream("hello".getBytes()));
+        assertEquals("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", result);
+    }
+
+    @Test
+    void checksumStream_matchesByteArrayChecksum() {
+        byte[] data = "some test data for streaming".getBytes();
+        assertEquals(
+                calculator.checksum(data),
+                calculator.checksum(new ByteArrayInputStream(data)));
     }
 
     @Test

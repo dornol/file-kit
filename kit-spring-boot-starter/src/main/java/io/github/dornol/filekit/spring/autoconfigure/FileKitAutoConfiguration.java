@@ -1,5 +1,6 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
+import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
 import io.github.dornol.filekit.image.ImageIOResizer;
@@ -24,10 +25,10 @@ import io.github.dornol.filekit.validator.MediaTypeDetector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
 import java.util.List;
@@ -42,12 +43,15 @@ import java.util.List;
  *   <li>{@link MultipartFileValidator}, {@link MultipartFileArrayValidator},
  *       {@link MultipartFileCollectionValidator}</li>
  *   <li>{@link FileStorageResolver}, {@link FileUploadService}, {@link FileDownloadService},
- *       {@link SpringDownloadService} &mdash; when port beans are available</li>
+ *       {@link FileDeleteService}, {@link SpringDownloadService} &mdash; when port beans are available</li>
  * </ul>
  *
  * <p>All beans are {@code @ConditionalOnMissingBean}, so user-defined beans always take priority.</p>
+ *
+ * @see FileKitProperties
  */
 @AutoConfiguration
+@EnableConfigurationProperties(FileKitProperties.class)
 public class FileKitAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(FileKitAutoConfiguration.class);
@@ -113,8 +117,9 @@ public class FileKitAutoConfiguration {
                                                FileMetadataRepository metadataRepository,
                                                FileFormatExtractor formatExtractor,
                                                FileStorageResolver storageResolver,
-                                               @Value("${file-kit.max-upload-size:0}") long maxUploadSize,
+                                               FileKitProperties properties,
                                                ObjectProvider<VirusScanner> virusScannerProvider) {
+        long maxUploadSize = properties.getMaxUploadSize();
         VirusScanner virusScanner = virusScannerProvider.getIfAvailable();
         log.info("Registering FileUploadService (maxUploadSize={}, virusScanner={})",
                 maxUploadSize == 0 ? "unlimited" : maxUploadSize,
@@ -130,6 +135,15 @@ public class FileKitAutoConfiguration {
                                                    FileStorageResolver storageResolver) {
         log.info("Registering FileDownloadService");
         return new FileDownloadService(metadataRepository, storageResolver);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
+    public FileDeleteService fileDeleteService(FileMetadataRepository metadataRepository,
+                                               FileStorageResolver storageResolver) {
+        log.info("Registering FileDeleteService");
+        return new FileDeleteService(metadataRepository, storageResolver);
     }
 
     @Bean

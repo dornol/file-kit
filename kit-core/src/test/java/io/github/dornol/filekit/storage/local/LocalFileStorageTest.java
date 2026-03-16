@@ -37,7 +37,7 @@ class LocalFileStorageTest {
 
     @Test
     void upload_writesFileAndReturnsLocation() {
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "test-key", "photo.png", "hello".getBytes(),
                 "image/png", "png", "uploads");
 
@@ -52,7 +52,7 @@ class LocalFileStorageTest {
     @Test
     void load_readsUploadedFile() throws IOException {
         byte[] content = "file-content".getBytes();
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "key1", "doc.txt", content, "text/plain", "txt", "bucket");
         storage.upload(command);
 
@@ -70,7 +70,7 @@ class LocalFileStorageTest {
         LocalFileStorage hashed = new LocalFileStorage(tempDir, StorageType.LOCAL,
                 ObjectKeyStrategy.hashPrefixed(2));
 
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "abcd1234-5678-9abc-def0-1234567890ab", "file.pdf",
                 "data".getBytes(), "application/pdf", "pdf", "docs");
 
@@ -86,7 +86,7 @@ class LocalFileStorageTest {
         LocalFileStorage dated = new LocalFileStorage(tempDir, StorageType.LOCAL,
                 ObjectKeyStrategy.dateBased());
 
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "key2", "img.jpg", "img".getBytes(), "image/jpeg", "jpg", "media");
 
         FileLocation location = dated.upload(command);
@@ -99,7 +99,7 @@ class LocalFileStorageTest {
 
     @Test
     void delete_removesFile() {
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "del-key", "f.txt", "data".getBytes(), "text/plain", "txt", "bucket");
         storage.upload(command);
 
@@ -148,14 +148,14 @@ class LocalFileStorageTest {
     @Test
     void upload_pathTraversalInBucket_rejected() {
         assertThrows(IllegalArgumentException.class, () ->
-                new FileUploadCommand("key", "f.txt", "data".getBytes(),
+                FileUploadCommand.ofBytes("key", "f.txt", "data".getBytes(),
                         "text/plain", "txt", "../../etc"));
     }
 
     @Test
     void upload_pathTraversalInObjectKey_rejected() {
         // key that escapes baseDir: baseDir/bucket/../../escape.txt -> baseDir/../escape.txt
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "../../escape", "f.txt", "data".getBytes(),
                 "text/plain", "txt", "bucket");
         assertThrows(FileStorageException.class, () -> storage.upload(command));
@@ -163,7 +163,7 @@ class LocalFileStorageTest {
 
     @Test
     void upload_errorMessageDoesNotExposeInternalPath() {
-        FileUploadCommand command = new FileUploadCommand(
+        FileUploadCommand command = FileUploadCommand.ofBytes(
                 "../../../escape", "f.txt", "data".getBytes(),
                 "text/plain", "txt", "bucket");
         FileStorageException ex = assertThrows(FileStorageException.class,

@@ -3,6 +3,7 @@ package io.github.dornol.filekit.spring.autoconfigure;
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
@@ -37,6 +38,7 @@ class FileKitStorageAutoConfigurationTest {
             assertThat(context).doesNotHaveBean(FileStorageResolver.class);
             assertThat(context).doesNotHaveBean(FileUploadService.class);
             assertThat(context).doesNotHaveBean(FileDownloadService.class);
+            assertThat(context).doesNotHaveBean(FileDeleteService.class);
             assertThat(context).doesNotHaveBean(SpringDownloadService.class);
         });
     }
@@ -49,6 +51,7 @@ class FileKitStorageAutoConfigurationTest {
                     assertThat(context).doesNotHaveBean(FileStorageResolver.class);
                     assertThat(context).doesNotHaveBean(FileUploadService.class);
                     assertThat(context).doesNotHaveBean(FileDownloadService.class);
+                    assertThat(context).doesNotHaveBean(FileDeleteService.class);
                     assertThat(context).doesNotHaveBean(SpringDownloadService.class);
                 });
     }
@@ -61,6 +64,7 @@ class FileKitStorageAutoConfigurationTest {
                     assertThat(context).hasSingleBean(FileStorageResolver.class);
                     assertThat(context).hasSingleBean(FileUploadService.class);
                     assertThat(context).hasSingleBean(FileDownloadService.class);
+                    assertThat(context).hasSingleBean(FileDeleteService.class);
                     assertThat(context).hasSingleBean(SpringDownloadService.class);
                 });
     }
@@ -72,6 +76,7 @@ class FileKitStorageAutoConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasSingleBean(FileStorageResolver.class);
                     assertThat(context).hasSingleBean(FileDownloadService.class);
+                    assertThat(context).hasSingleBean(FileDeleteService.class);
                     assertThat(context).hasSingleBean(SpringDownloadService.class);
                     assertThat(context).doesNotHaveBean(FileUploadService.class);
                 });
@@ -107,6 +112,7 @@ class FileKitStorageAutoConfigurationTest {
                 @Override public FileMetadata findByChecksum(String checksum) { return null; }
                 @Override public FileMetadata findByKey(String key) { return null; }
                 @Override public FileMetadata save(FileMetadata metadata) { return metadata; }
+                @Override public void deleteByKey(String key) {}
             };
         }
         @Bean FileFormatExtractor fileFormatExtractor() {
@@ -121,6 +127,7 @@ class FileKitStorageAutoConfigurationTest {
                 @Override public FileMetadata findByChecksum(String checksum) { return null; }
                 @Override public FileMetadata findByKey(String key) { return null; }
                 @Override public FileMetadata save(FileMetadata metadata) { return metadata; }
+                @Override public void deleteByKey(String key) {}
             };
         }
     }

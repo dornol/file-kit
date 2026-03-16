@@ -5,6 +5,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,13 +23,15 @@ class FileUploadCommandTest {
     class Construction {
 
         @Test
-        void validConstruction() {
+        void validConstruction() throws IOException {
+            InputStream is = new ByteArrayInputStream(content);
             FileUploadCommand cmd = new FileUploadCommand(
-                    "key", "file.txt", content, "text/plain", "txt", "bucket");
+                    "key", "file.txt", is, content.length, "text/plain", "txt", "bucket");
 
             assertEquals("key", cmd.key());
             assertEquals("file.txt", cmd.originalFilename());
-            assertArrayEquals(content, cmd.content());
+            assertEquals(content.length, cmd.contentLength());
+            assertArrayEquals(content, cmd.content().readAllBytes());
             assertEquals("text/plain", cmd.mimeType());
             assertEquals("txt", cmd.extension());
             assertEquals("bucket", cmd.bucket());
@@ -33,7 +39,7 @@ class FileUploadCommandTest {
 
         @Test
         void nullOriginalFilename_allowed() {
-            FileUploadCommand cmd = new FileUploadCommand(
+            FileUploadCommand cmd = FileUploadCommand.ofBytes(
                     "key", null, content, "text/plain", "txt", "bucket");
 
             assertNull(cmd.originalFilename());
@@ -41,8 +47,18 @@ class FileUploadCommandTest {
 
         @Test
         void emptyContent_allowed() {
-            assertDoesNotThrow(() -> new FileUploadCommand(
+            assertDoesNotThrow(() -> FileUploadCommand.ofBytes(
                     "key", "f.txt", new byte[0], "text/plain", "txt", "bucket"));
+        }
+
+        @Test
+        void ofBytes_createsCommandFromByteArray() throws IOException {
+            FileUploadCommand cmd = FileUploadCommand.ofBytes(
+                    "key", "file.txt", content, "text/plain", "txt", "bucket");
+
+            assertEquals("key", cmd.key());
+            assertEquals(content.length, cmd.contentLength());
+            assertArrayEquals(content, cmd.content().readAllBytes());
         }
     }
 
@@ -52,35 +68,42 @@ class FileUploadCommandTest {
         @Test
         void nullKey_throws() {
             NullPointerException ex = assertThrows(NullPointerException.class,
-                    () -> new FileUploadCommand(null, "f.txt", content, "text/plain", "txt", "bucket"));
+                    () -> FileUploadCommand.ofBytes(null, "f.txt", content, "text/plain", "txt", "bucket"));
             assertEquals("key", ex.getMessage());
         }
 
         @Test
         void nullContent_throws() {
             NullPointerException ex = assertThrows(NullPointerException.class,
-                    () -> new FileUploadCommand("key", "f.txt", null, "text/plain", "txt", "bucket"));
+                    () -> new FileUploadCommand("key", "f.txt", null, 0, "text/plain", "txt", "bucket"));
             assertEquals("content", ex.getMessage());
+        }
+
+        @Test
+        void negativeContentLength_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new FileUploadCommand("key", "f.txt",
+                            new ByteArrayInputStream(content), -1, "text/plain", "txt", "bucket"));
         }
 
         @Test
         void nullMimeType_throws() {
             NullPointerException ex = assertThrows(NullPointerException.class,
-                    () -> new FileUploadCommand("key", "f.txt", content, null, "txt", "bucket"));
+                    () -> FileUploadCommand.ofBytes("key", "f.txt", content, null, "txt", "bucket"));
             assertEquals("mimeType", ex.getMessage());
         }
 
         @Test
         void nullExtension_throws() {
             NullPointerException ex = assertThrows(NullPointerException.class,
-                    () -> new FileUploadCommand("key", "f.txt", content, "text/plain", null, "bucket"));
+                    () -> FileUploadCommand.ofBytes("key", "f.txt", content, "text/plain", null, "bucket"));
             assertEquals("extension", ex.getMessage());
         }
 
         @Test
         void nullBucket_throws() {
             NullPointerException ex = assertThrows(NullPointerException.class,
-                    () -> new FileUploadCommand("key", "f.txt", content, "text/plain", "txt", null));
+                    () -> FileUploadCommand.ofBytes("key", "f.txt", content, "text/plain", "txt", null));
             assertEquals("bucket", ex.getMessage());
         }
     }
@@ -91,7 +114,7 @@ class FileUploadCommandTest {
         @ParameterizedTest
         @ValueSource(strings = {"bucket", "my-bucket", "my.bucket", "my_bucket", "Bucket123"})
         void validBucketNames(String bucket) {
-            assertDoesNotThrow(() -> new FileUploadCommand(
+            assertDoesNotThrow(() -> FileUploadCommand.ofBytes(
                     "key", "f.txt", content, "text/plain", "txt", bucket));
         }
 
@@ -100,7 +123,7 @@ class FileUploadCommandTest {
                 "bucket#", "../escape", "bucket\n", ""})
         void invalidBucketNames_throws(String bucket) {
             assertThrows(IllegalArgumentException.class,
-                    () -> new FileUploadCommand("key", "f.txt", content, "text/plain", "txt", bucket));
+                    () -> FileUploadCommand.ofBytes("key", "f.txt", content, "text/plain", "txt", bucket));
         }
     }
 }

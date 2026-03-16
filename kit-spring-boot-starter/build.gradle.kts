@@ -24,6 +24,8 @@ dependencies {
     compileOnly(libs.spring.boot.autoconfigure)
     compileOnly(libs.tika.core)
 
+    annotationProcessor(libs.spring.boot.configuration.processor)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.slf4j.simple)

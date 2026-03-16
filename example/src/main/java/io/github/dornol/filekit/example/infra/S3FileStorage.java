@@ -36,8 +36,9 @@ public class S3FileStorage implements FileStorage {
                             .bucket(command.bucket())
                             .key(objectKey)
                             .contentType(command.mimeType())
+                            .contentLength(command.contentLength())
                             .build(),
-                    RequestBody.fromBytes(command.content()));
+                    RequestBody.fromInputStream(command.content(), command.contentLength()));
             return new FileLocation(command.bucket(), objectKey, StorageType.S3);
         } catch (Exception e) {
             throw new FileStorageException(FileStorageException.UPLOAD_FAILED,

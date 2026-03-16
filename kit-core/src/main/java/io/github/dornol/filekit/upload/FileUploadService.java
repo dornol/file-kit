@@ -18,14 +18,20 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
  * Orchestrates the file upload flow: checksum deduplication, format detection,
  * storage delegation, and metadata persistence.
+ *
+ * <p>File content is buffered to a temporary file on disk so that arbitrarily
+ * large uploads can be processed without loading the entire content into memory.</p>
  *
  * <p><strong>Thread safety / TOCTOU note:</strong> The checksum-based deduplication
  * ({@code findByChecksum → save}) is not atomic. Under concurrent uploads of the
@@ -123,34 +129,54 @@ public class FileUploadService {
         validateFileSize(fileSource);
         validateFilename(fileSource.getOriginalFilename());
 
-        byte[] bytes = fileSource.getInputStream().readAllBytes();
+        Path tempFile = Files.createTempFile("file-kit-upload-", ".tmp");
+        try {
+            long bytesWritten;
+            try (InputStream is = fileSource.getInputStream()) {
+                bytesWritten = Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            }
 
-        scanForVirus(bytes);
+            scanForVirus(tempFile);
 
-        FileMetadata existing = findDuplicate(bytes);
-        if (existing != null) {
-            return existing;
+            String checksum;
+            try (InputStream is = Files.newInputStream(tempFile)) {
+                checksum = checksumCalculator.checksum(is);
+            }
+
+            FileMetadata existing = metadataRepository.findByChecksum(checksum);
+            if (existing != null) {
+                log.info("Duplicate file detected (checksum={}), returning existing metadata: {}", checksum, existing.key());
+                return existing;
+            }
+
+            FileFormat format;
+            try (InputStream is = Files.newInputStream(tempFile)) {
+                format = formatExtractor.extract(is);
+            }
+
+            String key = UUID.randomUUID().toString();
+            String name = fileSource.getOriginalFilename() != null
+                    ? fileSource.getOriginalFilename()
+                    : key + "." + format.extension();
+
+            FileStorage storage = storageResolver.resolve(storageType);
+            FileLocation location;
+            try (InputStream is = Files.newInputStream(tempFile)) {
+                location = storage.upload(new FileUploadCommand(
+                        key, fileSource.getOriginalFilename(), is, bytesWritten,
+                        format.mimeType(), format.extension(), bucket));
+            }
+
+            FileMetadata metadata = new FileMetadata(key, name, bytesWritten, checksum, format, location);
+
+            executeCallback(callback, metadata, storage);
+
+            FileMetadata saved = metadataRepository.save(metadata);
+            log.info("File uploaded: key={}, size={}, bucket={}, storageType={}", saved.key(), saved.size(), bucket, storageType);
+            return saved;
+        } finally {
+            Files.deleteIfExists(tempFile);
         }
-
-        FileFormat format = formatExtractor.extract(new ByteArrayInputStream(bytes));
-        String key = UUID.randomUUID().toString();
-        String checksum = checksumCalculator.checksum(bytes);
-        String name = fileSource.getOriginalFilename() != null
-                ? fileSource.getOriginalFilename()
-                : key + "." + format.extension();
-
-        FileStorage storage = storageResolver.resolve(storageType);
-        FileLocation location = storage.upload(new FileUploadCommand(
-                key, fileSource.getOriginalFilename(), bytes,
-                format.mimeType(), format.extension(), bucket));
-
-        FileMetadata metadata = new FileMetadata(key, name, bytes.length, checksum, format, location);
-
-        executeCallback(callback, metadata, storage);
-
-        FileMetadata saved = metadataRepository.save(metadata);
-        log.info("File uploaded: key={}, size={}, bucket={}, storageType={}", saved.key(), saved.size(), bucket, storageType);
-        return saved;
     }
 
     private void validateFileSize(FileSource fileSource) {
@@ -174,11 +200,14 @@ public class FileUploadService {
         }
     }
 
-    private void scanForVirus(byte[] bytes) {
+    private void scanForVirus(Path tempFile) throws IOException {
         if (virusScanner == null) {
             return;
         }
-        ScanResult result = virusScanner.scan(bytes);
+        ScanResult result;
+        try (InputStream is = Files.newInputStream(tempFile)) {
+            result = virusScanner.scan(is);
+        }
         switch (result.status()) {
             case CLEAN -> log.debug("Virus scan passed");
             case INFECTED -> {
@@ -192,15 +221,6 @@ public class FileUploadService {
                         "Virus scan error: " + result.message());
             }
         }
-    }
-
-    private @Nullable FileMetadata findDuplicate(byte[] bytes) {
-        String checksum = checksumCalculator.checksum(bytes);
-        FileMetadata existing = metadataRepository.findByChecksum(checksum);
-        if (existing != null) {
-            log.info("Duplicate file detected (checksum={}), returning existing metadata: {}", checksum, existing.key());
-        }
-        return existing;
     }
 
     private static void executeCallback(@Nullable UploadCallback callback,

@@ -39,6 +39,13 @@ public interface FileMetadataRepository {
     FileMetadata save(FileMetadata metadata);
 
     /**
+     * Deletes metadata by unique file key.
+     *
+     * @param key unique file key
+     */
+    void deleteByKey(String key);
+
+    /**
      * Finds metadata by key, throwing {@link FileStorageException} if not found.
      *
      * @param key unique file key

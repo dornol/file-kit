@@ -29,6 +29,7 @@ spring-web = { module = "org.springframework:spring-web", version.ref = "spring-
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-test", version.ref = "spring-boot" }
+spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor", version.ref = "spring-boot" }
 tika-core = { module = "org.apache.tika:tika-core", version.ref = "tika" }
 aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 aws-sdk-s3 = { module = "software.amazon.awssdk:s3" }

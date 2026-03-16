@@ -66,6 +66,11 @@ class FileMetadataRepositoryTest {
             public FileMetadata save(FileMetadata metadata) {
                 return metadata;
             }
+
+            @Override
+            public void deleteByKey(String key) {
+                // no-op for stub
+            }
         };
     }
 

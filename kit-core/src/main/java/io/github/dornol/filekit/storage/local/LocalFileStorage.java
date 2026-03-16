@@ -79,7 +79,7 @@ public class LocalFileStorage implements FileStorage {
         Path target = validatePath(baseDir.resolve(command.bucket()).resolve(objectKey));
         try {
             Files.createDirectories(target.getParent());
-            Files.write(target, command.content());
+            Files.copy(command.content(), target);
         } catch (IOException e) {
             log.error("Failed to write file: {}", target, e);
             throw new FileStorageException(FileStorageException.UPLOAD_FAILED,

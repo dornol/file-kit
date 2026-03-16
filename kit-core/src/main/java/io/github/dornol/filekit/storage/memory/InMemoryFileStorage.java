@@ -7,6 +7,7 @@ import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileUploadCommand;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,7 +49,12 @@ public class InMemoryFileStorage implements FileStorage {
     @Override
     public FileLocation upload(FileUploadCommand command) {
         String objectKey = command.key() + "." + command.extension();
-        store.put(buildStoreKey(command.bucket(), objectKey), command.content().clone());
+        try {
+            store.put(buildStoreKey(command.bucket(), objectKey), command.content().readAllBytes());
+        } catch (IOException e) {
+            throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
+                    "Failed to read upload content");
+        }
         return new FileLocation(command.bucket(), objectKey, storageType);
     }
 
