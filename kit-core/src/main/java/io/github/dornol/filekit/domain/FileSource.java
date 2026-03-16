@@ -12,7 +12,7 @@ import java.io.InputStream;
  * (e.g. Spring's {@code MultipartFile}) so that core validation
  * logic remains independent of any web framework.</p>
  *
- * @see io.github.dornol.filekit.spring.validator.MultipartFileSource
+ * @see io.github.dornol.filekit.validator.FileSourceValidator
  */
 public interface FileSource {
 

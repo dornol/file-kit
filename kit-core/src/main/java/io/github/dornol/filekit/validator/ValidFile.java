@@ -13,9 +13,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * Jakarta Validation constraint annotation for validating uploaded files.
  *
- * <p>This is the framework-agnostic annotation for use with {@link FileSource}.
+ * <p>This is the framework-agnostic annotation for use with {@code FileSource}.
  * For Spring's {@code MultipartFile}, use
- * {@link io.github.dornol.filekit.spring.validator.ValidMultipartFile} instead.</p>
+ * {@code ValidMultipartFile} from the Spring module instead.</p>
  *
  * <p>Supported validation checks:</p>
  * <ul>

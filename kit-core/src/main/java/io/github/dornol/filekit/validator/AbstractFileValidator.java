@@ -13,7 +13,7 @@ import java.util.Set;
  * and exposes the annotation configuration (allowed media types, max size)
  * to subclasses via protected accessors.</p>
  *
- * @param <T> the type of value being validated (e.g. {@link FileSource})
+ * @param <T> the type of value being validated (e.g. {@code FileSource})
  * @see FileSourceValidator
  */
 public abstract class AbstractFileValidator<T> implements ConstraintValidator<ValidFile, T>, FileValidationCallbacks<T> {
