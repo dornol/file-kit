@@ -11,15 +11,21 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 import java.io.InputStream;
+import java.time.Duration;
 
 public class S3FileStorage implements FileStorage {
 
     private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
 
-    public S3FileStorage(S3Client s3Client) {
+    public S3FileStorage(S3Client s3Client, S3Presigner s3Presigner) {
         this.s3Client = s3Client;
+        this.s3Presigner = s3Presigner;
     }
 
     @Override
@@ -75,6 +81,27 @@ public class S3FileStorage implements FileStorage {
     @Override
     public String resolveUri(FileMetadata metadata) {
         return "/files/" + metadata.key() + "/download";
+    }
+
+    @Override
+    public String generatePresignedUrl(FileMetadata metadata, Duration expiration) {
+        try {
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(metadata.location().bucket())
+                    .key(metadata.location().objectKey())
+                    .build();
+
+            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(expiration)
+                    .getObjectRequest(getObjectRequest)
+                    .build();
+
+            PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+            return presignedRequest.url().toString();
+        } catch (Exception e) {
+            throw new FileStorageException(FileStorageException.PRESIGNED_URL_FAILED,
+                    "Failed to generate pre-signed URL for: " + metadata.location().objectKey(), e);
+        }
     }
 
 }

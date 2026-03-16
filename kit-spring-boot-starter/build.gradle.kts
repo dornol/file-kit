@@ -40,6 +40,7 @@ dependencies {
     testImplementation(libs.spring.boot.test)
     testImplementation(libs.assertj.core)
     testImplementation(libs.tika.core)
+    testImplementation(libs.pdfbox)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

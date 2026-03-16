@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.time.Duration;
 import java.util.Objects;
 
 /**
@@ -37,6 +38,13 @@ public class FileDownloadService extends AbstractFileOperationService {
         Objects.requireNonNull(fileKey, "fileKey");
         FileMetadata metadata = metadataRepository.getByKey(fileKey);
         return resolveStorage(metadata).resolveUri(metadata);
+    }
+
+    public String generatePresignedUrl(String fileKey, Duration expiration) {
+        Objects.requireNonNull(fileKey, "fileKey");
+        Objects.requireNonNull(expiration, "expiration");
+        FileMetadata metadata = metadataRepository.getByKey(fileKey);
+        return resolveStorage(metadata).generatePresignedUrl(metadata, expiration);
     }
 
 }

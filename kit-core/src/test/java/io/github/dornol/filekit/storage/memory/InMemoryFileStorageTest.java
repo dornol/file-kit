@@ -145,4 +145,14 @@ class InMemoryFileStorageTest {
         assertTrue(uri.contains("bucket/key1.txt"));
     }
 
+    @Test
+    void generatePresignedUrl_throwsUnsupported() {
+        FileMetadata metadata = new FileMetadata("key1", "f.txt", 5, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("bucket", "key1.txt", StorageType.MEM));
+
+        assertThrows(UnsupportedOperationException.class,
+                () -> storage.generatePresignedUrl(metadata, java.time.Duration.ofHours(1)));
+    }
+
 }

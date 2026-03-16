@@ -3,9 +3,15 @@ package io.github.dornol.filekit.example.controller;
 import io.github.dornol.filekit.image.ImageMetadata;
 import io.github.dornol.filekit.image.ImageMetadataExtractor;
 import io.github.dornol.filekit.image.ImageResizer;
+import io.github.dornol.filekit.image.ImageWatermarker;
 import io.github.dornol.filekit.image.ResizeOption;
 import io.github.dornol.filekit.image.ResizeResult;
 import io.github.dornol.filekit.image.ScaleMode;
+import io.github.dornol.filekit.image.ThumbnailGenerator;
+import io.github.dornol.filekit.image.ThumbnailOption;
+import io.github.dornol.filekit.image.WatermarkOption;
+import io.github.dornol.filekit.image.WatermarkPosition;
+import io.github.dornol.filekit.image.WatermarkResult;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -25,10 +31,17 @@ public class ImageController {
 
     private final ImageMetadataExtractor metadataExtractor;
     private final ImageResizer resizer;
+    private final ThumbnailGenerator thumbnailGenerator;
+    private final ImageWatermarker watermarker;
 
-    public ImageController(ImageMetadataExtractor metadataExtractor, ImageResizer resizer) {
+    public ImageController(ImageMetadataExtractor metadataExtractor,
+                           ImageResizer resizer,
+                           ThumbnailGenerator thumbnailGenerator,
+                           ImageWatermarker watermarker) {
         this.metadataExtractor = metadataExtractor;
         this.resizer = resizer;
+        this.thumbnailGenerator = thumbnailGenerator;
+        this.watermarker = watermarker;
     }
 
     @PostMapping("/metadata")
@@ -57,8 +70,45 @@ public class ImageController {
         ResizeOption option = new ResizeOption(width, height, scaleMode, outputFormat, quality);
         ResizeResult result = resizer.resize(bytes, option);
 
-        String format = result.metadata().format();
-        String mediaType = switch (format.toLowerCase()) {
+        return buildImageResponse(result.data(), result.metadata(),
+                "resized_" + width + "x" + height + "." + result.metadata().format());
+    }
+
+    @PostMapping("/thumbnail")
+    public ResponseEntity<byte[]> thumbnail(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "maxDimension", defaultValue = "200") int maxDimension,
+            @RequestParam(value = "quality", defaultValue = "0.8") float quality,
+            @RequestParam(value = "outputFormat", required = false) String outputFormat
+    ) throws IOException {
+        byte[] bytes = file.getBytes();
+        ThumbnailOption option = new ThumbnailOption(maxDimension, outputFormat, quality);
+        ResizeResult result = thumbnailGenerator.generate(bytes, option);
+
+        return buildImageResponse(result.data(), result.metadata(),
+                "thumbnail_" + maxDimension + "." + result.metadata().format());
+    }
+
+    @PostMapping("/watermark")
+    public ResponseEntity<byte[]> watermark(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("text") String text,
+            @RequestParam(value = "position", defaultValue = "CENTER") WatermarkPosition position,
+            @RequestParam(value = "opacity", defaultValue = "0.5") float opacity,
+            @RequestParam(value = "fontSize", defaultValue = "24") int fontSize
+    ) throws IOException {
+        byte[] bytes = file.getBytes();
+        WatermarkOption option = new WatermarkOption(
+                WatermarkOption.WatermarkType.TEXT, text, null,
+                position, opacity, "SansSerif", fontSize, null, 0.85f);
+        WatermarkResult result = watermarker.apply(bytes, option);
+
+        return buildImageResponse(result.data(), result.metadata(),
+                "watermarked." + result.metadata().format());
+    }
+
+    private ResponseEntity<byte[]> buildImageResponse(byte[] data, ImageMetadata metadata, String filename) {
+        String mediaType = switch (metadata.format().toLowerCase()) {
             case "jpeg", "jpg" -> "image/jpeg";
             case "png" -> "image/png";
             case "gif" -> "image/gif";
@@ -66,14 +116,12 @@ public class ImageController {
             default -> "application/octet-stream";
         };
 
-        String filename = "resized_" + width + "x" + height + "." + format;
-
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(mediaType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                .header("X-Image-Width", String.valueOf(result.metadata().width()))
-                .header("X-Image-Height", String.valueOf(result.metadata().height()))
-                .header("X-Image-Format", result.metadata().format())
-                .body(result.data());
+                .header("X-Image-Width", String.valueOf(metadata.width()))
+                .header("X-Image-Height", String.valueOf(metadata.height()))
+                .header("X-Image-Format", metadata.format())
+                .body(data);
     }
 }

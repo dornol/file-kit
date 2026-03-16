@@ -9,15 +9,18 @@ import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class FileDownloadServiceTest {
@@ -41,70 +44,162 @@ class FileDownloadServiceTest {
         service = new FileDownloadService(metadataRepository, storageResolver);
     }
 
-    @Test
-    void download_returnsResultWithStream() {
-        InputStream content = new ByteArrayInputStream("hello".getBytes());
-        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
-        when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
-        when(fileStorage.load(metadata)).thenReturn(content);
+    // ── Download ─────────────────────────────────────────────────────
 
-        DownloadResult result = service.download("file-key");
+    @Nested
+    class Download {
 
-        assertNotNull(result);
-        assertEquals(metadata, result.metadata());
-        assertEquals(content, result.content());
+        @Test
+        void returnsResultWithStream() {
+            InputStream content = new ByteArrayInputStream("hello".getBytes());
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(metadata)).thenReturn(content);
+
+            DownloadResult result = service.download("file-key");
+
+            assertNotNull(result);
+            assertEquals(metadata, result.metadata());
+            assertEquals(content, result.content());
+        }
+
+        @Test
+        void throwsWhenFileNotFound() {
+            when(metadataRepository.getByKey("missing")).thenThrow(
+                    new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found: missing"));
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> service.download("missing"));
+            assertEquals(FileStorageException.FILE_NOT_FOUND, ex.getMessageKey());
+        }
+
+        @Test
+        void nullFileKey_throws() {
+            assertThrows(NullPointerException.class, () -> service.download(null));
+        }
     }
 
-    @Test
-    void download_throwsWhenFileNotFound() {
-        when(metadataRepository.getByKey("missing")).thenThrow(
-                new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found: missing"));
+    // ── Resolve URI ──────────────────────────────────────────────────
 
-        assertThrows(FileStorageException.class, () -> service.download("missing"));
-    }
+    @Nested
+    class ResolveUri {
 
-    @Test
-    void resolveUri_returnsUri() {
-        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
-        when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
-        when(fileStorage.resolveUri(metadata)).thenReturn("https://example.com/file");
+        @Test
+        void returnsUri() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.resolveUri(metadata)).thenReturn("https://example.com/file");
 
-        String uri = service.resolveUri("file-key");
-        assertEquals("https://example.com/file", uri);
+            String uri = service.resolveUri("file-key");
+            assertEquals("https://example.com/file", uri);
+        }
+
+        @Test
+        void throwsWhenFileNotFound() {
+            when(metadataRepository.getByKey("missing")).thenThrow(
+                    new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found: missing"));
+
+            assertThrows(FileStorageException.class, () -> service.resolveUri("missing"));
+        }
+
+        @Test
+        void nullFileKey_throws() {
+            assertThrows(NullPointerException.class, () -> service.resolveUri(null));
+        }
     }
 
     // ── Constructor validation ───────────────────────────────────────
 
-    @Test
-    void nullMetadataRepository_throws() {
-        assertThrows(NullPointerException.class,
-                () -> new FileDownloadService(null, storageResolver));
+    @Nested
+    class ConstructorValidation {
+
+        @Test
+        void nullMetadataRepository_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new FileDownloadService(null, storageResolver));
+        }
+
+        @Test
+        void nullStorageResolver_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new FileDownloadService(metadataRepository, null));
+        }
     }
 
-    @Test
-    void nullStorageResolver_throws() {
-        assertThrows(NullPointerException.class,
-                () -> new FileDownloadService(metadataRepository, null));
+    // ── Pre-signed URL ───────────────────────────────────────────────
+
+    @Nested
+    class PresignedUrl {
+
+        @Test
+        void delegatesToStorage() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.generatePresignedUrl(metadata, Duration.ofHours(1)))
+                    .thenReturn("https://example.com/presigned");
+
+            String url = service.generatePresignedUrl("file-key", Duration.ofHours(1));
+
+            assertEquals("https://example.com/presigned", url);
+            verify(fileStorage).generatePresignedUrl(metadata, Duration.ofHours(1));
+        }
+
+        @Test
+        void throwsWhenFileNotFound() {
+            when(metadataRepository.getByKey("missing")).thenThrow(
+                    new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found"));
+
+            assertThrows(FileStorageException.class,
+                    () -> service.generatePresignedUrl("missing", Duration.ofHours(1)));
+        }
+
+        @Test
+        void throwsWhenStorageDoesNotSupport() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.generatePresignedUrl(metadata, Duration.ofHours(1)))
+                    .thenThrow(new UnsupportedOperationException("Not supported"));
+
+            assertThrows(UnsupportedOperationException.class,
+                    () -> service.generatePresignedUrl("file-key", Duration.ofHours(1)));
+        }
+
+        @Test
+        void nullFileKey_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> service.generatePresignedUrl(null, Duration.ofHours(1)));
+        }
+
+        @Test
+        void nullExpiration_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> service.generatePresignedUrl("file-key", null));
+        }
+
+        @Test
+        void shortExpiration() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            Duration shortDuration = Duration.ofSeconds(30);
+            when(fileStorage.generatePresignedUrl(metadata, shortDuration))
+                    .thenReturn("https://example.com/short");
+
+            String url = service.generatePresignedUrl("file-key", shortDuration);
+
+            assertEquals("https://example.com/short", url);
+        }
+
+        @Test
+        void longExpiration() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            Duration longDuration = Duration.ofDays(7);
+            when(fileStorage.generatePresignedUrl(metadata, longDuration))
+                    .thenReturn("https://example.com/long");
+
+            String url = service.generatePresignedUrl("file-key", longDuration);
+
+            assertEquals("https://example.com/long", url);
+        }
     }
-
-    @Test
-    void resolveUri_throwsWhenFileNotFound() {
-        when(metadataRepository.getByKey("missing")).thenThrow(
-                new FileStorageException(FileStorageException.FILE_NOT_FOUND, "File not found: missing"));
-
-        assertThrows(FileStorageException.class, () -> service.resolveUri("missing"));
-    }
-
-    // ── Null fileKey validation ──────────────────────────────────────
-
-    @Test
-    void download_nullFileKey_throws() {
-        assertThrows(NullPointerException.class, () -> service.download(null));
-    }
-
-    @Test
-    void resolveUri_nullFileKey_throws() {
-        assertThrows(NullPointerException.class, () -> service.resolveUri(null));
-    }
-
 }

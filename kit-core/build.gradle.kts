@@ -18,12 +18,14 @@ dependencies {
     compileOnly(libs.slf4j.api)
     compileOnly(libs.jakarta.validation.api)
     compileOnly(libs.jspecify)
+    compileOnly(libs.pdfbox)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.slf4j.simple)
     testImplementation(libs.jakarta.validation.api)
     testImplementation(libs.mockito.core)
+    testImplementation(libs.pdfbox)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

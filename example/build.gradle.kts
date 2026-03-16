@@ -18,6 +18,7 @@ java {
 dependencies {
     implementation(project(":kit-spring-boot-starter"))
     implementation(libs.tika.core)
+    implementation(libs.pdfbox)
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")

@@ -15,10 +15,13 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.5'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.7'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
+
+// Optional: for PDF metadata extraction
+implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 ```
 
 ```xml
@@ -26,7 +29,7 @@ implementation 'org.apache.tika:tika-core:3.1.0'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.0.5</version>
+    <version>0.0.7</version>
 </dependency>
 ```
 
@@ -284,6 +287,54 @@ downloadService.download(fileKey);
 deleteService.delete(fileKey);
 ```
 
+### Pre-signed URL
+
+Generate time-limited direct-access URLs for storage backends that support it (e.g. S3):
+
+```java
+// Generate a pre-signed URL valid for 1 hour
+String url = downloadService.generatePresignedUrl(fileKey, Duration.ofHours(1));
+```
+
+The default `FileStorage` implementation throws `UnsupportedOperationException`. Override `generatePresignedUrl()` in your storage implementation:
+
+```java
+@Override
+public String generatePresignedUrl(FileMetadata metadata, Duration expiration) {
+    GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+            .signatureDuration(expiration)
+            .getObjectRequest(GetObjectRequest.builder()
+                    .bucket(metadata.location().bucket())
+                    .key(metadata.location().objectKey())
+                    .build())
+            .build();
+    return s3Presigner.presignGetObject(presignRequest).url().toString();
+}
+```
+
+### Range request (206 Partial Content)
+
+`FileResponseBuilder` supports HTTP Range requests for streaming and resumable downloads:
+
+```java
+@GetMapping("/files/{fileKey}/stream")
+public ResponseEntity<Resource> stream(
+        @PathVariable String fileKey,
+        @RequestHeader(value = "Range", required = false) String rangeHeader) {
+    DownloadResult result = downloadService.download(fileKey);
+    return FileResponseBuilder.inline(result.metadata())
+            .range(rangeHeader)
+            .body(new InputStreamResource(result.content()));
+}
+```
+
+Behavior:
+- No Range header → `200 OK` with `Accept-Ranges: bytes`
+- Valid Range → `206 Partial Content` with `Content-Range` header
+- Invalid Range → `416 Range Not Satisfiable`
+
+`FileStorage` also provides a default `loadRange(metadata, start, end)` method that skips to the start offset and wraps the stream with `BoundedInputStream` for efficient partial reads.
+
 ### Transactional upload with callback
 
 Run business logic after upload — if it fails, the file is automatically deleted:
@@ -371,7 +422,7 @@ If no `VirusScanner` bean is registered, scanning is skipped entirely.
 
 ### FileResponseBuilder
 
-Utility for building download/inline HTTP responses with proper Content-Disposition (RFC 5987, Korean filename support):
+Utility for building download/inline HTTP responses with proper Content-Disposition (RFC 5987, Korean filename support) and Range request handling:
 
 ```java
 // Download
@@ -385,6 +436,11 @@ return FileResponseBuilder.inline(metadata)
 // Custom filename + content type
 return FileResponseBuilder.download("report.xlsx")
         .contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        .body(resource);
+
+// Range request support (206 Partial Content)
+return FileResponseBuilder.inline(metadata)
+        .range(request.getHeader("Range"))
         .body(resource);
 ```
 
@@ -416,6 +472,22 @@ public class FileController {
     public ResponseEntity<?> delete(@PathVariable String fileKey) {
         deleteService.delete(fileKey);
         return ResponseEntity.ok(Map.of("status", "deleted"));
+    }
+
+    @GetMapping("/files/{fileKey}/presigned-url")
+    public ResponseEntity<?> presignedUrl(@PathVariable String fileKey) {
+        String url = downloadService.generatePresignedUrl(fileKey, Duration.ofHours(1));
+        return ResponseEntity.ok(Map.of("url", url));
+    }
+
+    @GetMapping("/files/{fileKey}/stream")
+    public ResponseEntity<Resource> stream(
+            @PathVariable String fileKey,
+            @RequestHeader(value = "Range", required = false) String rangeHeader) {
+        DownloadResult result = downloadService.download(fileKey);
+        return FileResponseBuilder.inline(result.metadata())
+                .range(rangeHeader)
+                .body(new InputStreamResource(result.content()));
     }
 }
 ```
@@ -456,10 +528,13 @@ The following beans are registered automatically when their dependencies are pre
 | `SpringDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
 | `ImageMetadataExtractor` | Always (`ImageIOMetadataExtractor` default, overridable) |
 | `ImageResizer` | Always (`ImageIOResizer` default, overridable) |
+| `ImageWatermarker` | Always (`ImageIOWatermarker` default, overridable) |
+| `ThumbnailGenerator` | Always (`DefaultThumbnailGenerator` default, overridable) |
+| `PdfMetadataExtractor` | When Apache PDFBox is on the classpath (`PdfBoxMetadataExtractor` default, overridable) |
 
 ## Image Processing
 
-file-kit provides image metadata extraction and resizing as standalone utilities. These are **not** integrated into the upload flow — use them directly where needed.
+file-kit provides image metadata extraction, resizing, thumbnail generation, and watermarking as standalone utilities. These are **not** integrated into the upload flow — use them directly where needed.
 
 ### Metadata extraction
 
@@ -508,14 +583,124 @@ ResizeResult converted = resizer.resize(imageBytes, option);
 
 `ResizeOption` validates its parameters at construction: `targetWidth` and `targetHeight` must be positive, and `quality` must be between 0.0 and 1.0 (inclusive).
 
+### Thumbnail generation
+
+`ThumbnailGenerator` provides a simplified API for generating thumbnails:
+
+```java
+@Autowired ThumbnailGenerator thumbnailGenerator;
+
+byte[] imageBytes = Files.readAllBytes(Path.of("photo.jpg"));
+
+// Default thumbnail (200px max dimension, 0.8 quality)
+ResizeResult thumbnail = thumbnailGenerator.generate(imageBytes, ThumbnailOption.defaults());
+
+// Custom size
+ResizeResult small = thumbnailGenerator.generate(imageBytes, ThumbnailOption.ofSize(128));
+
+// Custom size + format + quality
+ThumbnailOption option = new ThumbnailOption(256, "jpeg", 0.9f);
+ResizeResult custom = thumbnailGenerator.generate(imageBytes, option);
+```
+
+The default `DefaultThumbnailGenerator` delegates to `ImageResizer` with `ScaleMode.FIT`, preserving aspect ratio.
+
+### Watermark
+
+`ImageWatermarker` applies text or image watermarks to images:
+
+```java
+@Autowired ImageWatermarker watermarker;
+
+byte[] imageBytes = Files.readAllBytes(Path.of("photo.jpg"));
+
+// Text watermark (center, 50% opacity)
+WatermarkOption textOption = WatermarkOption.text("© 2026 ACME", WatermarkPosition.CENTER, 0.5f);
+WatermarkResult result = watermarker.apply(imageBytes, textOption);
+// result.data() → watermarked image bytes
+// result.metadata() → width, height, format
+
+// Image watermark (logo overlay, bottom-right corner)
+byte[] logo = Files.readAllBytes(Path.of("logo.png"));
+WatermarkOption logoOption = WatermarkOption.image(logo, WatermarkPosition.BOTTOM_RIGHT, 0.7f);
+WatermarkResult logoResult = watermarker.apply(imageBytes, logoOption);
+
+// Tiled watermark (repeated across entire image)
+WatermarkOption tiledOption = WatermarkOption.text("DRAFT", WatermarkPosition.TILED, 0.3f);
+WatermarkResult tiledResult = watermarker.apply(imageBytes, tiledOption);
+
+// Full control: custom font, font size, output format, quality
+WatermarkOption custom = new WatermarkOption(
+        WatermarkOption.WatermarkType.TEXT, "Confidential", null,
+        WatermarkPosition.CENTER, 0.5f, "Serif", 48, "jpeg", 0.9f);
+WatermarkResult customResult = watermarker.apply(imageBytes, custom);
+```
+
+**Watermark positions:**
+
+| Position | Behavior |
+|----------|----------|
+| `CENTER` | Centered on the image |
+| `TOP_LEFT` | Top-left corner with padding |
+| `TOP_RIGHT` | Top-right corner with padding |
+| `BOTTOM_LEFT` | Bottom-left corner with padding |
+| `BOTTOM_RIGHT` | Bottom-right corner with padding |
+| `TILED` | Repeated across the entire image |
+
 ### Custom implementation
 
-Both `ImageMetadataExtractor` and `ImageResizer` are SPI interfaces with default `ImageIO`-based implementations. Register your own bean to override:
+`ImageMetadataExtractor`, `ImageResizer`, `ImageWatermarker`, and `ThumbnailGenerator` are all SPI interfaces with default `ImageIO`-based implementations. Register your own bean to override:
 
 ```java
 @Bean
 public ImageResizer imageResizer() {
     return new ThumbnailatorResizer(); // e.g., using Thumbnailator library
+}
+
+@Bean
+public ImageWatermarker imageWatermarker() {
+    return new MyCustomWatermarker(); // e.g., using external library
+}
+```
+
+## PDF Metadata Extraction
+
+Extract metadata from PDF documents using Apache PDFBox. This feature is auto-configured when PDFBox is on the classpath.
+
+### Add PDFBox dependency
+
+```groovy
+implementation 'org.apache.pdfbox:pdfbox:3.0.4'
+```
+
+### Usage
+
+```java
+@Autowired PdfMetadataExtractor pdfExtractor;
+
+byte[] pdfBytes = Files.readAllBytes(Path.of("document.pdf"));
+PdfMetadata metadata = pdfExtractor.extract(pdfBytes);
+
+metadata.pageCount();    // number of pages
+metadata.title();        // document title (nullable)
+metadata.author();       // document author (nullable)
+metadata.creator();      // creator application (nullable)
+metadata.creationDate(); // creation date as Instant (nullable)
+
+// Also works with InputStream
+try (InputStream is = Files.newInputStream(Path.of("document.pdf"))) {
+    PdfMetadata meta = pdfExtractor.extract(is);
+}
+```
+
+### Custom implementation
+
+`PdfMetadataExtractor` is an SPI interface. Register your own bean to override:
+
+```java
+@Bean
+public PdfMetadataExtractor pdfMetadataExtractor() {
+    return new MyCustomPdfExtractor(); // e.g., using iText or other library
 }
 ```
 
@@ -558,7 +743,10 @@ file-kit.storage.file-too-large=File size exceeds the maximum allowed
 file-kit.storage.invalid-filename=Invalid filename
 file-kit.storage.virus-detected=Virus detected in uploaded file
 file-kit.storage.virus-scan-error=Virus scan failed
+file-kit.storage.presigned-url-failed=Pre-signed URL generation failed
+file-kit.storage.range-not-satisfiable=Invalid byte range requested
 file-kit.image.processing-failed=Image processing failed
+file-kit.pdf.processing-failed=PDF processing failed
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.
@@ -598,6 +786,15 @@ boolean validName = helper.isValidFilename(source);
 
 Or use `@ValidFile` with Jakarta Validation and `FileSourceValidator`.
 
+Image processing, thumbnail, watermark, and PDF metadata extraction can also be used standalone without Spring:
+
+```java
+ImageResizer resizer = new ImageIOResizer();
+ImageWatermarker watermarker = new ImageIOWatermarker();
+ThumbnailGenerator thumbnailGenerator = new DefaultThumbnailGenerator(resizer);
+PdfMetadataExtractor pdfExtractor = new PdfBoxMetadataExtractor();
+```
+
 ## Running the Example
 
 The `example` module is a full Spring Boot app with JPA (PostgreSQL), S3 (MinIO), and a web UI.
@@ -614,6 +811,23 @@ docker compose up -d
 Open `http://localhost:8880` — upload files to LOCAL or S3, view the file list, download, and delete.
 
 MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
+
+### Example endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/upload` | POST | Upload a file (multipart) |
+| `/files` | GET | List all uploaded files |
+| `/files/{fileKey}/download` | GET | Download a file |
+| `/files/{fileKey}/stream` | GET | Stream a file with Range header support |
+| `/files/{fileKey}/presigned-url` | GET | Generate a pre-signed URL |
+| `/files/{fileKey}/uri` | GET | Resolve file URI |
+| `/files/{fileKey}` | DELETE | Delete a file |
+| `/image/metadata` | POST | Extract image metadata |
+| `/image/resize` | POST | Resize an image |
+| `/image/thumbnail` | POST | Generate a thumbnail |
+| `/image/watermark` | POST | Apply a text watermark |
+| `/pdf/metadata` | POST | Extract PDF metadata |
 
 ## Security Considerations
 
@@ -673,6 +887,7 @@ file-kit does **not** handle download authorization. Access control (e.g., verif
 - Java 17+
 - Jakarta Validation 3.x (for annotation-based validation)
 - Spring Boot 3+ / 4+ (for the starter module)
+- Apache PDFBox 3.x (optional, for PDF metadata extraction)
 
 ## License
 

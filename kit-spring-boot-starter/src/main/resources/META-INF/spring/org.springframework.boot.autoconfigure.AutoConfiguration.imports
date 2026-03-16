@@ -1,1 +1,2 @@
 io.github.dornol.filekit.spring.autoconfigure.FileKitAutoConfiguration
+io.github.dornol.filekit.spring.autoconfigure.PdfKitAutoConfiguration

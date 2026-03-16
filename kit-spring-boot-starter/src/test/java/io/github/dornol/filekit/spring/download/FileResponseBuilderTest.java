@@ -303,8 +303,6 @@ class FileResponseBuilderTest {
             ResponseEntity<String> response = FileResponseBuilder.download("file.txt")
                     .body("data");
 
-            // When no content type is set, Spring may set default or leave null
-            // The important thing is no custom header was explicitly set
             assertThat(response.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
         }
 
@@ -314,6 +312,198 @@ class FileResponseBuilderTest {
                     .body("data");
 
             assertThat(response.getHeaders().getContentLength()).isEqualTo(-1);
+        }
+    }
+
+    // ── Range request support ────────────────────────────────────────
+
+    @Nested
+    class RangeRequest {
+
+        @Test
+        void noRange_returns200WithAcceptRanges() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata).body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+        }
+
+        @Test
+        void validRange_returns206() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-499")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE))
+                    .isEqualTo("bytes 0-499/1024");
+            assertThat(response.getHeaders().getContentLength()).isEqualTo(500);
+        }
+
+        @Test
+        void openEndedRange_returns206() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=500-")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE))
+                    .isEqualTo("bytes 500-1023/1024");
+            assertThat(response.getHeaders().getContentLength()).isEqualTo(524);
+        }
+
+        @Test
+        void suffixRange_returns206() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=-100")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE))
+                    .isEqualTo("bytes 924-1023/1024");
+            assertThat(response.getHeaders().getContentLength()).isEqualTo(100);
+        }
+
+        @Test
+        void singleByteRange_returns206() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-0")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            assertThat(response.getHeaders().getContentLength()).isEqualTo(1);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE))
+                    .isEqualTo("bytes 0-0/1024");
+        }
+
+        @Test
+        void invalidRange_returns416() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=2000-3000")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(416);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE))
+                    .isEqualTo("bytes */1024");
+        }
+
+        @Test
+        void multiRange_returns416() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-100,200-300")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(416);
+        }
+
+        @Test
+        void malformedRange_returns416() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=abc-def")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(416);
+        }
+
+        @Test
+        void invalidPrefix_returns416() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("items=0-499")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(416);
+        }
+
+        @Test
+        void nullRange_returns200() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range(null)
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+        }
+
+        @Test
+        void rangeWithoutContentLength_returns200() {
+            ResponseEntity<String> response = FileResponseBuilder.download("file.txt")
+                    .range("bytes=0-499")
+                    .body("data");
+
+            // Without contentLength, range cannot be applied
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+        }
+
+        @Test
+        void validRange_preservesContentType() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-99")
+                    .body("data");
+
+            assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE))
+                    .isEqualTo("application/pdf");
+        }
+
+        @Test
+        void validRange_hasAcceptRanges() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-99")
+                    .body("data");
+
+            assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+        }
+
+        @Test
+        void validRange_setsNosniffHeader() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-99")
+                    .body("data");
+
+            assertThat(response.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
+        }
+
+        @Test
+        void validRange_setsContentDisposition() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-99")
+                    .body("data");
+
+            String cd = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+            assertThat(cd).startsWith("attachment;");
+            assertThat(cd).contains("report.pdf");
+        }
+
+        @Test
+        void validRange_withCache() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .cache(Duration.ofHours(1))
+                    .range("bytes=0-99")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            assertThat(response.getHeaders().getCacheControl()).contains("max-age=3600");
+        }
+
+        @Test
+        void inline_withRange_returns206() {
+            ResponseEntity<String> response = FileResponseBuilder.inline(metadata)
+                    .range("bytes=0-499")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            String cd = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+            assertThat(cd).startsWith("inline;");
+        }
+
+        @Test
+        void rangeEndExceedsSize_clampedTo206() {
+            ResponseEntity<String> response = FileResponseBuilder.download(metadata)
+                    .range("bytes=0-9999")
+                    .body("data");
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE))
+                    .isEqualTo("bytes 0-1023/1024");
+            assertThat(response.getHeaders().getContentLength()).isEqualTo(1024);
         }
     }
 }

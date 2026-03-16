@@ -1,10 +1,13 @@
 package io.github.dornol.filekit.spring.download;
 
+import io.github.dornol.filekit.domain.ByteRange;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.storage.FileStorageException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.net.URLEncoder;
@@ -26,9 +29,9 @@ import java.util.Objects;
  *         .cache(Duration.ofHours(1))
  *         .body(resource);
  *
- * // Custom content type
- * return FileResponseBuilder.download("report.xlsx")
- *         .contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+ * // Range request support
+ * return FileResponseBuilder.inline(metadata)
+ *         .range(rangeHeaderValue)
  *         .body(resource);
  * }</pre>
  */
@@ -39,6 +42,7 @@ public final class FileResponseBuilder {
     private @Nullable String contentType;
     private @Nullable Long contentLength;
     private @Nullable Duration cacheDuration;
+    private @Nullable String rangeHeaderValue;
 
     private FileResponseBuilder(String filename, FileFetchAction action) {
         Objects.requireNonNull(filename, "filename");
@@ -124,21 +128,62 @@ public final class FileResponseBuilder {
     }
 
     /**
+     * Sets the Range header value for partial content responses.
+     * When set and valid, the response will be 206 Partial Content.
+     *
+     * @param rangeHeaderValue the Range header value (e.g. "bytes=0-499"), or null for full content
+     */
+    public FileResponseBuilder range(@Nullable String rangeHeaderValue) {
+        this.rangeHeaderValue = rangeHeaderValue;
+        return this;
+    }
+
+    /**
      * Builds the {@link ResponseEntity.BodyBuilder} with all configured headers.
      * Call {@code .body(resource)} on the result to complete the response.
      *
      * @return configured ResponseEntity.BodyBuilder
      */
     public ResponseEntity.BodyBuilder toResponseBuilder() {
+        if (rangeHeaderValue != null && contentLength != null) {
+            try {
+                ByteRange byteRange = ByteRange.parse(rangeHeaderValue, contentLength);
+                return buildRangeResponse(byteRange);
+            } catch (FileStorageException e) {
+                // 416 Range Not Satisfiable
+                return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                        .header(HttpHeaders.CONTENT_RANGE, "bytes */" + contentLength);
+            }
+        }
+
         ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition())
-                .header("X-Content-Type-Options", "nosniff");
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes");
 
         if (contentType != null) {
             builder.header(HttpHeaders.CONTENT_TYPE, contentType);
         }
         if (contentLength != null) {
             builder.contentLength(contentLength);
+        }
+        if (cacheDuration != null) {
+            builder.cacheControl(CacheControl.maxAge(cacheDuration));
+        }
+
+        return builder;
+    }
+
+    private ResponseEntity.BodyBuilder buildRangeResponse(ByteRange byteRange) {
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                .header(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition())
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                .header(HttpHeaders.CONTENT_RANGE, byteRange.toContentRangeHeader())
+                .contentLength(byteRange.length());
+
+        if (contentType != null) {
+            builder.header(HttpHeaders.CONTENT_TYPE, contentType);
         }
         if (cacheDuration != null) {
             builder.cacheControl(CacheControl.maxAge(cacheDuration));

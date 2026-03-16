@@ -1,12 +1,20 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
+import io.github.dornol.filekit.image.DefaultThumbnailGenerator;
 import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
 import io.github.dornol.filekit.image.ImageIOResizer;
+import io.github.dornol.filekit.image.ImageIOWatermarker;
 import io.github.dornol.filekit.image.ImageMetadata;
 import io.github.dornol.filekit.image.ImageMetadataExtractor;
 import io.github.dornol.filekit.image.ImageResizer;
+import io.github.dornol.filekit.image.ImageWatermarker;
 import io.github.dornol.filekit.image.ResizeOption;
 import io.github.dornol.filekit.image.ResizeResult;
+import io.github.dornol.filekit.image.ThumbnailGenerator;
+import io.github.dornol.filekit.image.ThumbnailOption;
+import io.github.dornol.filekit.image.WatermarkOption;
+import io.github.dornol.filekit.image.WatermarkPosition;
+import io.github.dornol.filekit.image.WatermarkResult;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
@@ -168,6 +176,50 @@ class FileKitAutoConfigurationTest {
                 });
     }
 
+    // ── Watermark bean ──────────────────────────────────────────────
+
+    @Test
+    void registersDefaultImageWatermarker() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ImageWatermarker.class);
+            assertThat(context.getBean(ImageWatermarker.class))
+                    .isInstanceOf(ImageIOWatermarker.class);
+        });
+    }
+
+    @Test
+    void userDefinedImageWatermarker_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomWatermarkerConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ImageWatermarker.class);
+                    assertThat(context.getBean(ImageWatermarker.class))
+                            .isSameAs(context.getBean("customWatermarker"));
+                });
+    }
+
+    // ── Thumbnail bean ──────────────────────────────────────────────
+
+    @Test
+    void registersDefaultThumbnailGenerator() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ThumbnailGenerator.class);
+            assertThat(context.getBean(ThumbnailGenerator.class))
+                    .isInstanceOf(DefaultThumbnailGenerator.class);
+        });
+    }
+
+    @Test
+    void userDefinedThumbnailGenerator_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomThumbnailConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ThumbnailGenerator.class);
+                    assertThat(context.getBean(ThumbnailGenerator.class))
+                            .isSameAs(context.getBean("customThumbnailGenerator"));
+                });
+    }
+
     // ── Test configurations ─────────────────────────────────────────
 
     @Configuration
@@ -211,6 +263,24 @@ class FileKitAutoConfigurationTest {
 
         @Bean
         ImageResizer customImageResizer() {
+            return (imageBytes, option) -> new ResizeResult(
+                    new byte[0], new ImageMetadata(1, 1, "custom"));
+        }
+    }
+
+    @Configuration
+    static class CustomWatermarkerConfig {
+        @Bean
+        ImageWatermarker customWatermarker() {
+            return (imageBytes, option) -> new WatermarkResult(
+                    new byte[0], new ImageMetadata(1, 1, "custom"));
+        }
+    }
+
+    @Configuration
+    static class CustomThumbnailConfig {
+        @Bean
+        ThumbnailGenerator customThumbnailGenerator() {
             return (imageBytes, option) -> new ResizeResult(
                     new byte[0], new ImageMetadata(1, 1, "custom"));
         }

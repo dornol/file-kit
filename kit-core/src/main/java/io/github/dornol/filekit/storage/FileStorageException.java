@@ -63,4 +63,13 @@ public class FileStorageException extends RuntimeException {
     /** Image processing (metadata extraction or resize) failed. */
     public static final String IMAGE_PROCESSING_FAILED = "file-kit.image.processing-failed";
 
+    /** Pre-signed URL generation failed. */
+    public static final String PRESIGNED_URL_FAILED = "file-kit.storage.presigned-url-failed";
+
+    /** PDF processing failed. */
+    public static final String PDF_PROCESSING_FAILED = "file-kit.pdf.processing-failed";
+
+    /** Range request failed (e.g. invalid range). */
+    public static final String RANGE_NOT_SATISFIABLE = "file-kit.storage.range-not-satisfiable";
+
 }

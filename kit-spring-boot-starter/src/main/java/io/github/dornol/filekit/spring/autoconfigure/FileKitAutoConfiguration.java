@@ -2,10 +2,14 @@ package io.github.dornol.filekit.spring.autoconfigure;
 
 import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.download.FileDownloadService;
+import io.github.dornol.filekit.image.DefaultThumbnailGenerator;
 import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
 import io.github.dornol.filekit.image.ImageIOResizer;
+import io.github.dornol.filekit.image.ImageIOWatermarker;
 import io.github.dornol.filekit.image.ImageMetadataExtractor;
 import io.github.dornol.filekit.image.ImageResizer;
+import io.github.dornol.filekit.image.ImageWatermarker;
+import io.github.dornol.filekit.image.ThumbnailGenerator;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
@@ -167,6 +171,20 @@ public class FileKitAutoConfiguration {
     public ImageResizer imageResizer(ImageMetadataExtractor metadataExtractor) {
         log.debug("Registering default ImageIOResizer");
         return new ImageIOResizer(metadataExtractor);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ImageWatermarker imageWatermarker(ImageMetadataExtractor metadataExtractor) {
+        log.debug("Registering default ImageIOWatermarker");
+        return new ImageIOWatermarker(metadataExtractor);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ThumbnailGenerator thumbnailGenerator(ImageResizer imageResizer) {
+        log.debug("Registering default DefaultThumbnailGenerator");
+        return new DefaultThumbnailGenerator(imageResizer);
     }
 
 }
