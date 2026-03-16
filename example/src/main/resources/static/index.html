@@ -59,6 +59,46 @@
     </div>
 
     <div class="card">
+        <h2>Image Metadata</h2>
+        <p class="desc">Extract width, height, format from an image</p>
+        <form id="metadataForm">
+            <label for="metaFile">Image file</label>
+            <input type="file" id="metaFile" accept="image/*">
+            <button type="submit">Extract</button>
+        </form>
+        <div id="metadataResult" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+        <h2>Image Resize</h2>
+        <p class="desc">Resize an image with different scale modes</p>
+        <form id="resizeForm">
+            <label for="resizeFile">Image file</label>
+            <input type="file" id="resizeFile" accept="image/*">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <div style="flex:1">
+                    <label for="resizeWidth">Width (px)</label>
+                    <input type="number" id="resizeWidth" value="200" min="1" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="flex:1">
+                    <label for="resizeHeight">Height (px)</label>
+                    <input type="number" id="resizeHeight" value="200" min="1" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;">
+                </div>
+            </div>
+            <label for="scaleMode">Scale Mode</label>
+            <select id="scaleMode" style="display:block;width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+                <option value="FIT">FIT — fit within bounds, preserve ratio</option>
+                <option value="COVER">COVER — cover area, crop excess</option>
+                <option value="EXACT">EXACT — stretch to exact size</option>
+            </select>
+            <label for="quality">Quality (0.0 ~ 1.0)</label>
+            <input type="number" id="quality" value="0.85" min="0" max="1" step="0.05" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+            <button type="submit">Resize</button>
+        </form>
+        <div id="resizeResult" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
         <h2>Uploaded Files</h2>
         <p class="desc" id="fileCount">Loading...</p>
         <div id="fileList"></div>
@@ -173,6 +213,71 @@
             btn.disabled = false;
             btn.textContent = 'Upload';
         }
+    });
+
+    // image metadata
+    document.getElementById('metadataForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('metaFile');
+        const resultEl = document.getElementById('metadataResult');
+        if (!input.files.length) { showToast('Please select an image.', 'error'); return; }
+
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        try {
+            const res = await fetch('/image/metadata', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (res.ok) {
+                resultEl.innerHTML = '<table><tbody>'
+                    + '<tr><td><b>Width</b></td><td>' + data.width + ' px</td></tr>'
+                    + '<tr><td><b>Height</b></td><td>' + data.height + ' px</td></tr>'
+                    + '<tr><td><b>Format</b></td><td>' + escapeHtml(data.format) + '</td></tr>'
+                    + '<tr><td><b>File Size</b></td><td>' + formatSize(data.fileSize) + '</td></tr>'
+                    + '</tbody></table>';
+            } else {
+                showToast(data.message || 'Failed to extract metadata', 'error');
+            }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+    });
+
+    // image resize
+    document.getElementById('resizeForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('resizeFile');
+        const btn = e.target.querySelector('button');
+        const resultEl = document.getElementById('resizeResult');
+        if (!input.files.length) { showToast('Please select an image.', 'error'); return; }
+
+        btn.disabled = true; btn.textContent = 'Resizing...';
+
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        formData.append('width', document.getElementById('resizeWidth').value);
+        formData.append('height', document.getElementById('resizeHeight').value);
+        formData.append('scaleMode', document.getElementById('scaleMode').value);
+        formData.append('quality', document.getElementById('quality').value);
+
+        try {
+            const res = await fetch('/image/resize', { method: 'POST', body: formData });
+            if (res.ok) {
+                const w = res.headers.get('X-Image-Width');
+                const h = res.headers.get('X-Image-Height');
+                const fmt = res.headers.get('X-Image-Format');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                resultEl.innerHTML = '<p style="font-size:13px;color:#555;margin-bottom:8px;">'
+                    + 'Result: ' + w + ' x ' + h + ' px, ' + escapeHtml(fmt || '') + ', ' + formatSize(blob.size)
+                    + '</p>'
+                    + '<img src="' + url + '" style="max-width:100%;border:1px solid #eee;border-radius:6px;">'
+                    + '<br><a href="' + url + '" download="resized.' + (fmt || 'jpg') + '" style="display:inline-block;margin-top:8px;font-size:13px;">Download</a>';
+                showToast('Resize complete!', 'success');
+            } else {
+                const data = await res.json();
+                showToast(data.message || 'Resize failed', 'error');
+            }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Resize'; }
     });
 
     // initial load
