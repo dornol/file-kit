@@ -1,5 +1,12 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
+import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
+import io.github.dornol.filekit.image.ImageIOResizer;
+import io.github.dornol.filekit.image.ImageMetadata;
+import io.github.dornol.filekit.image.ImageMetadataExtractor;
+import io.github.dornol.filekit.image.ImageResizer;
+import io.github.dornol.filekit.image.ResizeOption;
+import io.github.dornol.filekit.image.ResizeResult;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
@@ -119,6 +126,48 @@ class FileKitAutoConfigurationTest {
                 });
     }
 
+    // ── Image processing beans ──────────────────────────────────────
+
+    @Test
+    void registersDefaultImageMetadataExtractor() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ImageMetadataExtractor.class);
+            assertThat(context.getBean(ImageMetadataExtractor.class))
+                    .isInstanceOf(ImageIOMetadataExtractor.class);
+        });
+    }
+
+    @Test
+    void registersDefaultImageResizer() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ImageResizer.class);
+            assertThat(context.getBean(ImageResizer.class))
+                    .isInstanceOf(ImageIOResizer.class);
+        });
+    }
+
+    @Test
+    void userDefinedImageMetadataExtractor_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomImageConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ImageMetadataExtractor.class);
+                    assertThat(context.getBean(ImageMetadataExtractor.class))
+                            .isSameAs(context.getBean("customImageMetadataExtractor"));
+                });
+    }
+
+    @Test
+    void userDefinedImageResizer_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomImageConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ImageResizer.class);
+                    assertThat(context.getBean(ImageResizer.class))
+                            .isSameAs(context.getBean("customImageResizer"));
+                });
+    }
+
     // ── Test configurations ─────────────────────────────────────────
 
     @Configuration
@@ -150,6 +199,20 @@ class FileKitAutoConfigurationTest {
         @Bean
         ChecksumCalculator customChecksum() {
             return bytes -> "custom";
+        }
+    }
+
+    @Configuration
+    static class CustomImageConfig {
+        @Bean
+        ImageMetadataExtractor customImageMetadataExtractor() {
+            return imageBytes -> new ImageMetadata(1, 1, "custom");
+        }
+
+        @Bean
+        ImageResizer customImageResizer() {
+            return (imageBytes, option) -> new ResizeResult(
+                    new byte[0], new ImageMetadata(1, 1, "custom"));
         }
     }
 

@@ -4,6 +4,8 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.domain.FileSource;
+import io.github.dornol.filekit.scan.ScanResult;
+import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -43,19 +45,20 @@ public class FileUploadService {
     private final FileFormatExtractor formatExtractor;
     private final FileStorageResolver storageResolver;
     private final long maxUploadSize;
+    private final @Nullable VirusScanner virusScanner;
 
     /**
-     * Creates an upload service with no file size limit.
+     * Creates an upload service with no file size limit and no virus scanner.
      */
     public FileUploadService(ChecksumCalculator checksumCalculator,
                              FileMetadataRepository metadataRepository,
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, 0);
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, 0, null);
     }
 
     /**
-     * Creates an upload service with a maximum upload size.
+     * Creates an upload service with a maximum upload size and no virus scanner.
      *
      * @param maxUploadSize maximum file size in bytes (0 = unlimited)
      */
@@ -64,11 +67,27 @@ public class FileUploadService {
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver,
                              long maxUploadSize) {
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, maxUploadSize, null);
+    }
+
+    /**
+     * Creates an upload service with a maximum upload size and optional virus scanner.
+     *
+     * @param maxUploadSize maximum file size in bytes (0 = unlimited)
+     * @param virusScanner  optional virus scanner; if non-null, files are scanned before upload
+     */
+    public FileUploadService(ChecksumCalculator checksumCalculator,
+                             FileMetadataRepository metadataRepository,
+                             FileFormatExtractor formatExtractor,
+                             FileStorageResolver storageResolver,
+                             long maxUploadSize,
+                             @Nullable VirusScanner virusScanner) {
         this.checksumCalculator = Objects.requireNonNull(checksumCalculator, "checksumCalculator");
         this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
         this.formatExtractor = Objects.requireNonNull(formatExtractor, "formatExtractor");
         this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
         this.maxUploadSize = maxUploadSize;
+        this.virusScanner = virusScanner;
     }
 
     /**
@@ -105,6 +124,8 @@ public class FileUploadService {
         validateFilename(fileSource.getOriginalFilename());
 
         byte[] bytes = fileSource.getInputStream().readAllBytes();
+
+        scanForVirus(bytes);
 
         FileMetadata existing = findDuplicate(bytes);
         if (existing != null) {
@@ -150,6 +171,26 @@ public class FileUploadService {
         if (FilenameValidator.containsTraversalCharacters(filename)) {
             throw new FileStorageException(FileStorageException.INVALID_FILENAME,
                     "Filename contains illegal characters: " + filename);
+        }
+    }
+
+    private void scanForVirus(byte[] bytes) {
+        if (virusScanner == null) {
+            return;
+        }
+        ScanResult result = virusScanner.scan(bytes);
+        switch (result.status()) {
+            case CLEAN -> log.debug("Virus scan passed");
+            case INFECTED -> {
+                log.warn("Virus detected: {}", result.message());
+                throw new FileStorageException(FileStorageException.VIRUS_DETECTED,
+                        "Virus detected: " + result.message());
+            }
+            case ERROR -> {
+                log.error("Virus scan error: {}", result.message());
+                throw new FileStorageException(FileStorageException.VIRUS_SCAN_ERROR,
+                        "Virus scan error: " + result.message());
+            }
         }
     }
 

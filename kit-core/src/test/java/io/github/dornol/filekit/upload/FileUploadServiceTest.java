@@ -4,6 +4,8 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.domain.FileSource;
+import io.github.dornol.filekit.scan.ScanResult;
+import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -489,6 +491,169 @@ class FileUploadServiceTest {
 
             assertTrue(ex.getMessage().contains("callback failed"),
                     "Message should indicate callback failure");
+        }
+    }
+
+    // ── Virus scan integration ────────────────────────────────────────
+
+    @Nested
+    class VirusScanIntegration {
+
+        VirusScanner virusScanner = mock(VirusScanner.class);
+
+        FileUploadService serviceWithScanner = new FileUploadService(
+                checksumCalculator, metadataRepository, formatExtractor,
+                storageResolver, 0, virusScanner);
+
+        @Test
+        void infected_throwsAndDoesNotUpload() throws IOException {
+            byte[] content = "hello".getBytes();
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.infected("EICAR"));
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            assertEquals(FileStorageException.VIRUS_DETECTED, ex.getMessageKey());
+            assertTrue(ex.getMessage().contains("EICAR"));
+            verify(storageResolver, never()).resolve(any());
+            verify(metadataRepository, never()).save(any());
+        }
+
+        @Test
+        void infected_doesNotComputeChecksum() throws IOException {
+            byte[] content = "hello".getBytes();
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.infected("Trojan.Gen"));
+
+            assertThrows(FileStorageException.class,
+                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            verify(checksumCalculator, never()).checksum(any());
+        }
+
+        @Test
+        void infected_withCallback_callbackNotInvoked() throws Exception {
+            byte[] content = "hello".getBytes();
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.infected("Malware"));
+
+            UploadCallback callback = mock(UploadCallback.class);
+
+            assertThrows(FileStorageException.class,
+                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket", callback));
+
+            verify(callback, never()).onUploaded(any());
+        }
+
+        @Test
+        void clean_proceedsWithUpload() throws IOException {
+            byte[] content = "hello".getBytes();
+            FileFormat format = new FileFormat("text/plain", "txt", "text");
+            FileLocation location = new FileLocation("bucket", "key", StorageType.LOCAL);
+
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.clean());
+            when(checksumCalculator.checksum(content)).thenReturn("abc123");
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
+            when(formatExtractor.extract(any())).thenReturn(format);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.upload(any())).thenReturn(location);
+            when(metadataRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            FileMetadata result = serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            assertNotNull(result);
+            assertEquals("test.txt", result.name());
+            verify(virusScanner).scan(content);
+            verify(metadataRepository).save(any());
+        }
+
+        @Test
+        void clean_withDuplicate_returnsDuplicateWithoutStorage() throws IOException {
+            byte[] content = "hello".getBytes();
+            FileMetadata existing = new FileMetadata("existing-key", "test.txt", 5, "abc123",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "key", StorageType.LOCAL));
+
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.clean());
+            when(checksumCalculator.checksum(content)).thenReturn("abc123");
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
+
+            FileMetadata result = serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            assertEquals(existing, result);
+            verify(virusScanner).scan(content);
+            verify(storageResolver, never()).resolve(any());
+        }
+
+        @Test
+        void error_throwsAndDoesNotUpload() throws IOException {
+            byte[] content = "hello".getBytes();
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.error("Scan service unavailable"));
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            assertEquals(FileStorageException.VIRUS_SCAN_ERROR, ex.getMessageKey());
+            assertTrue(ex.getMessage().contains("Scan service unavailable"));
+            verify(storageResolver, never()).resolve(any());
+            verify(metadataRepository, never()).save(any());
+        }
+
+        @Test
+        void error_doesNotComputeChecksum() throws IOException {
+            byte[] content = "hello".getBytes();
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.error("timeout"));
+
+            assertThrows(FileStorageException.class,
+                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            verify(checksumCalculator, never()).checksum(any());
+        }
+
+        @Test
+        void noScanner_skipsScan() throws IOException {
+            // service (without scanner) should work without calling any scanner
+            setupSuccessfulUpload("test.txt");
+
+            FileMetadata result = service.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            assertNotNull(result);
+            // no virus scanner mock to verify — just ensure upload completes
+        }
+
+        @Test
+        void scanRunsAfterFileRead() throws IOException {
+            byte[] content = "hello".getBytes();
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(virusScanner.scan(content)).thenReturn(ScanResult.infected("virus"));
+
+            assertThrows(FileStorageException.class,
+                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            // InputStream was read (to get bytes for scanning)
+            verify(fileSource).getInputStream();
+            verify(virusScanner).scan(content);
+        }
+
+        @Test
+        void constructorAcceptsNullScanner() {
+            FileUploadService svc = new FileUploadService(
+                    checksumCalculator, metadataRepository, formatExtractor,
+                    storageResolver, 0, null);
+            assertNotNull(svc);
         }
     }
 

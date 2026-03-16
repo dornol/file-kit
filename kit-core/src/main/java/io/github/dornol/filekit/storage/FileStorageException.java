@@ -54,4 +54,13 @@ public class FileStorageException extends RuntimeException {
     /** Filename is invalid (too long, contains path traversal characters, etc.). */
     public static final String INVALID_FILENAME = "file-kit.storage.invalid-filename";
 
+    /** Virus detected in uploaded file. */
+    public static final String VIRUS_DETECTED = "file-kit.storage.virus-detected";
+
+    /** Virus scan failed with an error. */
+    public static final String VIRUS_SCAN_ERROR = "file-kit.storage.virus-scan-error";
+
+    /** Image processing (metadata extraction or resize) failed. */
+    public static final String IMAGE_PROCESSING_FAILED = "file-kit.image.processing-failed";
+
 }

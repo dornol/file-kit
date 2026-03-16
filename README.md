@@ -263,17 +263,51 @@ uploadService.upload(file, StorageType.LOCAL, "uploads", metadata -> {
 });
 ```
 
+### Virus scanning
+
+file-kit supports optional virus scanning via the `VirusScanner` SPI. When a `VirusScanner` is registered, uploaded files are automatically scanned before storage.
+
+```java
+@Component
+public class ClamAvVirusScanner implements VirusScanner {
+
+    @Override
+    public ScanResult scan(byte[] fileBytes) {
+        try {
+            // Integrate with ClamAV, VirusTotal, or any AV engine
+            boolean clean = clamAvClient.scan(fileBytes);
+            return clean ? ScanResult.clean() : ScanResult.infected("Threat detected");
+        } catch (Exception e) {
+            return ScanResult.error("Scan service unavailable: " + e.getMessage());
+        }
+    }
+}
+```
+
+The scan result determines the upload outcome:
+
+| Status | Behavior |
+|--------|----------|
+| `CLEAN` | Upload proceeds normally |
+| `INFECTED` | Upload rejected with `FileStorageException` (`VIRUS_DETECTED`) |
+| `ERROR` | Upload rejected with `FileStorageException` (`VIRUS_SCAN_ERROR`) — fail-closed by default |
+
+To implement **fail-open** semantics (allow upload on scan error), return `ScanResult.clean()` from your `VirusScanner` implementation's error handling.
+
+If no `VirusScanner` bean is registered, scanning is skipped entirely.
+
 ### Upload / download flow
 
 **Upload:**
 1. Validate file size against configured maximum
 2. Validate filename safety (length, path traversal)
-3. Read file bytes, compute checksum
-4. If a file with the same checksum already exists, return the existing metadata (deduplication)
-5. Detect file format (MIME type, extension)
-6. Delegate to `FileStorage.upload()` for physical storage
-7. Run callback (if provided) — on failure, delete from storage and throw
-8. Save and return `FileMetadata`
+3. Read file bytes
+4. Virus scan (if `VirusScanner` is registered) — reject if INFECTED or ERROR
+5. Compute checksum; if a file with the same checksum already exists, return the existing metadata (deduplication)
+6. Detect file format (MIME type, extension)
+7. Delegate to `FileStorage.upload()` for physical storage
+8. Run callback (if provided) — on failure, delete from storage and throw
+9. Save and return `FileMetadata`
 
 **Download:**
 1. Look up `FileMetadata` by file key
@@ -332,9 +366,68 @@ The following beans are registered automatically when their dependencies are pre
 |------|-----------|
 | `ChecksumCalculator` | Always (SHA-256 default, overridable) |
 | `FileStorageResolver` | At least one `FileStorage` bean |
-| `FileUploadService` | `FileMetadataRepository` + `FileFormatExtractor` + `FileStorageResolver` |
+| `FileUploadService` | `FileMetadataRepository` + `FileFormatExtractor` + `FileStorageResolver` (+ optional `VirusScanner`) |
 | `FileDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
 | `SpringDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
+| `ImageMetadataExtractor` | Always (`ImageIOMetadataExtractor` default, overridable) |
+| `ImageResizer` | Always (`ImageIOResizer` default, overridable) |
+
+## Image Processing
+
+file-kit provides image metadata extraction and resizing as standalone utilities. These are **not** integrated into the upload flow — use them directly where needed.
+
+### Metadata extraction
+
+```java
+@Autowired ImageMetadataExtractor metadataExtractor;
+
+byte[] imageBytes = Files.readAllBytes(Path.of("photo.jpg"));
+ImageMetadata metadata = metadataExtractor.extract(imageBytes);
+// metadata.width(), metadata.height(), metadata.format()
+```
+
+### Image resizing
+
+```java
+@Autowired ImageResizer resizer;
+
+byte[] imageBytes = Files.readAllBytes(Path.of("photo.jpg"));
+
+// Thumbnail (fit within 128x128, preserving aspect ratio)
+ResizeResult thumbnail = resizer.resize(imageBytes, ResizeOption.thumbnail(128));
+
+// Fit within bounds (aspect ratio preserved)
+ResizeResult fitted = resizer.resize(imageBytes, ResizeOption.fit(800, 600));
+
+// Cover target area (crop to fill, aspect ratio preserved)
+ResizeResult covered = resizer.resize(imageBytes, ResizeOption.cover(400, 400));
+
+// Exact dimensions (stretches to fit)
+ResizeResult exact = resizer.resize(imageBytes, ResizeOption.exact(1920, 1080));
+
+// Custom: format conversion + quality
+ResizeOption option = new ResizeOption(800, 600, ScaleMode.FIT, "jpeg", 0.9f);
+ResizeResult converted = resizer.resize(imageBytes, option);
+```
+
+### Scale modes
+
+| Mode | Behavior |
+|------|----------|
+| `FIT` | Scale to fit within target dimensions, preserving aspect ratio. Result may be smaller than target. |
+| `COVER` | Scale to cover target dimensions, preserving aspect ratio. Result is cropped to exact target size. |
+| `EXACT` | Scale to exact target dimensions, ignoring aspect ratio. |
+
+### Custom implementation
+
+Both `ImageMetadataExtractor` and `ImageResizer` are SPI interfaces with default `ImageIO`-based implementations. Register your own bean to override:
+
+```java
+@Bean
+public ImageResizer imageResizer() {
+    return new ThumbnailatorResizer(); // e.g., using Thumbnailator library
+}
+```
 
 ## Validation Checks
 
@@ -373,6 +466,9 @@ file-kit.storage.delete-failed=File deletion failed
 file-kit.storage.callback-failed=Post-upload processing failed, file has been deleted
 file-kit.storage.file-too-large=File size exceeds the maximum allowed
 file-kit.storage.invalid-filename=Invalid filename
+file-kit.storage.virus-detected=Virus detected in uploaded file
+file-kit.storage.virus-scan-error=Virus scan failed
+file-kit.image.processing-failed=Image processing failed
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.

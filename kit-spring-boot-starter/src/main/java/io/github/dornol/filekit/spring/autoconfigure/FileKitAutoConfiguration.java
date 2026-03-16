@@ -1,6 +1,11 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
 import io.github.dornol.filekit.download.FileDownloadService;
+import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
+import io.github.dornol.filekit.image.ImageIOResizer;
+import io.github.dornol.filekit.image.ImageMetadataExtractor;
+import io.github.dornol.filekit.image.ImageResizer;
+import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -18,6 +23,7 @@ import io.github.dornol.filekit.validator.FileValidationHelper;
 import io.github.dornol.filekit.validator.MediaTypeDetector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -107,10 +113,14 @@ public class FileKitAutoConfiguration {
                                                FileMetadataRepository metadataRepository,
                                                FileFormatExtractor formatExtractor,
                                                FileStorageResolver storageResolver,
-                                               @Value("${file-kit.max-upload-size:0}") long maxUploadSize) {
-        log.info("Registering FileUploadService (maxUploadSize={})", maxUploadSize == 0 ? "unlimited" : maxUploadSize);
+                                               @Value("${file-kit.max-upload-size:0}") long maxUploadSize,
+                                               ObjectProvider<VirusScanner> virusScannerProvider) {
+        VirusScanner virusScanner = virusScannerProvider.getIfAvailable();
+        log.info("Registering FileUploadService (maxUploadSize={}, virusScanner={})",
+                maxUploadSize == 0 ? "unlimited" : maxUploadSize,
+                virusScanner != null ? virusScanner.getClass().getSimpleName() : "none");
         return new FileUploadService(checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver, maxUploadSize);
+                storageResolver, maxUploadSize, virusScanner);
     }
 
     @Bean
@@ -129,6 +139,20 @@ public class FileKitAutoConfiguration {
                                                        FileStorageResolver storageResolver) {
         log.info("Registering SpringDownloadService");
         return new SpringDownloadService(metadataRepository, storageResolver);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ImageMetadataExtractor imageMetadataExtractor() {
+        log.debug("Registering default ImageIOMetadataExtractor");
+        return new ImageIOMetadataExtractor();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ImageResizer imageResizer(ImageMetadataExtractor metadataExtractor) {
+        log.debug("Registering default ImageIOResizer");
+        return new ImageIOResizer(metadataExtractor);
     }
 
 }

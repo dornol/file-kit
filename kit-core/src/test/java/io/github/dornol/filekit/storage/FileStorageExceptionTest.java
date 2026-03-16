@@ -34,6 +34,9 @@ class FileStorageExceptionTest {
         assertEquals("file-kit.storage.callback-failed", FileStorageException.CALLBACK_FAILED);
         assertEquals("file-kit.storage.file-too-large", FileStorageException.FILE_TOO_LARGE);
         assertEquals("file-kit.storage.invalid-filename", FileStorageException.INVALID_FILENAME);
+        assertEquals("file-kit.storage.virus-detected", FileStorageException.VIRUS_DETECTED);
+        assertEquals("file-kit.storage.virus-scan-error", FileStorageException.VIRUS_SCAN_ERROR);
+        assertEquals("file-kit.image.processing-failed", FileStorageException.IMAGE_PROCESSING_FAILED);
     }
 
 }

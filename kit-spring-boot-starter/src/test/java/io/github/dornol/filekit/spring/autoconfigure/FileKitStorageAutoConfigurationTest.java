@@ -4,6 +4,8 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.download.FileDownloadService;
+import io.github.dornol.filekit.scan.ScanResult;
+import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -75,6 +77,26 @@ class FileKitStorageAutoConfigurationTest {
                 });
     }
 
+    @Test
+    void uploadService_registeredWithoutVirusScanner() {
+        contextRunner
+                .withUserConfiguration(AllPortsConfig.class, FileStorageConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(FileUploadService.class);
+                    assertThat(context).doesNotHaveBean(VirusScanner.class);
+                });
+    }
+
+    @Test
+    void uploadService_registeredWithVirusScanner() {
+        contextRunner
+                .withUserConfiguration(AllPortsConfig.class, FileStorageConfig.class, VirusScannerConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(FileUploadService.class);
+                    assertThat(context).hasSingleBean(VirusScanner.class);
+                });
+    }
+
     // ── Test configurations ─────────────────────────────────────────
 
     @Configuration
@@ -100,6 +122,13 @@ class FileKitStorageAutoConfigurationTest {
                 @Override public FileMetadata findByKey(String key) { return null; }
                 @Override public FileMetadata save(FileMetadata metadata) { return metadata; }
             };
+        }
+    }
+
+    @Configuration
+    static class VirusScannerConfig {
+        @Bean VirusScanner virusScanner() {
+            return bytes -> ScanResult.clean();
         }
     }
 
