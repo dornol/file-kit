@@ -1,5 +1,6 @@
 package io.github.dornol.filekit.integration;
 
+import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileMetadata;
@@ -44,6 +45,7 @@ class LocalStorageIntegrationTest {
     private UploadDownloadIntegrationTest.InMemoryMetadataRepository metadataRepository;
     private FileUploadService uploadService;
     private FileDownloadService downloadService;
+    private FileDeleteService deleteService;
 
     @BeforeEach
     void setUp() {
@@ -57,6 +59,7 @@ class LocalStorageIntegrationTest {
                 is -> new FileFormat("application/octet-stream", "bin", "application"),
                 storageResolver);
         downloadService = new FileDownloadService(metadataRepository, storageResolver);
+        deleteService = new FileDeleteService(metadataRepository, storageResolver);
     }
 
     @Nested
@@ -227,6 +230,41 @@ class LocalStorageIntegrationTest {
             try (var files = Files.list(bucket)) {
                 assertEquals(1, files.count());
             }
+        }
+    }
+
+    // ── Delete on filesystem ──────────────────────────────────────────
+
+    @Nested
+    class DeleteOnFilesystem {
+
+        @Test
+        void delete_removesFileFromDiskAndMetadata() throws IOException {
+            FileSource source = testSource("removable.bin", "remove me".getBytes());
+            FileMetadata meta = uploadService.upload(source, StorageType.LOCAL, "bucket");
+
+            Path bucket = tempDir.resolve("bucket");
+            try (var files = Files.list(bucket)) {
+                assertEquals(1, files.count());
+            }
+
+            deleteService.delete(meta.key());
+
+            try (var files = Files.list(bucket)) {
+                assertEquals(0, files.count(), "File should be removed from disk");
+            }
+            assertEquals(0, metadataRepository.count());
+        }
+
+        @Test
+        void delete_thenDownload_throwsNotFound() throws IOException {
+            FileSource source = testSource("gone.bin", "goodbye".getBytes());
+            FileMetadata meta = uploadService.upload(source, StorageType.LOCAL, "bucket");
+
+            deleteService.delete(meta.key());
+
+            assertThrows(FileStorageException.class,
+                    () -> downloadService.download(meta.key()));
         }
     }
 

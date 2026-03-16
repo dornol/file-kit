@@ -1,5 +1,6 @@
 package io.github.dornol.filekit.integration;
 
+import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileMetadata;
@@ -46,6 +47,7 @@ class UploadDownloadIntegrationTest {
     private InMemoryMetadataRepository metadataRepository;
     private FileUploadService uploadService;
     private FileDownloadService downloadService;
+    private FileDeleteService deleteService;
 
     @BeforeEach
     void setUp() {
@@ -58,6 +60,7 @@ class UploadDownloadIntegrationTest {
         uploadService = new FileUploadService(checksumCalculator, metadataRepository,
                 formatExtractor, storageResolver);
         downloadService = new FileDownloadService(metadataRepository, storageResolver);
+        deleteService = new FileDeleteService(metadataRepository, storageResolver);
     }
 
     // ── Upload → Download full flow ──────────────────────────────────
@@ -300,6 +303,73 @@ class UploadDownloadIntegrationTest {
 
             assertEquals(0, memoryStorage.size(), "File should be cleaned up");
             assertEquals(0, metadataRepository.count(), "No metadata should be saved");
+        }
+    }
+
+    // ── Delete flow ───────────────────────────────────────────────────
+
+    @Nested
+    class DeleteFlow {
+
+        @Test
+        void uploadAndDelete_fileRemovedFromStorageAndRepository() throws IOException {
+            byte[] content = "to be deleted".getBytes();
+            FileSource source = testSource("delete-me.txt", content);
+
+            FileMetadata uploaded = uploadService.upload(source, StorageType.MEMORY, "docs");
+            assertEquals(1, memoryStorage.size());
+            assertNotNull(metadataRepository.findByKey(uploaded.key()));
+
+            deleteService.delete(uploaded.key());
+
+            assertEquals(0, memoryStorage.size());
+            assertEquals(0, metadataRepository.count());
+        }
+
+        @Test
+        void deleteNonExistentKey_throwsFileNotFound() {
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> deleteService.delete("non-existent-key"));
+            assertEquals(FileStorageException.FILE_NOT_FOUND, ex.getMessageKey());
+        }
+
+        @Test
+        void uploadMultiple_deleteOne_otherRemains() throws IOException {
+            FileMetadata meta1 = uploadService.upload(
+                    testSource("a.txt", "content A".getBytes()), StorageType.MEMORY, "bucket");
+            FileMetadata meta2 = uploadService.upload(
+                    testSource("b.txt", "content B".getBytes()), StorageType.MEMORY, "bucket");
+
+            assertEquals(2, memoryStorage.size());
+
+            deleteService.delete(meta1.key());
+
+            assertEquals(1, memoryStorage.size());
+            assertNotNull(metadataRepository.findByKey(meta2.key()));
+
+            // Download remaining file still works
+            DownloadResult result = downloadService.download(meta2.key());
+            try (InputStream is = result.content()) {
+                assertArrayEquals("content B".getBytes(), is.readAllBytes());
+            }
+        }
+
+        @Test
+        void deleteAndReupload_samContentGetsNewEntry() throws IOException {
+            byte[] content = "reuploadable".getBytes();
+
+            FileMetadata first = uploadService.upload(
+                    testSource("file.txt", content), StorageType.MEMORY, "bucket");
+            deleteService.delete(first.key());
+
+            assertEquals(0, memoryStorage.size());
+
+            // Re-upload same content — should get a new key since metadata was deleted
+            FileMetadata second = uploadService.upload(
+                    testSource("file.txt", content), StorageType.MEMORY, "bucket");
+
+            assertNotEquals(first.key(), second.key());
+            assertEquals(1, memoryStorage.size());
         }
     }
 

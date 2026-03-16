@@ -1,12 +1,12 @@
 # file-kit
 
-A lightweight Java library for file validation, upload, and download. Validates uploaded files by media type, file size, filename safety, and extension-content consistency. Provides a pluggable storage abstraction for uploading and downloading files with checksum-based deduplication.
+A lightweight Java library for file validation, upload, download, and deletion. Validates uploaded files by media type, file size, filename safety, and extension-content consistency. Provides a pluggable storage abstraction for uploading and downloading files with checksum-based deduplication.
 
 ## Modules
 
 | Module | Artifact | Description |
 |--------|----------|-------------|
-| `kit-core` | `io.github.dornol:file-kit-core` | Pure Java validation, upload/download logic. No framework dependency. |
+| `kit-core` | `io.github.dornol:file-kit-core` | Pure Java validation, upload/download/delete logic. No framework dependency. |
 | `kit-spring-boot-starter` | `io.github.dornol:file-kit-spring-boot-starter` | Spring Boot auto-configuration with `@ValidMultipartFile` and storage integration. |
 
 ## Quick Start (Spring Boot)
@@ -15,7 +15,7 @@ A lightweight Java library for file validation, upload, and download. Validates 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.1'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.3'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -26,7 +26,7 @@ implementation 'org.apache.tika:tika-core:3.1.0'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.3</version>
 </dependency>
 ```
 
@@ -74,9 +74,18 @@ public class FileUploadController {
 
 That's it. No configuration class needed.
 
+### 4. Configuration
+
+Configure file-kit via `application.yml`:
+
+```yaml
+file-kit:
+  max-upload-size: 10485760  # 10MB, 0 = unlimited (default)
+```
+
 ## File Storage
 
-file-kit provides a pluggable storage abstraction. Implement the SPI interfaces and register a `FileStorage` bean, and the upload/download flow is auto-configured.
+file-kit provides a pluggable storage abstraction. Implement the SPI interfaces and register a `FileStorage` bean, and the upload/download/delete flow is auto-configured.
 
 ### What you need to provide
 
@@ -102,6 +111,7 @@ public class MyFileMetadataRepository implements FileMetadataRepository {
     public FileMetadata findByChecksum(String checksum) { /* query DB */ }
     public FileMetadata findByKey(String key) { /* query DB */ }
     public FileMetadata save(FileMetadata metadata) { /* insert DB */ }
+    public void deleteByKey(String key) { /* delete from DB */ }
     // getByKey(key) is provided as a default method — throws FileStorageException if not found
 }
 ```
@@ -152,7 +162,7 @@ public FileStorage memoryStorage() {
 
 ### Custom storage (S3, GCS, etc.)
 
-Implement `FileStorage` to integrate with any storage backend:
+Implement `FileStorage` to integrate with any storage backend. `FileUploadCommand.content()` provides an `InputStream` for streaming — no need to load the entire file into memory:
 
 ```java
 public enum StorageType { S3 }
@@ -173,8 +183,9 @@ public class S3FileStorage implements FileStorage {
                         .bucket(command.bucket())
                         .key(objectKey)
                         .contentType(command.mimeType())
+                        .contentLength(command.contentLength())
                         .build(),
-                RequestBody.fromBytes(command.content()));
+                RequestBody.fromInputStream(command.content(), command.contentLength()));
         return new FileLocation(command.bucket(), objectKey, StorageType.S3);
     }
 
@@ -230,27 +241,14 @@ uploadService.upload(file, StorageType.LOCAL, "uploads");
 uploadService.upload(file, StorageType.S3, "my-s3-bucket");
 ```
 
-Download is automatic — `FileMetadata` records which storage was used:
+Download and delete are automatic — `FileMetadata` records which storage was used:
 
 ```java
 // Automatically reads from the correct storage
 downloadService.download(fileKey);
-```
 
-This also works for scaling local storage across multiple volumes:
-
-```java
-public enum StorageType { DISK1, DISK2 }
-
-@Bean
-public FileStorage disk1() {
-    return new LocalFileStorage(Path.of("/data"), StorageType.DISK1);
-}
-
-@Bean
-public FileStorage disk2() {
-    return new LocalFileStorage(Path.of("/data2"), StorageType.DISK2);
-}
+// Deletes from the correct storage + removes metadata
+deleteService.delete(fileKey);
 ```
 
 ### Transactional upload with callback
@@ -263,9 +261,22 @@ uploadService.upload(file, StorageType.LOCAL, "uploads", metadata -> {
 });
 ```
 
+### File deletion
+
+`FileDeleteService` coordinates deletion across storage and metadata:
+
+```java
+@Autowired FileDeleteService deleteService;
+
+deleteService.delete(fileKey);
+// 1. Looks up metadata by key (throws FileStorageException if not found)
+// 2. Deletes the physical file from storage
+// 3. Deletes the metadata record
+```
+
 ### Virus scanning
 
-file-kit supports optional virus scanning via the `VirusScanner` SPI. When a `VirusScanner` is registered, uploaded files are automatically scanned before storage.
+file-kit supports optional virus scanning via the `VirusScanner` SPI. When a `VirusScanner` is registered, uploaded files are automatically scanned before storage. Both `byte[]` and `InputStream` overloads are supported:
 
 ```java
 @Component
@@ -274,12 +285,17 @@ public class ClamAvVirusScanner implements VirusScanner {
     @Override
     public ScanResult scan(byte[] fileBytes) {
         try {
-            // Integrate with ClamAV, VirusTotal, or any AV engine
             boolean clean = clamAvClient.scan(fileBytes);
             return clean ? ScanResult.clean() : ScanResult.infected("Threat detected");
         } catch (Exception e) {
             return ScanResult.error("Scan service unavailable: " + e.getMessage());
         }
+    }
+
+    // Optional: override for streaming support
+    @Override
+    public ScanResult scan(InputStream inputStream) {
+        // e.g., pipe directly to ClamAV INSTREAM command
     }
 }
 ```
@@ -301,18 +317,24 @@ If no `VirusScanner` bean is registered, scanning is skipped entirely.
 **Upload:**
 1. Validate file size against configured maximum
 2. Validate filename safety (length, path traversal)
-3. Read file bytes
+3. Buffer file content to a temporary file (memory-safe for large files)
 4. Virus scan (if `VirusScanner` is registered) — reject if INFECTED or ERROR
-5. Compute checksum; if a file with the same checksum already exists, return the existing metadata (deduplication)
+5. Compute checksum (streaming); if a file with the same checksum already exists, return the existing metadata (deduplication)
 6. Detect file format (MIME type, extension)
-7. Delegate to `FileStorage.upload()` for physical storage
+7. Delegate to `FileStorage.upload()` with an `InputStream` for streaming storage
 8. Run callback (if provided) — on failure, delete from storage and throw
 9. Save and return `FileMetadata`
+10. Clean up temporary file
 
 **Download:**
 1. Look up `FileMetadata` by file key
 2. Resolve the correct `FileStorage` from `metadata.location().storageType()`
 3. Load and return the file content
+
+**Delete:**
+1. Look up `FileMetadata` by file key
+2. Resolve the correct `FileStorage` and delete the physical file
+3. Delete the metadata record
 
 ### FileResponseBuilder
 
@@ -341,6 +363,7 @@ public class FileController {
 
     private final FileUploadService uploadService;
     private final FileDownloadService downloadService;
+    private final FileDeleteService deleteService;
 
     @PostMapping("/upload")
     public ResponseEntity<?> upload(@RequestParam MultipartFile file) throws IOException {
@@ -355,6 +378,12 @@ public class FileController {
         return FileResponseBuilder.download(result.metadata())
                 .body(new InputStreamResource(result.content()));
     }
+
+    @DeleteMapping("/files/{fileKey}")
+    public ResponseEntity<?> delete(@PathVariable String fileKey) {
+        deleteService.delete(fileKey);
+        return ResponseEntity.ok(Map.of("status", "deleted"));
+    }
 }
 ```
 
@@ -368,6 +397,7 @@ The following beans are registered automatically when their dependencies are pre
 | `FileStorageResolver` | At least one `FileStorage` bean |
 | `FileUploadService` | `FileMetadataRepository` + `FileFormatExtractor` + `FileStorageResolver` (+ optional `VirusScanner`) |
 | `FileDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
+| `FileDeleteService` | `FileMetadataRepository` + `FileStorageResolver` |
 | `SpringDownloadService` | `FileMetadataRepository` + `FileStorageResolver` |
 | `ImageMetadataExtractor` | Always (`ImageIOMetadataExtractor` default, overridable) |
 | `ImageResizer` | Always (`ImageIOResizer` default, overridable) |
@@ -521,7 +551,7 @@ docker compose up -d
 ./gradlew :example:bootRun
 ```
 
-Open `http://localhost:8880` — upload files to LOCAL or S3, view the file list, and download.
+Open `http://localhost:8880` — upload files to LOCAL or S3, view the file list, download, and delete.
 
 MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 
@@ -530,6 +560,10 @@ MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 ### Input validation
 
 All domain records (`FileFormat`, `FileLocation`, `FileMetadata`) and command objects (`FileUploadCommand`) validate their constructor parameters. Null values for required fields are rejected immediately with `NullPointerException`, and invalid values (e.g., negative file size) throw `IllegalArgumentException`.
+
+### Streaming upload
+
+The upload service buffers file content to a temporary file on disk, then streams from it for each processing step (virus scan, checksum, format detection, storage). This ensures that arbitrarily large files can be uploaded without loading the entire content into memory.
 
 ### Filename safety
 
@@ -571,7 +605,7 @@ file-kit does **not** handle download authorization. Access control (e.g., verif
 
 ### Thread safety
 
-- `FileUploadService`, `FileDownloadService`, and `LocalFileStorage` are thread-safe and can be used as singletons.
+- `FileUploadService`, `FileDownloadService`, `FileDeleteService`, and `LocalFileStorage` are thread-safe and can be used as singletons.
 - `InMemoryFileStorage` is thread-safe (backed by `ConcurrentHashMap`) but is **not recommended for production** — it has no size limits and all data is lost on restart.
 
 ## Requirements

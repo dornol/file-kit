@@ -33,6 +33,8 @@
         .empty-msg { color: #aaa; padding: 24px; text-align: center; font-size: 14px; }
         .dl-btn { background: none; border: none; color: #2563eb; cursor: pointer; font-size: 13px; padding: 4px 8px; text-decoration: underline; }
         .dl-btn:hover { color: #1d4ed8; }
+        .del-btn { background: none; border: none; color: #dc2626; cursor: pointer; font-size: 13px; padding: 4px 8px; text-decoration: underline; }
+        .del-btn:hover { color: #991b1b; }
         .size { color: #888; }
         .mime { color: #888; font-family: monospace; font-size: 12px; }
         .filename { font-weight: 500; word-break: break-all; }
@@ -146,7 +148,8 @@
                     + '<td class="size">' + formatSize(f.size) + '</td>'
                     + '<td class="mime">' + escapeHtml(f.mimeType) + '</td>'
                     + '<td class="mime">' + escapeHtml(f.storageType || '') + '</td>'
-                    + '<td><button class="dl-btn" onclick="downloadFile(\'' + f.fileKey + '\')">Download</button></td>'
+                    + '<td><button class="dl-btn" onclick="downloadFile(\'' + f.fileKey + '\')">Download</button>'
+                    + '<button class="del-btn" onclick="deleteFile(\'' + f.fileKey + '\')">Delete</button></td>'
                     + '</tr>';
             }
             html += '</tbody></table>';
@@ -165,6 +168,22 @@
 
     function downloadFile(fileKey) {
         window.location.href = '/files/' + encodeURIComponent(fileKey) + '/download';
+    }
+
+    async function deleteFile(fileKey) {
+        if (!confirm('Delete this file?')) return;
+        try {
+            const res = await fetch('/files/' + encodeURIComponent(fileKey), { method: 'DELETE' });
+            if (res.ok) {
+                showToast('File deleted.', 'success');
+                loadFiles();
+            } else {
+                const data = await res.json();
+                showToast(data.message || 'Delete failed', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
     }
 
     // upload
