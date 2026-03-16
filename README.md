@@ -7,7 +7,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 | Module | Artifact | Description |
 |--------|----------|-------------|
 | `kit-core` | `io.github.dornol:file-kit-core` | Pure Java validation, upload/download/delete logic. No framework dependency. |
-| `kit-spring-boot-starter` | `io.github.dornol:file-kit-spring-boot-starter` | Spring Boot auto-configuration with `@ValidMultipartFile` and storage integration. |
+| `kit-spring-boot-starter` | `io.github.dornol:file-kit-spring-boot-starter` | Spring Boot auto-configuration with `@ValidMultipartFile`, WebFlux `FilePart` support, and storage integration. |
 
 ## Quick Start (Spring Boot)
 
@@ -73,6 +73,39 @@ public class FileUploadController {
 ```
 
 That's it. No configuration class needed.
+
+### WebFlux (FilePart) Support
+
+For Spring WebFlux applications, use `FilePartSource` to wrap a `FilePart` as a `FileSource`. This lets you use the same `FileUploadService` without any changes:
+
+```java
+@RestController
+public class FileController {
+
+    private final FileUploadService uploadService;
+
+    @PostMapping("/upload")
+    public Mono<Map<String, String>> upload(@RequestPart("file") FilePart filePart) {
+        return FilePartSource.from(filePart)
+            .flatMap(source -> Mono.fromCallable(() -> {
+                try (source) {
+                    FileMetadata metadata = uploadService.upload(
+                        source, StorageType.LOCAL, "bucket");
+                    return Map.of("fileKey", metadata.key());
+                }
+            }).subscribeOn(Schedulers.boundedElastic()));
+    }
+}
+```
+
+**How it works:**
+- `FilePartSource.from(FilePart)` buffers the reactive `FilePart` content to a temporary file via `transferTo(Path)`
+- The resulting `FilePartSource` implements `FileSource`, so it works with `FileUploadService`, `FileValidationHelper`, and all existing validation logic
+- `getInputStream()` can be called multiple times (replayable), unlike `FilePart.content()` which is single-use
+- Implements `Closeable` — always use try-with-resources to clean up the temporary file
+- Use `Schedulers.boundedElastic()` for the blocking `FileUploadService` call inside a reactive pipeline
+
+**Note:** `@ValidMultipartFile` is not available for `FilePart` because `FilePart.content()` is a single-use `Flux<DataBuffer>` — consuming it in a validator would prevent the controller from reading the file. Use `FileUploadService` for validation instead, which performs file size, filename, and virus scan checks.
 
 ### 4. Configuration
 
@@ -355,7 +388,7 @@ return FileResponseBuilder.download("report.xlsx")
         .body(resource);
 ```
 
-### Controller example
+### Controller example (Spring MVC)
 
 ```java
 @RestController
@@ -383,6 +416,28 @@ public class FileController {
     public ResponseEntity<?> delete(@PathVariable String fileKey) {
         deleteService.delete(fileKey);
         return ResponseEntity.ok(Map.of("status", "deleted"));
+    }
+}
+```
+
+### Controller example (Spring WebFlux)
+
+```java
+@RestController
+public class FileController {
+
+    private final FileUploadService uploadService;
+
+    @PostMapping("/upload")
+    public Mono<Map<String, String>> upload(@RequestPart("file") FilePart filePart) {
+        return FilePartSource.from(filePart)
+            .flatMap(source -> Mono.fromCallable(() -> {
+                try (source) {
+                    FileMetadata metadata = uploadService.upload(
+                        source, StorageType.LOCAL, "my-bucket");
+                    return Map.of("fileKey", metadata.key());
+                }
+            }).subscribeOn(Schedulers.boundedElastic()));
     }
 }
 ```

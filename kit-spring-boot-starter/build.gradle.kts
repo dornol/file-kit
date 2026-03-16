@@ -21,6 +21,7 @@ dependencies {
     compileOnly(libs.jakarta.validation.api)
     compileOnly(libs.jspecify)
     compileOnly(libs.spring.web)
+    compileOnly(libs.spring.webflux)
     compileOnly(libs.spring.boot.autoconfigure)
     compileOnly(libs.tika.core)
 
@@ -34,6 +35,7 @@ dependencies {
     testImplementation(libs.expressly)
     testImplementation(libs.mockito.core)
     testImplementation(libs.spring.web)
+    testImplementation(libs.spring.webflux)
     testImplementation(libs.spring.boot.autoconfigure)
     testImplementation(libs.spring.boot.test)
     testImplementation(libs.assertj.core)

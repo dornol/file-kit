@@ -26,6 +26,7 @@ hibernate-validator = { module = "org.hibernate.validator:hibernate-validator", 
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 expressly = { module = "org.glassfish.expressly:expressly", version.ref = "expressly" }
 spring-web = { module = "org.springframework:spring-web", version.ref = "spring-web" }
+spring-webflux = { module = "org.springframework:spring-webflux", version.ref = "spring-web" }
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure", version.ref = "spring-boot" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 spring-boot-test = { module = "org.springframework.boot:spring-boot-test", version.ref = "spring-boot" }
