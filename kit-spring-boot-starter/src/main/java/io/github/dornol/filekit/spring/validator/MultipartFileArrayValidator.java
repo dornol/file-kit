@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Validates a {@code MultipartFile[]} against the {@link ValidMultipartFile} constraint.
@@ -17,7 +18,7 @@ public class MultipartFileArrayValidator extends AbstractMultipartFileValidator<
     private final FileValidationHelper helper;
 
     public MultipartFileArrayValidator(FileValidationHelper helper) {
-        this.helper = helper;
+        this.helper = Objects.requireNonNull(helper, "helper");
     }
 
     @Override

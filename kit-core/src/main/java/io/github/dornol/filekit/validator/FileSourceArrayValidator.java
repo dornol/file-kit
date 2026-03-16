@@ -4,6 +4,7 @@ import io.github.dornol.filekit.domain.FileSource;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Validates an array of {@link FileSource} against the {@link ValidFile} constraint.
@@ -14,7 +15,7 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
     private final FileValidationHelper helper;
 
     public FileSourceArrayValidator(FileValidationHelper helper) {
-        this.helper = helper;
+        this.helper = Objects.requireNonNull(helper, "helper");
     }
 
     @Override

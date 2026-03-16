@@ -7,6 +7,8 @@ import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.domain.FileSource;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
+import io.github.dornol.filekit.test.InMemoryMetadataRepository;
+import io.github.dornol.filekit.test.TestFileSource;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.local.LocalFileStorage;
@@ -18,7 +20,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -42,7 +43,7 @@ class LocalStorageIntegrationTest {
     @TempDir
     Path tempDir;
 
-    private UploadDownloadIntegrationTest.InMemoryMetadataRepository metadataRepository;
+    private InMemoryMetadataRepository metadataRepository;
     private FileUploadService uploadService;
     private FileDownloadService downloadService;
     private FileDeleteService deleteService;
@@ -51,7 +52,7 @@ class LocalStorageIntegrationTest {
     void setUp() {
         LocalFileStorage localStorage = new LocalFileStorage(
                 tempDir, StorageType.LOCAL, ObjectKeyStrategy.flat());
-        metadataRepository = new UploadDownloadIntegrationTest.InMemoryMetadataRepository();
+        metadataRepository = new InMemoryMetadataRepository();
         FileStorageResolver storageResolver = new FileStorageResolver(List.of(localStorage));
 
         uploadService = new FileUploadService(
@@ -68,7 +69,7 @@ class LocalStorageIntegrationTest {
         @Test
         void fileWrittenToDisk_andReadBack() throws IOException {
             byte[] content = "local file content".getBytes();
-            FileSource source = testSource("data.bin", content);
+            FileSource source = new TestFileSource("data.bin", content);
 
             FileMetadata meta = uploadService.upload(source, StorageType.LOCAL, "uploads");
 
@@ -89,9 +90,9 @@ class LocalStorageIntegrationTest {
         @Test
         void multipleFiles_inDifferentBuckets() throws IOException {
             FileMetadata meta1 = uploadService.upload(
-                    testSource("a.bin", "aaa".getBytes()), StorageType.LOCAL, "bucket-a");
+                    new TestFileSource("a.bin", "aaa".getBytes()), StorageType.LOCAL, "bucket-a");
             FileMetadata meta2 = uploadService.upload(
-                    testSource("b.bin", "bbb".getBytes()), StorageType.LOCAL, "bucket-b");
+                    new TestFileSource("b.bin", "bbb".getBytes()), StorageType.LOCAL, "bucket-b");
 
             assertTrue(Files.exists(tempDir.resolve("bucket-a")));
             assertTrue(Files.exists(tempDir.resolve("bucket-b")));
@@ -107,7 +108,7 @@ class LocalStorageIntegrationTest {
         @Test
         void resolveUri_returnsFileUri() throws IOException {
             FileMetadata meta = uploadService.upload(
-                    testSource("file.bin", "data".getBytes()), StorageType.LOCAL, "bucket");
+                    new TestFileSource("file.bin", "data".getBytes()), StorageType.LOCAL, "bucket");
 
             String uri = downloadService.resolveUri(meta.key());
             assertTrue(uri.startsWith("file:"));
@@ -128,7 +129,7 @@ class LocalStorageIntegrationTest {
                     resolver);
 
             FileMetadata meta = hashedUploadService.upload(
-                    testSource("doc.txt", "hash me".getBytes()), StorageType.LOCAL, "data");
+                    new TestFileSource("doc.txt", "hash me".getBytes()), StorageType.LOCAL, "data");
 
             // Object key should contain subdirectory separators
             assertTrue(meta.location().objectKey().contains("/"),
@@ -146,7 +147,7 @@ class LocalStorageIntegrationTest {
 
         @Test
         void pathTraversalFilename_rejected_noFileCreated() {
-            FileSource source = testSource("../escape.txt", "evil".getBytes());
+            FileSource source = new TestFileSource("../escape.txt", "evil".getBytes());
 
             assertThrows(FileStorageException.class,
                     () -> uploadService.upload(source, StorageType.LOCAL, "bucket"));
@@ -157,7 +158,7 @@ class LocalStorageIntegrationTest {
 
         @Test
         void backslashFilename_rejected() {
-            FileSource source = testSource("sub\\file.txt", "data".getBytes());
+            FileSource source = new TestFileSource("sub\\file.txt", "data".getBytes());
 
             assertThrows(FileStorageException.class,
                     () -> uploadService.upload(source, StorageType.LOCAL, "bucket"));
@@ -176,7 +177,7 @@ class LocalStorageIntegrationTest {
 
         @Test
         void callbackFailure_fileRemovedFromDisk() {
-            FileSource source = testSource("temp.bin", "temporary".getBytes());
+            FileSource source = new TestFileSource("temp.bin", "temporary".getBytes());
 
             assertThrows(FileStorageException.class,
                     () -> uploadService.upload(source, StorageType.LOCAL, "bucket",
@@ -198,7 +199,7 @@ class LocalStorageIntegrationTest {
 
         @Test
         void callbackSuccess_filePersistsOnDisk() throws IOException {
-            FileSource source = testSource("keep.bin", "persistent".getBytes());
+            FileSource source = new TestFileSource("keep.bin", "persistent".getBytes());
 
             FileMetadata meta = uploadService.upload(source, StorageType.LOCAL, "bucket",
                     metadata -> { /* no-op callback */ });
@@ -219,9 +220,9 @@ class LocalStorageIntegrationTest {
             byte[] content = "duplicate".getBytes();
 
             FileMetadata first = uploadService.upload(
-                    testSource("first.bin", content), StorageType.LOCAL, "bucket");
+                    new TestFileSource("first.bin", content), StorageType.LOCAL, "bucket");
             FileMetadata second = uploadService.upload(
-                    testSource("second.bin", content), StorageType.LOCAL, "bucket");
+                    new TestFileSource("second.bin", content), StorageType.LOCAL, "bucket");
 
             assertEquals(first.key(), second.key());
 
@@ -240,7 +241,7 @@ class LocalStorageIntegrationTest {
 
         @Test
         void delete_removesFileFromDiskAndMetadata() throws IOException {
-            FileSource source = testSource("removable.bin", "remove me".getBytes());
+            FileSource source = new TestFileSource("removable.bin", "remove me".getBytes());
             FileMetadata meta = uploadService.upload(source, StorageType.LOCAL, "bucket");
 
             Path bucket = tempDir.resolve("bucket");
@@ -258,7 +259,7 @@ class LocalStorageIntegrationTest {
 
         @Test
         void delete_thenDownload_throwsNotFound() throws IOException {
-            FileSource source = testSource("gone.bin", "goodbye".getBytes());
+            FileSource source = new TestFileSource("gone.bin", "goodbye".getBytes());
             FileMetadata meta = uploadService.upload(source, StorageType.LOCAL, "bucket");
 
             deleteService.delete(meta.key());
@@ -268,29 +269,4 @@ class LocalStorageIntegrationTest {
         }
     }
 
-    // ── Helper ───────────────────────────────────────────────────────
-
-    private static FileSource testSource(String filename, byte[] content) {
-        return new FileSource() {
-            @Override
-            public String getOriginalFilename() {
-                return filename;
-            }
-
-            @Override
-            public InputStream getInputStream() {
-                return new ByteArrayInputStream(content);
-            }
-
-            @Override
-            public long getSize() {
-                return content.length;
-            }
-
-            @Override
-            public boolean isEmpty() {
-                return content.length == 0;
-            }
-        };
-    }
 }

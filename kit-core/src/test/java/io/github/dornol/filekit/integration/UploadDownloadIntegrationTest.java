@@ -8,11 +8,12 @@ import io.github.dornol.filekit.domain.FileSource;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
-import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.memory.InMemoryFileStorage;
+import io.github.dornol.filekit.test.InMemoryMetadataRepository;
+import io.github.dornol.filekit.test.TestFileSource;
 import io.github.dornol.filekit.upload.FileUploadService;
 import io.github.dornol.filekit.upload.UploadCallback;
 
@@ -20,12 +21,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -71,7 +69,7 @@ class UploadDownloadIntegrationTest {
         @Test
         void uploadAndDownload_contentPreserved() throws IOException {
             byte[] content = "Hello, file-kit!".getBytes();
-            FileSource source = testSource("greeting.txt", content);
+            FileSource source = new TestFileSource("greeting.txt", content);
 
             FileMetadata uploaded = uploadService.upload(source, StorageType.MEMORY, "docs");
 
@@ -92,9 +90,9 @@ class UploadDownloadIntegrationTest {
             byte[] content2 = "file two".getBytes();
 
             FileMetadata meta1 = uploadService.upload(
-                    testSource("one.txt", content1), StorageType.MEMORY, "bucket");
+                    new TestFileSource("one.txt", content1), StorageType.MEMORY, "bucket");
             FileMetadata meta2 = uploadService.upload(
-                    testSource("two.txt", content2), StorageType.MEMORY, "bucket");
+                    new TestFileSource("two.txt", content2), StorageType.MEMORY, "bucket");
 
             assertNotEquals(meta1.key(), meta2.key());
 
@@ -109,7 +107,7 @@ class UploadDownloadIntegrationTest {
         @Test
         void uploadAndResolveUri() throws IOException {
             FileMetadata meta = uploadService.upload(
-                    testSource("file.txt", "data".getBytes()), StorageType.MEMORY, "bucket");
+                    new TestFileSource("file.txt", "data".getBytes()), StorageType.MEMORY, "bucket");
 
             String uri = downloadService.resolveUri(meta.key());
 
@@ -129,9 +127,9 @@ class UploadDownloadIntegrationTest {
             byte[] content = "duplicate content".getBytes();
 
             FileMetadata first = uploadService.upload(
-                    testSource("first.txt", content), StorageType.MEMORY, "bucket");
+                    new TestFileSource("first.txt", content), StorageType.MEMORY, "bucket");
             FileMetadata second = uploadService.upload(
-                    testSource("second.txt", content), StorageType.MEMORY, "bucket");
+                    new TestFileSource("second.txt", content), StorageType.MEMORY, "bucket");
 
             assertEquals(first.key(), second.key());
             assertEquals(first.checksum(), second.checksum());
@@ -141,9 +139,9 @@ class UploadDownloadIntegrationTest {
         @Test
         void differentContent_createsSeparateEntries() throws IOException {
             FileMetadata first = uploadService.upload(
-                    testSource("a.txt", "content A".getBytes()), StorageType.MEMORY, "bucket");
+                    new TestFileSource("a.txt", "content A".getBytes()), StorageType.MEMORY, "bucket");
             FileMetadata second = uploadService.upload(
-                    testSource("b.txt", "content B".getBytes()), StorageType.MEMORY, "bucket");
+                    new TestFileSource("b.txt", "content B".getBytes()), StorageType.MEMORY, "bucket");
 
             assertNotEquals(first.key(), second.key());
             assertNotEquals(first.checksum(), second.checksum());
@@ -161,7 +159,7 @@ class UploadDownloadIntegrationTest {
             byte[] content = "consistent content".getBytes();
 
             FileMetadata meta = uploadService.upload(
-                    testSource("file.txt", content), StorageType.MEMORY, "bucket");
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket");
 
             Sha256ChecksumCalculator calc = new Sha256ChecksumCalculator();
             assertEquals(calc.checksum(content), meta.checksum());
@@ -170,9 +168,9 @@ class UploadDownloadIntegrationTest {
         @Test
         void differentContent_differentChecksum() throws IOException {
             FileMetadata meta1 = uploadService.upload(
-                    testSource("a.txt", "AAA".getBytes()), StorageType.MEMORY, "bucket");
+                    new TestFileSource("a.txt", "AAA".getBytes()), StorageType.MEMORY, "bucket");
             FileMetadata meta2 = uploadService.upload(
-                    testSource("b.txt", "BBB".getBytes()), StorageType.MEMORY, "bucket");
+                    new TestFileSource("b.txt", "BBB".getBytes()), StorageType.MEMORY, "bucket");
 
             assertNotEquals(meta1.checksum(), meta2.checksum());
         }
@@ -185,7 +183,7 @@ class UploadDownloadIntegrationTest {
 
         @Test
         void pathTraversalFilename_rejectedBeforeUpload() {
-            FileSource source = testSource("../etc/passwd", "evil".getBytes());
+            FileSource source = new TestFileSource("../etc/passwd", "evil".getBytes());
 
             FileStorageException ex = assertThrows(FileStorageException.class,
                     () -> uploadService.upload(source, StorageType.MEMORY, "bucket"));
@@ -196,7 +194,7 @@ class UploadDownloadIntegrationTest {
 
         @Test
         void backslashInFilename_rejectedBeforeUpload() {
-            FileSource source = testSource("path\\file.txt", "data".getBytes());
+            FileSource source = new TestFileSource("path\\file.txt", "data".getBytes());
 
             assertThrows(FileStorageException.class,
                     () -> uploadService.upload(source, StorageType.MEMORY, "bucket"));
@@ -207,7 +205,7 @@ class UploadDownloadIntegrationTest {
         @Test
         void tooLongFilename_rejected() {
             String longName = "a".repeat(201) + ".txt";
-            FileSource source = testSource(longName, "data".getBytes());
+            FileSource source = new TestFileSource(longName, "data".getBytes());
 
             assertThrows(FileStorageException.class,
                     () -> uploadService.upload(source, StorageType.MEMORY, "bucket"));
@@ -217,7 +215,7 @@ class UploadDownloadIntegrationTest {
 
         @Test
         void nullFilename_generatesNameAndSucceeds() throws IOException {
-            FileSource source = testSource(null, "data".getBytes());
+            FileSource source = new TestFileSource(null, "data".getBytes());
 
             FileMetadata meta = uploadService.upload(source, StorageType.MEMORY, "bucket");
 
@@ -228,7 +226,7 @@ class UploadDownloadIntegrationTest {
 
         @Test
         void emptyFile_uploadsSuccessfully() throws IOException {
-            FileSource source = testSource("empty.txt", new byte[0]);
+            FileSource source = new TestFileSource("empty.txt", new byte[0]);
 
             FileMetadata meta = uploadService.upload(source, StorageType.MEMORY, "bucket");
 
@@ -248,7 +246,7 @@ class UploadDownloadIntegrationTest {
                     is -> new FileFormat("text/plain", "txt", "text"),
                     new FileStorageResolver(List.of(memoryStorage)), 100);
 
-            FileSource source = testSource("small.txt", "hi".getBytes());
+            FileSource source = new TestFileSource("small.txt", "hi".getBytes());
             FileMetadata meta = limited.upload(source, StorageType.MEMORY, "bucket");
 
             assertNotNull(meta);
@@ -261,7 +259,7 @@ class UploadDownloadIntegrationTest {
                     is -> new FileFormat("text/plain", "txt", "text"),
                     new FileStorageResolver(List.of(memoryStorage)), 5);
 
-            FileSource source = testSource("big.txt", "this is too long".getBytes());
+            FileSource source = new TestFileSource("big.txt", "this is too long".getBytes());
 
             FileStorageException ex = assertThrows(FileStorageException.class,
                     () -> limited.upload(source, StorageType.MEMORY, "bucket"));
@@ -279,7 +277,7 @@ class UploadDownloadIntegrationTest {
             AtomicReference<FileMetadata> captured = new AtomicReference<>();
 
             FileMetadata meta = uploadService.upload(
-                    testSource("file.txt", "data".getBytes()),
+                    new TestFileSource("file.txt", "data".getBytes()),
                     StorageType.MEMORY, "bucket",
                     captured::set);
 
@@ -297,7 +295,7 @@ class UploadDownloadIntegrationTest {
 
             assertThrows(FileStorageException.class,
                     () -> uploadService.upload(
-                            testSource("file.txt", "data".getBytes()),
+                            new TestFileSource("file.txt", "data".getBytes()),
                             StorageType.MEMORY, "bucket",
                             failingCallback));
 
@@ -314,7 +312,7 @@ class UploadDownloadIntegrationTest {
         @Test
         void uploadAndDelete_fileRemovedFromStorageAndRepository() throws IOException {
             byte[] content = "to be deleted".getBytes();
-            FileSource source = testSource("delete-me.txt", content);
+            FileSource source = new TestFileSource("delete-me.txt", content);
 
             FileMetadata uploaded = uploadService.upload(source, StorageType.MEMORY, "docs");
             assertEquals(1, memoryStorage.size());
@@ -336,9 +334,9 @@ class UploadDownloadIntegrationTest {
         @Test
         void uploadMultiple_deleteOne_otherRemains() throws IOException {
             FileMetadata meta1 = uploadService.upload(
-                    testSource("a.txt", "content A".getBytes()), StorageType.MEMORY, "bucket");
+                    new TestFileSource("a.txt", "content A".getBytes()), StorageType.MEMORY, "bucket");
             FileMetadata meta2 = uploadService.upload(
-                    testSource("b.txt", "content B".getBytes()), StorageType.MEMORY, "bucket");
+                    new TestFileSource("b.txt", "content B".getBytes()), StorageType.MEMORY, "bucket");
 
             assertEquals(2, memoryStorage.size());
 
@@ -359,14 +357,14 @@ class UploadDownloadIntegrationTest {
             byte[] content = "reuploadable".getBytes();
 
             FileMetadata first = uploadService.upload(
-                    testSource("file.txt", content), StorageType.MEMORY, "bucket");
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket");
             deleteService.delete(first.key());
 
             assertEquals(0, memoryStorage.size());
 
             // Re-upload same content — should get a new key since metadata was deleted
             FileMetadata second = uploadService.upload(
-                    testSource("file.txt", content), StorageType.MEMORY, "bucket");
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket");
 
             assertNotEquals(first.key(), second.key());
             assertEquals(1, memoryStorage.size());
@@ -395,67 +393,4 @@ class UploadDownloadIntegrationTest {
         }
     }
 
-    // ── Helper ───────────────────────────────────────────────────────
-
-    private static FileSource testSource(String filename, byte[] content) {
-        return new FileSource() {
-            @Override
-            public String getOriginalFilename() {
-                return filename;
-            }
-
-            @Override
-            public InputStream getInputStream() {
-                return new ByteArrayInputStream(content);
-            }
-
-            @Override
-            public long getSize() {
-                return content.length;
-            }
-
-            @Override
-            public boolean isEmpty() {
-                return content.length == 0;
-            }
-        };
-    }
-
-    /**
-     * Simple in-memory metadata repository for integration testing.
-     */
-    static class InMemoryMetadataRepository implements FileMetadataRepository {
-
-        private final Map<String, FileMetadata> byKey = new ConcurrentHashMap<>();
-        private final Map<String, FileMetadata> byChecksum = new ConcurrentHashMap<>();
-
-        @Override
-        public FileMetadata findByChecksum(String checksum) {
-            return byChecksum.get(checksum);
-        }
-
-        @Override
-        public FileMetadata findByKey(String key) {
-            return byKey.get(key);
-        }
-
-        @Override
-        public FileMetadata save(FileMetadata metadata) {
-            byKey.put(metadata.key(), metadata);
-            byChecksum.put(metadata.checksum(), metadata);
-            return metadata;
-        }
-
-        @Override
-        public void deleteByKey(String key) {
-            FileMetadata removed = byKey.remove(key);
-            if (removed != null) {
-                byChecksum.remove(removed.checksum());
-            }
-        }
-
-        int count() {
-            return byKey.size();
-        }
-    }
 }

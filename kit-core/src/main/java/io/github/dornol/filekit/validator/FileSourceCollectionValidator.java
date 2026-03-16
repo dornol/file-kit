@@ -4,6 +4,7 @@ import io.github.dornol.filekit.domain.FileSource;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.Objects;
 
 /**
  * Validates a {@link Collection} of {@link FileSource} against the {@link ValidFile} constraint.
@@ -14,7 +15,7 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
     private final FileValidationHelper helper;
 
     public FileSourceCollectionValidator(FileValidationHelper helper) {
-        this.helper = helper;
+        this.helper = Objects.requireNonNull(helper, "helper");
     }
 
     @Override

@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.validator;
 
 import io.github.dornol.filekit.domain.FileSource;
+import io.github.dornol.filekit.test.ValidatorTestSupport;
 import jakarta.validation.ConstraintValidatorContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,10 +28,7 @@ class FileSourceCollectionValidatorTest {
         when(annotation.maxSize()).thenReturn(10 * 1024L);
         validator.initialize(annotation);
 
-        context = mock(ConstraintValidatorContext.class);
-        ConstraintValidatorContext.ConstraintViolationBuilder builder =
-                mock(ConstraintValidatorContext.ConstraintViolationBuilder.class);
-        when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
+        context = ValidatorTestSupport.mockContext();
     }
 
     @Test

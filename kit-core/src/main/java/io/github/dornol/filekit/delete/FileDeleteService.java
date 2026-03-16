@@ -2,6 +2,7 @@ package io.github.dornol.filekit.delete;
 
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.storage.AbstractFileOperationService;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import org.slf4j.Logger;
@@ -16,17 +17,13 @@ import java.util.Objects;
  * @see FileStorage#delete(FileMetadata)
  * @see FileMetadataRepository#deleteByKey(String)
  */
-public class FileDeleteService {
+public class FileDeleteService extends AbstractFileOperationService {
 
     private static final Logger log = LoggerFactory.getLogger(FileDeleteService.class);
 
-    private final FileMetadataRepository metadataRepository;
-    private final FileStorageResolver storageResolver;
-
     public FileDeleteService(FileMetadataRepository metadataRepository,
                              FileStorageResolver storageResolver) {
-        this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
-        this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
+        super(metadataRepository, storageResolver);
     }
 
     /**
@@ -39,8 +36,7 @@ public class FileDeleteService {
         Objects.requireNonNull(fileKey, "fileKey");
 
         FileMetadata metadata = metadataRepository.getByKey(fileKey);
-        FileStorage storage = storageResolver.resolve(metadata.location().storageType());
-        storage.delete(metadata);
+        resolveStorage(metadata).delete(metadata);
         metadataRepository.deleteByKey(fileKey);
 
         log.info("File deleted: key={}", fileKey);

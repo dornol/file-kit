@@ -4,6 +4,8 @@ import io.github.dornol.filekit.validator.FileValidationHelper;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Objects;
+
 /**
  * Validates a single {@link MultipartFile} against the {@link ValidMultipartFile} constraint.
  */
@@ -12,7 +14,7 @@ public class MultipartFileValidator extends AbstractMultipartFileValidator<Multi
     private final FileValidationHelper helper;
 
     public MultipartFileValidator(FileValidationHelper helper) {
-        this.helper = helper;
+        this.helper = Objects.requireNonNull(helper, "helper");
     }
 
     @Override
