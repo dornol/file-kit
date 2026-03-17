@@ -72,4 +72,13 @@ public class FileStorageException extends RuntimeException {
     /** Range request failed (e.g. invalid range). */
     public static final String RANGE_NOT_SATISFIABLE = "file-kit.storage.range-not-satisfiable";
 
+    /** Archive processing (listing, extraction) failed. */
+    public static final String ARCHIVE_PROCESSING_FAILED = "file-kit.archive.processing-failed";
+
+    /** File copy operation failed. */
+    public static final String COPY_FAILED = "file-kit.storage.copy-failed";
+
+    /** File move operation failed. */
+    public static final String MOVE_FAILED = "file-kit.storage.move-failed";
+
 }

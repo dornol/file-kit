@@ -5,13 +5,16 @@ import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.example.infra.FileMetadataRepositoryAdapter;
+import io.github.dornol.filekit.example.config.StorageType;
 import io.github.dornol.filekit.spring.download.FileResponseBuilder;
+import io.github.dornol.filekit.transfer.FileTransferService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,13 +29,16 @@ public class FileDownloadController {
 
     private final FileDownloadService fileDownloadService;
     private final FileDeleteService fileDeleteService;
+    private final FileTransferService fileTransferService;
     private final FileMetadataRepositoryAdapter metadataRepository;
 
     public FileDownloadController(FileDownloadService fileDownloadService,
                                   FileDeleteService fileDeleteService,
+                                  FileTransferService fileTransferService,
                                   FileMetadataRepositoryAdapter metadataRepository) {
         this.fileDownloadService = fileDownloadService;
         this.fileDeleteService = fileDeleteService;
+        this.fileTransferService = fileTransferService;
         this.metadataRepository = metadataRepository;
     }
 
@@ -93,6 +99,35 @@ public class FileDownloadController {
         return FileResponseBuilder.inline(result.metadata())
                 .range(rangeHeader)
                 .body(new InputStreamResource(result.content()));
+    }
+
+    @PostMapping("/files/{fileKey}/copy")
+    public ResponseEntity<Map<String, Object>> copy(
+            @PathVariable String fileKey,
+            @RequestParam(value = "targetStorageType", defaultValue = "LOCAL") StorageType targetStorageType,
+            @RequestParam(value = "targetBucket", defaultValue = "uploads") String targetBucket) {
+        FileMetadata copied = fileTransferService.copy(fileKey, targetStorageType, targetBucket);
+        return ResponseEntity.ok(toMetadataMap(copied));
+    }
+
+    @PostMapping("/files/{fileKey}/move")
+    public ResponseEntity<Map<String, Object>> move(
+            @PathVariable String fileKey,
+            @RequestParam(value = "targetStorageType", defaultValue = "LOCAL") StorageType targetStorageType,
+            @RequestParam(value = "targetBucket", defaultValue = "uploads") String targetBucket) {
+        FileMetadata moved = fileTransferService.move(fileKey, targetStorageType, targetBucket);
+        return ResponseEntity.ok(toMetadataMap(moved));
+    }
+
+    private static Map<String, Object> toMetadataMap(FileMetadata m) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("fileKey", m.key());
+        result.put("filename", m.name());
+        result.put("size", m.size());
+        result.put("mimeType", m.format().mimeType());
+        result.put("storageType", m.location().storageType().name());
+        result.put("bucket", m.location().bucket());
+        return result;
     }
 
 }

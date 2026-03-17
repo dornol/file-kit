@@ -1,6 +1,15 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
+import io.github.dornol.filekit.archive.ArchiveMetadata;
+import io.github.dornol.filekit.archive.ArchiveMetadataExtractor;
+import io.github.dornol.filekit.archive.ZipArchiveMetadataExtractor;
+import io.github.dornol.filekit.image.ConvertOption;
+import io.github.dornol.filekit.image.ConvertResult;
 import io.github.dornol.filekit.image.DefaultThumbnailGenerator;
+import io.github.dornol.filekit.image.ExifStripper;
+import io.github.dornol.filekit.image.ImageFormatConverter;
+import io.github.dornol.filekit.image.ImageIOExifStripper;
+import io.github.dornol.filekit.image.ImageIOFormatConverter;
 import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
 import io.github.dornol.filekit.image.ImageIOResizer;
 import io.github.dornol.filekit.image.ImageIOWatermarker;
@@ -220,6 +229,72 @@ class FileKitAutoConfigurationTest {
                 });
     }
 
+    // ── Archive bean ────────────────────────────────────────────────
+
+    @Test
+    void registersDefaultArchiveMetadataExtractor() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ArchiveMetadataExtractor.class);
+            assertThat(context.getBean(ArchiveMetadataExtractor.class))
+                    .isInstanceOf(ZipArchiveMetadataExtractor.class);
+        });
+    }
+
+    @Test
+    void userDefinedArchiveMetadataExtractor_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomArchiveConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ArchiveMetadataExtractor.class);
+                    assertThat(context.getBean(ArchiveMetadataExtractor.class))
+                            .isSameAs(context.getBean("customArchiveExtractor"));
+                });
+    }
+
+    // ── ExifStripper bean ──────────────────────────────────────────
+
+    @Test
+    void registersDefaultExifStripper() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ExifStripper.class);
+            assertThat(context.getBean(ExifStripper.class))
+                    .isInstanceOf(ImageIOExifStripper.class);
+        });
+    }
+
+    @Test
+    void userDefinedExifStripper_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomExifStripperConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ExifStripper.class);
+                    assertThat(context.getBean(ExifStripper.class))
+                            .isSameAs(context.getBean("customExifStripper"));
+                });
+    }
+
+    // ── ImageFormatConverter bean ──────────────────────────────────
+
+    @Test
+    void registersDefaultImageFormatConverter() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(ImageFormatConverter.class);
+            assertThat(context.getBean(ImageFormatConverter.class))
+                    .isInstanceOf(ImageIOFormatConverter.class);
+        });
+    }
+
+    @Test
+    void userDefinedImageFormatConverter_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomFormatConverterConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(ImageFormatConverter.class);
+                    assertThat(context.getBean(ImageFormatConverter.class))
+                            .isSameAs(context.getBean("customFormatConverter"));
+                });
+    }
+
     // ── Test configurations ─────────────────────────────────────────
 
     @Configuration
@@ -282,6 +357,36 @@ class FileKitAutoConfigurationTest {
         @Bean
         ThumbnailGenerator customThumbnailGenerator() {
             return (imageBytes, option) -> new ResizeResult(
+                    new byte[0], new ImageMetadata(1, 1, "custom"));
+        }
+    }
+
+    @Configuration
+    static class CustomArchiveConfig {
+        @Bean
+        ArchiveMetadataExtractor customArchiveExtractor() {
+            return archiveBytes -> new ArchiveMetadata(0, 0, java.util.List.of());
+        }
+    }
+
+    @Configuration
+    static class CustomExifStripperConfig {
+        @Bean
+        ExifStripper customExifStripper() {
+            return new ExifStripper() {
+                @Override
+                public byte[] strip(byte[] imageBytes) { return imageBytes; }
+                @Override
+                public byte[] strip(byte[] imageBytes, float quality) { return imageBytes; }
+            };
+        }
+    }
+
+    @Configuration
+    static class CustomFormatConverterConfig {
+        @Bean
+        ImageFormatConverter customFormatConverter() {
+            return (imageBytes, option) -> new ConvertResult(
                     new byte[0], new ImageMetadata(1, 1, "custom"));
         }
     }

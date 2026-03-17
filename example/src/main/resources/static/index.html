@@ -35,6 +35,10 @@
         .dl-btn:hover { color: #1d4ed8; }
         .del-btn { background: none; border: none; color: #dc2626; cursor: pointer; font-size: 13px; padding: 4px 8px; text-decoration: underline; }
         .del-btn:hover { color: #991b1b; }
+        .copy-btn { background: none; border: none; color: #7c3aed; cursor: pointer; font-size: 13px; padding: 4px 8px; text-decoration: underline; }
+        .copy-btn:hover { color: #5b21b6; }
+        .move-btn { background: none; border: none; color: #d97706; cursor: pointer; font-size: 13px; padding: 4px 8px; text-decoration: underline; }
+        .move-btn:hover { color: #92400e; }
         .size { color: #888; }
         .mime { color: #888; font-family: monospace; font-size: 12px; }
         .filename { font-weight: 500; word-break: break-all; }
@@ -101,6 +105,49 @@
     </div>
 
     <div class="card">
+        <h2>EXIF Strip</h2>
+        <p class="desc">Strip EXIF metadata from an image (re-encodes without metadata)</p>
+        <form id="exifForm">
+            <label for="exifFile">Image file</label>
+            <input type="file" id="exifFile" accept="image/*">
+            <label for="exifQuality">Quality (0.0 ~ 1.0)</label>
+            <input type="number" id="exifQuality" value="0.95" min="0" max="1" step="0.05" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+            <button type="submit">Strip EXIF</button>
+        </form>
+        <div id="exifResult" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+        <h2>Format Convert</h2>
+        <p class="desc">Convert image format (e.g. PNG → JPEG)</p>
+        <form id="convertForm">
+            <label for="convertFile">Image file</label>
+            <input type="file" id="convertFile" accept="image/*">
+            <label for="outputFormat">Output format</label>
+            <select id="outputFormat" style="display:block;width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+                <option value="jpeg">JPEG</option>
+                <option value="png">PNG</option>
+                <option value="gif">GIF</option>
+            </select>
+            <label for="convertQuality">Quality (0.0 ~ 1.0)</label>
+            <input type="number" id="convertQuality" value="0.85" min="0" max="1" step="0.05" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+            <button type="submit">Convert</button>
+        </form>
+        <div id="convertResult" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+        <h2>ZIP Archive Metadata</h2>
+        <p class="desc">List entries in a ZIP archive without extracting</p>
+        <form id="archiveForm">
+            <label for="archiveFile">ZIP file</label>
+            <input type="file" id="archiveFile" accept=".zip,application/zip">
+            <button type="submit">Extract Metadata</button>
+        </form>
+        <div id="archiveResult" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
         <h2>Uploaded Files</h2>
         <p class="desc" id="fileCount">Loading...</p>
         <div id="fileList"></div>
@@ -149,6 +196,8 @@
                     + '<td class="mime">' + escapeHtml(f.mimeType) + '</td>'
                     + '<td class="mime">' + escapeHtml(f.storageType || '') + '</td>'
                     + '<td><button class="dl-btn" onclick="downloadFile(\'' + f.fileKey + '\')">Download</button>'
+                    + '<button class="copy-btn" onclick="copyFile(\'' + f.fileKey + '\')">Copy</button>'
+                    + '<button class="move-btn" onclick="moveFile(\'' + f.fileKey + '\')">Move</button>'
                     + '<button class="del-btn" onclick="deleteFile(\'' + f.fileKey + '\')">Delete</button></td>'
                     + '</tr>';
             }
@@ -298,6 +347,156 @@
         } catch (err) { showToast('Error: ' + err.message, 'error'); }
         finally { btn.disabled = false; btn.textContent = 'Resize'; }
     });
+
+    // EXIF strip
+    document.getElementById('exifForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('exifFile');
+        const btn = e.target.querySelector('button');
+        const resultEl = document.getElementById('exifResult');
+        if (!input.files.length) { showToast('Please select an image.', 'error'); return; }
+
+        btn.disabled = true; btn.textContent = 'Stripping...';
+
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        formData.append('quality', document.getElementById('exifQuality').value);
+
+        try {
+            const res = await fetch('/image/strip-exif', { method: 'POST', body: formData });
+            if (res.ok) {
+                const w = res.headers.get('X-Image-Width');
+                const h = res.headers.get('X-Image-Height');
+                const fmt = res.headers.get('X-Image-Format');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                resultEl.innerHTML = '<p style="font-size:13px;color:#555;margin-bottom:8px;">'
+                    + 'Result: ' + w + ' x ' + h + ' px, ' + escapeHtml(fmt || '') + ', ' + formatSize(blob.size)
+                    + ' (original: ' + formatSize(input.files[0].size) + ')</p>'
+                    + '<img src="' + url + '" style="max-width:100%;border:1px solid #eee;border-radius:6px;">'
+                    + '<br><a href="' + url + '" download="stripped.' + (fmt || 'jpg') + '" style="display:inline-block;margin-top:8px;font-size:13px;">Download</a>';
+                showToast('EXIF stripped!', 'success');
+            } else {
+                const data = await res.json();
+                showToast(data.message || 'Strip failed', 'error');
+            }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Strip EXIF'; }
+    });
+
+    // format convert
+    document.getElementById('convertForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('convertFile');
+        const btn = e.target.querySelector('button');
+        const resultEl = document.getElementById('convertResult');
+        if (!input.files.length) { showToast('Please select an image.', 'error'); return; }
+
+        btn.disabled = true; btn.textContent = 'Converting...';
+
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        formData.append('outputFormat', document.getElementById('outputFormat').value);
+        formData.append('quality', document.getElementById('convertQuality').value);
+
+        try {
+            const res = await fetch('/image/convert', { method: 'POST', body: formData });
+            if (res.ok) {
+                const w = res.headers.get('X-Image-Width');
+                const h = res.headers.get('X-Image-Height');
+                const fmt = res.headers.get('X-Image-Format');
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                resultEl.innerHTML = '<p style="font-size:13px;color:#555;margin-bottom:8px;">'
+                    + 'Result: ' + w + ' x ' + h + ' px, ' + escapeHtml(fmt || '') + ', ' + formatSize(blob.size)
+                    + '</p>'
+                    + '<img src="' + url + '" style="max-width:100%;border:1px solid #eee;border-radius:6px;">'
+                    + '<br><a href="' + url + '" download="converted.' + (fmt || 'jpg') + '" style="display:inline-block;margin-top:8px;font-size:13px;">Download</a>';
+                showToast('Conversion complete!', 'success');
+            } else {
+                const data = await res.json();
+                showToast(data.message || 'Conversion failed', 'error');
+            }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Convert'; }
+    });
+
+    // archive metadata
+    document.getElementById('archiveForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('archiveFile');
+        const btn = e.target.querySelector('button');
+        const resultEl = document.getElementById('archiveResult');
+        if (!input.files.length) { showToast('Please select a ZIP file.', 'error'); return; }
+
+        btn.disabled = true; btn.textContent = 'Extracting...';
+
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        try {
+            const res = await fetch('/archive/metadata', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (res.ok) {
+                let html = '<p style="font-size:13px;color:#555;margin-bottom:8px;">'
+                    + data.entryCount + ' entries, total ' + formatSize(data.totalUncompressedSize) + ' uncompressed</p>';
+
+                if (data.entries.length > 0) {
+                    html += '<table><thead><tr><th>Path</th><th>Size</th><th>Compressed</th><th>Dir</th></tr></thead><tbody>';
+                    for (const entry of data.entries) {
+                        html += '<tr>'
+                            + '<td class="filename">' + escapeHtml(entry.path) + '</td>'
+                            + '<td class="size">' + formatSize(entry.uncompressedSize) + '</td>'
+                            + '<td class="size">' + formatSize(entry.compressedSize) + '</td>'
+                            + '<td>' + (entry.directory ? '📁' : '') + '</td>'
+                            + '</tr>';
+                    }
+                    html += '</tbody></table>';
+                }
+                resultEl.innerHTML = html;
+                showToast('Archive metadata extracted!', 'success');
+            } else {
+                showToast(data.message || 'Extraction failed', 'error');
+            }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Extract Metadata'; }
+    });
+
+    // copy file
+    async function copyFile(fileKey) {
+        try {
+            const res = await fetch('/files/' + encodeURIComponent(fileKey) + '/copy', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                showToast('File copied! New key: ' + data.fileKey, 'success');
+                loadFiles();
+            } else {
+                showToast(data.message || 'Copy failed', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    // move file
+    async function moveFile(fileKey) {
+        if (!confirm('Move this file? The original will be deleted.')) return;
+        const targetBucket = prompt('Target bucket name:', 'uploads');
+        if (targetBucket === null) return;
+        try {
+            const params = new URLSearchParams({ targetBucket });
+            const res = await fetch('/files/' + encodeURIComponent(fileKey) + '/move?' + params, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                showToast('File moved! New key: ' + data.fileKey, 'success');
+                loadFiles();
+            } else {
+                showToast(data.message || 'Move failed', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
 
     // initial load
     loadFiles();

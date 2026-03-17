@@ -1,5 +1,9 @@
 package io.github.dornol.filekit.example.controller;
 
+import io.github.dornol.filekit.image.ConvertOption;
+import io.github.dornol.filekit.image.ConvertResult;
+import io.github.dornol.filekit.image.ExifStripper;
+import io.github.dornol.filekit.image.ImageFormatConverter;
 import io.github.dornol.filekit.image.ImageMetadata;
 import io.github.dornol.filekit.image.ImageMetadataExtractor;
 import io.github.dornol.filekit.image.ImageResizer;
@@ -33,15 +37,21 @@ public class ImageController {
     private final ImageResizer resizer;
     private final ThumbnailGenerator thumbnailGenerator;
     private final ImageWatermarker watermarker;
+    private final ExifStripper exifStripper;
+    private final ImageFormatConverter formatConverter;
 
     public ImageController(ImageMetadataExtractor metadataExtractor,
                            ImageResizer resizer,
                            ThumbnailGenerator thumbnailGenerator,
-                           ImageWatermarker watermarker) {
+                           ImageWatermarker watermarker,
+                           ExifStripper exifStripper,
+                           ImageFormatConverter formatConverter) {
         this.metadataExtractor = metadataExtractor;
         this.resizer = resizer;
         this.thumbnailGenerator = thumbnailGenerator;
         this.watermarker = watermarker;
+        this.exifStripper = exifStripper;
+        this.formatConverter = formatConverter;
     }
 
     @PostMapping("/metadata")
@@ -105,6 +115,32 @@ public class ImageController {
 
         return buildImageResponse(result.data(), result.metadata(),
                 "watermarked." + result.metadata().format());
+    }
+
+    @PostMapping("/strip-exif")
+    public ResponseEntity<byte[]> stripExif(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "quality", defaultValue = "0.95") float quality
+    ) throws IOException {
+        byte[] bytes = file.getBytes();
+        byte[] stripped = exifStripper.strip(bytes, quality);
+        ImageMetadata meta = metadataExtractor.extract(stripped);
+
+        return buildImageResponse(stripped, meta, "stripped." + meta.format());
+    }
+
+    @PostMapping("/convert")
+    public ResponseEntity<byte[]> convert(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("outputFormat") String outputFormat,
+            @RequestParam(value = "quality", defaultValue = "0.85") float quality
+    ) throws IOException {
+        byte[] bytes = file.getBytes();
+        ConvertOption option = ConvertOption.of(outputFormat, quality);
+        ConvertResult result = formatConverter.convert(bytes, option);
+
+        return buildImageResponse(result.data(), result.metadata(),
+                "converted." + result.metadata().format());
     }
 
     private ResponseEntity<byte[]> buildImageResponse(byte[] data, ImageMetadata metadata, String filename) {

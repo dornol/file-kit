@@ -1,8 +1,14 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
+import io.github.dornol.filekit.archive.ArchiveMetadataExtractor;
+import io.github.dornol.filekit.archive.ZipArchiveMetadataExtractor;
 import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.image.DefaultThumbnailGenerator;
+import io.github.dornol.filekit.image.ExifStripper;
+import io.github.dornol.filekit.image.ImageFormatConverter;
+import io.github.dornol.filekit.image.ImageIOExifStripper;
+import io.github.dornol.filekit.image.ImageIOFormatConverter;
 import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
 import io.github.dornol.filekit.image.ImageIOResizer;
 import io.github.dornol.filekit.image.ImageIOWatermarker;
@@ -10,6 +16,7 @@ import io.github.dornol.filekit.image.ImageMetadataExtractor;
 import io.github.dornol.filekit.image.ImageResizer;
 import io.github.dornol.filekit.image.ImageWatermarker;
 import io.github.dornol.filekit.image.ThumbnailGenerator;
+import io.github.dornol.filekit.transfer.FileTransferService;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
@@ -185,6 +192,36 @@ public class FileKitAutoConfiguration {
     public ThumbnailGenerator thumbnailGenerator(ImageResizer imageResizer) {
         log.debug("Registering default DefaultThumbnailGenerator");
         return new DefaultThumbnailGenerator(imageResizer);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ArchiveMetadataExtractor archiveMetadataExtractor() {
+        log.debug("Registering default ZipArchiveMetadataExtractor");
+        return new ZipArchiveMetadataExtractor();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ExifStripper exifStripper(ImageMetadataExtractor metadataExtractor) {
+        log.debug("Registering default ImageIOExifStripper");
+        return new ImageIOExifStripper(metadataExtractor);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ImageFormatConverter imageFormatConverter(ImageMetadataExtractor metadataExtractor) {
+        log.debug("Registering default ImageIOFormatConverter");
+        return new ImageIOFormatConverter(metadataExtractor);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
+    public FileTransferService fileTransferService(FileMetadataRepository metadataRepository,
+                                                    FileStorageResolver storageResolver) {
+        log.info("Registering FileTransferService");
+        return new FileTransferService(metadataRepository, storageResolver);
     }
 
 }

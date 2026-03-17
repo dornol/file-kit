@@ -15,7 +15,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.7'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.8'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -29,7 +29,7 @@ implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.0.7</version>
+    <version>0.0.8</version>
 </dependency>
 ```
 
@@ -531,10 +531,14 @@ The following beans are registered automatically when their dependencies are pre
 | `ImageWatermarker` | Always (`ImageIOWatermarker` default, overridable) |
 | `ThumbnailGenerator` | Always (`DefaultThumbnailGenerator` default, overridable) |
 | `PdfMetadataExtractor` | When Apache PDFBox is on the classpath (`PdfBoxMetadataExtractor` default, overridable) |
+| `ArchiveMetadataExtractor` | Always (`ZipArchiveMetadataExtractor` default, overridable) |
+| `ExifStripper` | Always (`ImageIOExifStripper` default, overridable) |
+| `ImageFormatConverter` | Always (`ImageIOFormatConverter` default, overridable) |
+| `FileTransferService` | `FileMetadataRepository` + `FileStorageResolver` |
 
 ## Image Processing
 
-file-kit provides image metadata extraction, resizing, thumbnail generation, and watermarking as standalone utilities. These are **not** integrated into the upload flow — use them directly where needed.
+file-kit provides image metadata extraction, resizing, thumbnail generation, watermarking, EXIF stripping, and format conversion as standalone utilities. These are **not** integrated into the upload flow — use them directly where needed.
 
 ### Metadata extraction
 
@@ -647,9 +651,43 @@ WatermarkResult customResult = watermarker.apply(imageBytes, custom);
 | `BOTTOM_RIGHT` | Bottom-right corner with padding |
 | `TILED` | Repeated across the entire image |
 
+### EXIF stripping
+
+Strip EXIF and other metadata from images by re-encoding through ImageIO:
+
+```java
+@Autowired ExifStripper exifStripper;
+
+byte[] imageBytes = Files.readAllBytes(Path.of("photo.jpg"));
+
+// Strip with default quality (0.95)
+byte[] stripped = exifStripper.strip(imageBytes);
+
+// Strip with custom quality
+byte[] strippedLow = exifStripper.strip(imageBytes, 0.8f);
+```
+
+### Image format conversion
+
+Convert images between formats (e.g., PNG → JPEG) without resizing:
+
+```java
+@Autowired ImageFormatConverter converter;
+
+byte[] pngBytes = Files.readAllBytes(Path.of("image.png"));
+
+// Convert to JPEG with default quality
+ConvertResult result = converter.convert(pngBytes, ConvertOption.of("jpeg"));
+// result.data() → converted image bytes
+// result.metadata() → width, height, format
+
+// Convert with custom quality
+ConvertResult hq = converter.convert(pngBytes, ConvertOption.of("jpeg", 0.95f));
+```
+
 ### Custom implementation
 
-`ImageMetadataExtractor`, `ImageResizer`, `ImageWatermarker`, and `ThumbnailGenerator` are all SPI interfaces with default `ImageIO`-based implementations. Register your own bean to override:
+`ImageMetadataExtractor`, `ImageResizer`, `ImageWatermarker`, `ThumbnailGenerator`, `ExifStripper`, and `ImageFormatConverter` are all SPI interfaces with default `ImageIO`-based implementations. Register your own bean to override:
 
 ```java
 @Bean
@@ -704,6 +742,53 @@ public PdfMetadataExtractor pdfMetadataExtractor() {
 }
 ```
 
+## ZIP Archive Listing
+
+Extract metadata from ZIP archives without fully extracting files:
+
+```java
+@Autowired ArchiveMetadataExtractor archiveExtractor;
+
+byte[] zipBytes = Files.readAllBytes(Path.of("archive.zip"));
+ArchiveMetadata metadata = archiveExtractor.extract(zipBytes);
+
+metadata.entryCount();            // number of entries
+metadata.totalUncompressedSize(); // total uncompressed size in bytes
+
+for (ArchiveEntry entry : metadata.entries()) {
+    entry.path();             // entry path within archive
+    entry.compressedSize();   // compressed size in bytes
+    entry.uncompressedSize(); // uncompressed size in bytes
+    entry.lastModified();     // last modification time (nullable)
+    entry.directory();        // whether this is a directory entry
+}
+
+// Also works with InputStream
+try (InputStream is = Files.newInputStream(Path.of("archive.zip"))) {
+    ArchiveMetadata meta = archiveExtractor.extract(is);
+}
+```
+
+The default `ZipArchiveMetadataExtractor` uses `java.util.zip.ZipInputStream` — no external dependencies required.
+
+## File Copy/Move
+
+Copy or move files between storage backends:
+
+```java
+@Autowired FileTransferService transferService;
+
+// Copy a file to a different bucket (or storage backend)
+FileMetadata copied = transferService.copy(fileKey, StorageType.S3, "archive-bucket");
+// Source file remains, new file gets a new UUID key
+
+// Move a file (copy + delete source)
+FileMetadata moved = transferService.move(fileKey, StorageType.S3, "archive-bucket");
+// Source file and metadata are deleted after successful copy
+```
+
+Copy preserves the original filename, checksum, and format while assigning a new UUID key and storage location. Move performs a copy followed by source deletion — if source deletion fails after a successful copy, a `FileStorageException` with `MOVE_FAILED` is thrown.
+
 ## Validation Checks
 
 | Check | Description |
@@ -747,6 +832,9 @@ file-kit.storage.presigned-url-failed=Pre-signed URL generation failed
 file-kit.storage.range-not-satisfiable=Invalid byte range requested
 file-kit.image.processing-failed=Image processing failed
 file-kit.pdf.processing-failed=PDF processing failed
+file-kit.archive.processing-failed=Archive processing failed
+file-kit.storage.copy-failed=File copy failed
+file-kit.storage.move-failed=File move failed
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.
@@ -786,13 +874,16 @@ boolean validName = helper.isValidFilename(source);
 
 Or use `@ValidFile` with Jakarta Validation and `FileSourceValidator`.
 
-Image processing, thumbnail, watermark, and PDF metadata extraction can also be used standalone without Spring:
+Image processing, thumbnail, watermark, PDF metadata extraction, EXIF stripping, format conversion, and archive listing can also be used standalone without Spring:
 
 ```java
 ImageResizer resizer = new ImageIOResizer();
 ImageWatermarker watermarker = new ImageIOWatermarker();
 ThumbnailGenerator thumbnailGenerator = new DefaultThumbnailGenerator(resizer);
 PdfMetadataExtractor pdfExtractor = new PdfBoxMetadataExtractor();
+ExifStripper exifStripper = new ImageIOExifStripper();
+ImageFormatConverter formatConverter = new ImageIOFormatConverter();
+ArchiveMetadataExtractor archiveExtractor = new ZipArchiveMetadataExtractor();
 ```
 
 ## Running the Example
@@ -828,6 +919,11 @@ MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 | `/image/thumbnail` | POST | Generate a thumbnail |
 | `/image/watermark` | POST | Apply a text watermark |
 | `/pdf/metadata` | POST | Extract PDF metadata |
+| `/image/strip-exif` | POST | Strip EXIF metadata from an image |
+| `/image/convert` | POST | Convert image format |
+| `/archive/metadata` | POST | Extract ZIP archive metadata |
+| `/files/{fileKey}/copy` | POST | Copy a file to a new location |
+| `/files/{fileKey}/move` | POST | Move a file to a new location |
 
 ## Security Considerations
 
@@ -879,7 +975,7 @@ file-kit does **not** handle download authorization. Access control (e.g., verif
 
 ### Thread safety
 
-- `FileUploadService`, `FileDownloadService`, `FileDeleteService`, and `LocalFileStorage` are thread-safe and can be used as singletons.
+- `FileUploadService`, `FileDownloadService`, `FileDeleteService`, `FileTransferService`, and `LocalFileStorage` are thread-safe and can be used as singletons.
 - `InMemoryFileStorage` is thread-safe (backed by `ConcurrentHashMap`) but is **not recommended for production** — it has no size limits and all data is lost on restart.
 
 ## Requirements
