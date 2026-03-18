@@ -5,11 +5,16 @@ import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.download.FileDownloadService;
+import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
+import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.spi.QuotaPolicy;
+import io.github.dornol.filekit.spi.QuotaUsageProvider;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
@@ -137,6 +142,77 @@ class FileKitStorageAutoConfigurationTest {
                 });
     }
 
+    // ── QuotaChecker bean conditions ────────────────────────────────
+
+    @Test
+    void quotaChecker_notRegistered_whenNoPolicyOrProvider() {
+        contextRunner.run(context -> {
+            assertThat(context).doesNotHaveBean(QuotaChecker.class);
+        });
+    }
+
+    @Test
+    void quotaChecker_notRegistered_whenOnlyPolicyPresent() {
+        contextRunner
+                .withUserConfiguration(QuotaPolicyOnlyConfig.class)
+                .run(context -> {
+                    assertThat(context).doesNotHaveBean(QuotaChecker.class);
+                });
+    }
+
+    @Test
+    void quotaChecker_registered_whenPolicyAndProviderPresent() {
+        contextRunner
+                .withUserConfiguration(QuotaConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(QuotaChecker.class);
+                });
+    }
+
+    // ── FileEventPublisher bean ─────────────────────────────────────
+
+    @Test
+    void eventPublisher_alwaysRegistered() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(FileEventPublisher.class);
+        });
+    }
+
+    @Test
+    void eventPublisher_registeredWithZeroListeners() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(FileEventPublisher.class);
+            assertThat(context).doesNotHaveBean(FileEventListener.class);
+        });
+    }
+
+    @Test
+    void eventPublisher_registeredWithListeners() {
+        contextRunner
+                .withUserConfiguration(EventListenerConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(FileEventPublisher.class);
+                    assertThat(context).hasSingleBean(FileEventListener.class);
+                });
+    }
+
+    // ── Service beans include quota and event ───────────────────────
+
+    @Test
+    void serviceBeans_createdWithQuotaAndEvent() {
+        contextRunner
+                .withUserConfiguration(AllPortsConfig.class, FileStorageConfig.class,
+                        QuotaConfig.class, EventListenerConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(FileUploadService.class);
+                    assertThat(context).hasSingleBean(FileDownloadService.class);
+                    assertThat(context).hasSingleBean(FileDeleteService.class);
+                    assertThat(context).hasSingleBean(FileTransferService.class);
+                    assertThat(context).hasSingleBean(QuotaChecker.class);
+                    assertThat(context).hasSingleBean(FileEventPublisher.class);
+                });
+    }
+
     // ── Test configurations ─────────────────────────────────────────
 
     @Configuration
@@ -188,6 +264,30 @@ class FileKitStorageAutoConfigurationTest {
                 }
                 @Override public String resolveUri(FileMetadata metadata) { return ""; }
             };
+        }
+    }
+
+    @Configuration
+    static class QuotaPolicyOnlyConfig {
+        @Bean QuotaPolicy quotaPolicy() {
+            return (storageType, bucket) -> 1000L;
+        }
+    }
+
+    @Configuration
+    static class QuotaConfig {
+        @Bean QuotaPolicy quotaPolicy() {
+            return (storageType, bucket) -> 1000L;
+        }
+        @Bean QuotaUsageProvider quotaUsageProvider() {
+            return (storageType, bucket) -> 0L;
+        }
+    }
+
+    @Configuration
+    static class EventListenerConfig {
+        @Bean FileEventListener testListener() {
+            return new FileEventListener() {};
         }
     }
 

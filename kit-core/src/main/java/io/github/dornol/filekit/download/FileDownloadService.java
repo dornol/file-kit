@@ -2,6 +2,7 @@ package io.github.dornol.filekit.download;
 
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.event.FileEventPublisher;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
@@ -17,6 +18,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -29,17 +31,34 @@ public class FileDownloadService extends AbstractFileOperationService {
     private static final Logger log = LoggerFactory.getLogger(FileDownloadService.class);
 
     private final FileEncryptor fileEncryptor;
+    private final FileEventPublisher eventPublisher;
 
     public FileDownloadService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver) {
-        this(metadataRepository, storageResolver, new NoOpFileEncryptor());
+        this(metadataRepository, storageResolver, new NoOpFileEncryptor(), new FileEventPublisher(List.of()));
     }
 
     public FileDownloadService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver,
                                FileEncryptor fileEncryptor) {
+        this(metadataRepository, storageResolver, fileEncryptor, new FileEventPublisher(List.of()));
+    }
+
+    /**
+     * Creates a download service with the specified encryptor and event publisher.
+     *
+     * @param metadataRepository repository for file metadata lookup
+     * @param storageResolver    resolver to find storage backends
+     * @param fileEncryptor      encryptor for at-rest decryption
+     * @param eventPublisher     publisher for file lifecycle events
+     */
+    public FileDownloadService(FileMetadataRepository metadataRepository,
+                               FileStorageResolver storageResolver,
+                               FileEncryptor fileEncryptor,
+                               FileEventPublisher eventPublisher) {
         super(metadataRepository, storageResolver);
         this.fileEncryptor = Objects.requireNonNull(fileEncryptor, "fileEncryptor");
+        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
     }
 
     public DownloadResult download(String fileKey) {
@@ -52,6 +71,7 @@ public class FileDownloadService extends AbstractFileOperationService {
         }
 
         log.info("File downloaded: key={}", fileKey);
+        eventPublisher.fireDownloaded(metadata);
         return new DownloadResult(metadata, content);
     }
 

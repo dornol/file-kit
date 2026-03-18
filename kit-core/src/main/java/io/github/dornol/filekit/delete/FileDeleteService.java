@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.delete;
 
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.event.FileEventPublisher;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.storage.AbstractFileOperationService;
 import io.github.dornol.filekit.storage.FileStorage;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -25,13 +27,27 @@ public class FileDeleteService extends AbstractFileOperationService {
 
     private static final Logger log = LoggerFactory.getLogger(FileDeleteService.class);
 
+    private final FileEventPublisher eventPublisher;
+
     /**
      * @param metadataRepository repository for file metadata lookup and deletion
      * @param storageResolver    resolver to find the storage backend for each file
      */
     public FileDeleteService(FileMetadataRepository metadataRepository,
                              FileStorageResolver storageResolver) {
+        this(metadataRepository, storageResolver, new FileEventPublisher(List.of()));
+    }
+
+    /**
+     * @param metadataRepository repository for file metadata lookup and deletion
+     * @param storageResolver    resolver to find the storage backend for each file
+     * @param eventPublisher     publisher for file lifecycle events
+     */
+    public FileDeleteService(FileMetadataRepository metadataRepository,
+                             FileStorageResolver storageResolver,
+                             FileEventPublisher eventPublisher) {
         super(metadataRepository, storageResolver);
+        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
     }
 
     /**
@@ -48,6 +64,7 @@ public class FileDeleteService extends AbstractFileOperationService {
         metadataRepository.deleteByKey(fileKey);
 
         log.info("File deleted: key={}", fileKey);
+        eventPublisher.fireDeleted(metadata);
     }
 
     /**

@@ -4,6 +4,7 @@ import io.github.dornol.filekit.archive.ArchiveMetadataExtractor;
 import io.github.dornol.filekit.archive.ZipArchiveMetadataExtractor;
 import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.download.FileDownloadService;
+import io.github.dornol.filekit.event.FileEventPublisher;
 import io.github.dornol.filekit.image.DefaultThumbnailGenerator;
 import io.github.dornol.filekit.image.ExifStripper;
 import io.github.dornol.filekit.image.ImageFormatConverter;
@@ -16,13 +17,17 @@ import io.github.dornol.filekit.image.ImageMetadataExtractor;
 import io.github.dornol.filekit.image.ImageResizer;
 import io.github.dornol.filekit.image.ImageWatermarker;
 import io.github.dornol.filekit.image.ThumbnailGenerator;
+import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.transfer.FileTransferService;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileEncryptor;
+import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
+import io.github.dornol.filekit.spi.QuotaPolicy;
+import io.github.dornol.filekit.spi.QuotaUsageProvider;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
@@ -57,6 +62,8 @@ import java.util.List;
  *       {@link MultipartFileCollectionValidator}</li>
  *   <li>{@link FileStorageResolver}, {@link FileUploadService}, {@link FileDownloadService},
  *       {@link FileDeleteService}, {@link SpringDownloadService} &mdash; when port beans are available</li>
+ *   <li>{@link QuotaChecker} &mdash; when both {@link QuotaPolicy} and {@link QuotaUsageProvider} are available</li>
+ *   <li>{@link FileEventPublisher} &mdash; always registered, with any available {@link FileEventListener}s</li>
  * </ul>
  *
  * <p>All beans are {@code @ConditionalOnMissingBean}, so user-defined beans always take priority.</p>
@@ -132,6 +139,22 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnBean({QuotaPolicy.class, QuotaUsageProvider.class})
+    public QuotaChecker quotaChecker(QuotaPolicy policy, QuotaUsageProvider provider) {
+        log.info("Registering QuotaChecker");
+        return new QuotaChecker(policy, provider);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public FileEventPublisher fileEventPublisher(ObjectProvider<FileEventListener> listeners) {
+        List<FileEventListener> list = listeners.orderedStream().toList();
+        log.info("Registering FileEventPublisher with {} listener(s)", list.size());
+        return new FileEventPublisher(list);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnBean({FileMetadataRepository.class, FileFormatExtractor.class, FileStorageResolver.class})
     public FileUploadService fileUploadService(ChecksumCalculator checksumCalculator,
                                                FileMetadataRepository metadataRepository,
@@ -139,15 +162,19 @@ public class FileKitAutoConfiguration {
                                                FileStorageResolver storageResolver,
                                                FileKitProperties properties,
                                                ObjectProvider<VirusScanner> virusScannerProvider,
-                                               FileEncryptor fileEncryptor) {
+                                               FileEncryptor fileEncryptor,
+                                               ObjectProvider<QuotaChecker> quotaCheckerProvider,
+                                               FileEventPublisher eventPublisher) {
         long maxUploadSize = properties.getMaxUploadSize();
         VirusScanner virusScanner = virusScannerProvider.getIfAvailable();
-        log.info("Registering FileUploadService (maxUploadSize={}, virusScanner={}, encryption={})",
+        QuotaChecker quotaChecker = quotaCheckerProvider.getIfAvailable();
+        log.info("Registering FileUploadService (maxUploadSize={}, virusScanner={}, encryption={}, quota={})",
                 maxUploadSize == 0 ? "unlimited" : maxUploadSize,
                 virusScanner != null ? virusScanner.getClass().getSimpleName() : "none",
-                fileEncryptor.getClass().getSimpleName());
+                fileEncryptor.getClass().getSimpleName(),
+                quotaChecker != null ? "enabled" : "none");
         return new FileUploadService(checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver, maxUploadSize, virusScanner, fileEncryptor);
+                storageResolver, maxUploadSize, virusScanner, fileEncryptor, quotaChecker, eventPublisher);
     }
 
     @Bean
@@ -155,18 +182,20 @@ public class FileKitAutoConfiguration {
     @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
     public FileDownloadService fileDownloadService(FileMetadataRepository metadataRepository,
                                                    FileStorageResolver storageResolver,
-                                                   FileEncryptor fileEncryptor) {
+                                                   FileEncryptor fileEncryptor,
+                                                   FileEventPublisher eventPublisher) {
         log.info("Registering FileDownloadService");
-        return new FileDownloadService(metadataRepository, storageResolver, fileEncryptor);
+        return new FileDownloadService(metadataRepository, storageResolver, fileEncryptor, eventPublisher);
     }
 
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
     public FileDeleteService fileDeleteService(FileMetadataRepository metadataRepository,
-                                               FileStorageResolver storageResolver) {
+                                               FileStorageResolver storageResolver,
+                                               FileEventPublisher eventPublisher) {
         log.info("Registering FileDeleteService");
-        return new FileDeleteService(metadataRepository, storageResolver);
+        return new FileDeleteService(metadataRepository, storageResolver, eventPublisher);
     }
 
     @Bean
@@ -232,9 +261,12 @@ public class FileKitAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
     public FileTransferService fileTransferService(FileMetadataRepository metadataRepository,
-                                                    FileStorageResolver storageResolver) {
-        log.info("Registering FileTransferService");
-        return new FileTransferService(metadataRepository, storageResolver);
+                                                    FileStorageResolver storageResolver,
+                                                    ObjectProvider<QuotaChecker> quotaCheckerProvider,
+                                                    FileEventPublisher eventPublisher) {
+        QuotaChecker quotaChecker = quotaCheckerProvider.getIfAvailable();
+        log.info("Registering FileTransferService (quota={})", quotaChecker != null ? "enabled" : "none");
+        return new FileTransferService(metadataRepository, storageResolver, quotaChecker, eventPublisher);
     }
 
 }

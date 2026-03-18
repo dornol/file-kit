@@ -4,6 +4,8 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.domain.FileSource;
+import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
@@ -26,6 +28,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -56,6 +59,8 @@ public class FileUploadService {
     private final long maxUploadSize;
     private final @Nullable VirusScanner virusScanner;
     private final FileEncryptor fileEncryptor;
+    private final @Nullable QuotaChecker quotaChecker;
+    private final FileEventPublisher eventPublisher;
 
     /**
      * Creates an upload service with no file size limit and no virus scanner.
@@ -64,7 +69,8 @@ public class FileUploadService {
                              FileMetadataRepository metadataRepository,
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, 0, null, new NoOpFileEncryptor());
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
+                0, null, new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
     }
 
     /**
@@ -77,7 +83,8 @@ public class FileUploadService {
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver,
                              long maxUploadSize) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, maxUploadSize, null, new NoOpFileEncryptor());
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
+                maxUploadSize, null, new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
     }
 
     /**
@@ -92,7 +99,8 @@ public class FileUploadService {
                              FileStorageResolver storageResolver,
                              long maxUploadSize,
                              @Nullable VirusScanner virusScanner) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, maxUploadSize, virusScanner, new NoOpFileEncryptor());
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
+                maxUploadSize, virusScanner, new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
     }
 
     /**
@@ -109,6 +117,28 @@ public class FileUploadService {
                              long maxUploadSize,
                              @Nullable VirusScanner virusScanner,
                              FileEncryptor fileEncryptor) {
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
+                maxUploadSize, virusScanner, fileEncryptor, null, new FileEventPublisher(List.of()));
+    }
+
+    /**
+     * Creates an upload service with all options including quota checking and event publishing.
+     *
+     * @param maxUploadSize  maximum file size in bytes (0 = unlimited)
+     * @param virusScanner   optional virus scanner; if non-null, files are scanned before upload
+     * @param fileEncryptor  encryptor for at-rest encryption
+     * @param quotaChecker   optional quota checker; if non-null, quota is verified before upload
+     * @param eventPublisher publisher for file lifecycle events
+     */
+    public FileUploadService(ChecksumCalculator checksumCalculator,
+                             FileMetadataRepository metadataRepository,
+                             FileFormatExtractor formatExtractor,
+                             FileStorageResolver storageResolver,
+                             long maxUploadSize,
+                             @Nullable VirusScanner virusScanner,
+                             FileEncryptor fileEncryptor,
+                             @Nullable QuotaChecker quotaChecker,
+                             FileEventPublisher eventPublisher) {
         this.checksumCalculator = Objects.requireNonNull(checksumCalculator, "checksumCalculator");
         this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
         this.formatExtractor = Objects.requireNonNull(formatExtractor, "formatExtractor");
@@ -116,6 +146,8 @@ public class FileUploadService {
         this.maxUploadSize = maxUploadSize;
         this.virusScanner = virusScanner;
         this.fileEncryptor = Objects.requireNonNull(fileEncryptor, "fileEncryptor");
+        this.quotaChecker = quotaChecker;
+        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
     }
 
     /**
@@ -172,6 +204,10 @@ public class FileUploadService {
                 return existing;
             }
 
+            if (quotaChecker != null) {
+                quotaChecker.check(storageType, bucket, bytesWritten);
+            }
+
             FileFormat format;
             try (InputStream is = Files.newInputStream(tempFile)) {
                 format = formatExtractor.extract(is);
@@ -201,6 +237,7 @@ public class FileUploadService {
 
             FileMetadata saved = metadataRepository.save(metadata);
             log.info("File uploaded: key={}, size={}, bucket={}, storageType={}", saved.key(), saved.size(), bucket, storageType);
+            eventPublisher.fireUploaded(saved);
             return saved;
         } finally {
             Files.deleteIfExists(tempFile);

@@ -89,4 +89,7 @@ public class FileStorageException extends RuntimeException {
     /** File decryption failed. */
     public static final String DECRYPTION_FAILED = "file-kit.storage.decryption-failed";
 
+    /** Upload would exceed the configured quota for the target bucket. */
+    public static final String QUOTA_EXCEEDED = "file-kit.storage.quota-exceeded";
+
 }
