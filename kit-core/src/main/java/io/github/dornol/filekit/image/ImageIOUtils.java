@@ -21,6 +21,20 @@ final class ImageIOUtils {
 
     private ImageIOUtils() {}
 
+    /**
+     * Writes a {@link BufferedImage} to a byte array in the specified format and quality.
+     *
+     * <p>For JPEG output, the image is converted to RGB (no alpha channel) with a white background
+     * to avoid rendering artifacts.</p>
+     *
+     * @param image   the image to write
+     * @param format  target format name (e.g. "png", "jpeg")
+     * @param quality compression quality between 0.0 (lowest) and 1.0 (highest);
+     *                ignored if the format does not support compression
+     * @return the encoded image bytes
+     * @throws IOException           if an I/O error occurs during writing
+     * @throws FileStorageException  if no {@link javax.imageio.ImageWriter} is available for the format
+     */
     static byte[] writeImage(BufferedImage image, String format, float quality) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 

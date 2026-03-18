@@ -12,6 +12,12 @@ import java.util.HexFormat;
  */
 public class Sha256ChecksumCalculator implements ChecksumCalculator {
 
+    /**
+     * Computes a SHA-256 checksum for the given byte array.
+     *
+     * @param bytes file content
+     * @return lowercase hex-encoded SHA-256 hash
+     */
     @Override
     public String checksum(byte[] bytes) {
         try {
@@ -23,6 +29,14 @@ public class Sha256ChecksumCalculator implements ChecksumCalculator {
         }
     }
 
+    /**
+     * Computes a SHA-256 checksum by streaming from the given {@link InputStream}.
+     *
+     * <p>Reads the stream in 8 KB chunks to avoid loading the entire file into memory.</p>
+     *
+     * @param inputStream file content stream (not closed by this method)
+     * @return lowercase hex-encoded SHA-256 hash
+     */
     @Override
     public String checksum(InputStream inputStream) {
         try {
