@@ -131,6 +131,9 @@ file-kit provides a pluggable storage abstraction. Implement the SPI interfaces 
 | `FileFormatExtractor` | Detects MIME type and extension from content | None — you must provide |
 | `FileMetadataRepository` | Persists and queries file metadata | None — you must provide |
 | `FileStorage` | Stores and loads file content | Built-in: `LocalFileStorage`, `InMemoryFileStorage` |
+| `QuotaPolicy` | Defines maximum bytes per storage type/bucket | None — optional |
+| `QuotaUsageProvider` | Reports current bytes used per storage type/bucket | None — optional |
+| `FileEventListener` | Receives file lifecycle events | None — optional |
 
 ### Minimal setup
 
@@ -403,22 +406,23 @@ If no `VirusScanner` bean is registered, scanning is skipped entirely.
 2. Validate filename safety (length, path traversal)
 3. Buffer file content to a temporary file (memory-safe for large files)
 4. Virus scan (if `VirusScanner` is registered) — reject if INFECTED or ERROR
-5. Compute checksum (streaming); if a file with the same checksum already exists, return the existing metadata (deduplication)
-6. Detect file format (MIME type, extension)
-7. Delegate to `FileStorage.upload()` with an `InputStream` for streaming storage
-8. Run callback (if provided) — on failure, delete from storage and throw
-9. Save and return `FileMetadata`
-10. Clean up temporary file
+5. Compute checksum (streaming); if a file with the same checksum already exists, return the existing metadata (deduplication — **no quota consumed, no event fired**)
+6. Quota check (if `QuotaChecker` is configured) — reject with `QUOTA_EXCEEDED` if over limit
+7. Detect file format (MIME type, extension)
+8. Delegate to `FileStorage.upload()` with an `InputStream` for streaming storage
+9. Run callback (if provided) — on failure, delete from storage and throw
+10. Save `FileMetadata` and fire `onUploaded` event
+11. Clean up temporary file
 
 **Download:**
 1. Look up `FileMetadata` by file key
 2. Resolve the correct `FileStorage` from `metadata.location().storageType()`
-3. Load and return the file content
+3. Load file content and fire `onDownloaded` event
 
 **Delete:**
 1. Look up `FileMetadata` by file key
 2. Resolve the correct `FileStorage` and delete the physical file
-3. Delete the metadata record
+3. Delete the metadata record and fire `onDeleted` event
 
 ### FileResponseBuilder
 
@@ -536,6 +540,8 @@ The following beans are registered automatically when their dependencies are pre
 | `ImageFormatConverter` | Always (`ImageIOFormatConverter` default, overridable) |
 | `FileTransferService` | `FileMetadataRepository` + `FileStorageResolver` |
 | `FileEncryptor` | Always (`NoOpFileEncryptor` default, overridable) |
+| `QuotaChecker` | `QuotaPolicy` + `QuotaUsageProvider` (both required) |
+| `FileEventPublisher` | Always (collects all `FileEventListener` beans, empty list if none) |
 
 ## Image Processing
 
@@ -790,6 +796,8 @@ FileMetadata moved = transferService.move(fileKey, StorageType.S3, "archive-buck
 
 Copy preserves the original filename, checksum, and format while assigning a new UUID key and storage location. Move performs a copy followed by source deletion — if source deletion fails after a successful copy, a `FileStorageException` with `MOVE_FAILED` is thrown.
 
+When a `QuotaChecker` is configured, both `copy()` and `move()` check the target bucket's quota before proceeding. Copy fires an `onCopied` event; move fires an `onMoved` event (never `onCopied`).
+
 ## Batch Delete
 
 Delete multiple files at once with best-effort strategy:
@@ -806,6 +814,98 @@ result.totalRequested(); // total count requested
 ```
 
 The method attempts every deletion and collects results — it does not stop on first failure. This is intentional because file storage operations are not transactional.
+
+## Storage Quota
+
+file-kit supports optional quota enforcement via two SPI interfaces. When both are registered, uploads and copy/move operations are checked against the quota before proceeding.
+
+### Implement the SPI
+
+```java
+@Component
+public class MyQuotaPolicy implements QuotaPolicy {
+    @Override
+    public long getMaxBytes(Enum<?> storageType, String bucket) {
+        // e.g., look up per-tenant limit from config or DB
+        return 100 * 1024 * 1024; // 100 MB
+    }
+}
+
+@Component
+public class MyQuotaUsageProvider implements QuotaUsageProvider {
+    @Override
+    public long getUsedBytes(Enum<?> storageType, String bucket) {
+        // e.g., query DB for current usage
+        return fileRepository.sumSizeByBucket(bucket);
+    }
+}
+```
+
+When both beans are registered, `QuotaChecker` is auto-configured and injected into `FileUploadService` and `FileTransferService`. No additional configuration needed.
+
+### Behavior
+
+- **Upload**: quota is checked after deduplication (dedup hits don't consume quota)
+- **Copy/Move**: quota is checked against the target bucket before the copy
+- **Quota exceeded**: throws `FileStorageException` with `QUOTA_EXCEEDED`
+- If neither `QuotaPolicy` nor `QuotaUsageProvider` is registered, quota checking is skipped entirely
+
+### Programmatic usage
+
+```java
+QuotaChecker checker = new QuotaChecker(policy, usageProvider);
+
+// Check before custom operations
+checker.check(StorageType.S3, "my-bucket", fileSize);
+
+// Query current usage
+QuotaUsage usage = checker.getUsage(StorageType.S3, "my-bucket");
+usage.usedBytes();      // current usage
+usage.maxBytes();       // configured limit
+usage.remainingBytes(); // available space
+```
+
+## File Lifecycle Events
+
+file-kit publishes events for file operations via the `FileEventListener` SPI. Use this for audit logging, cache invalidation, statistics, or notifications.
+
+### Implement a listener
+
+```java
+@Component
+public class AuditFileEventListener implements FileEventListener {
+
+    @Override
+    public void onUploaded(FileMetadata metadata) {
+        auditLog.record("FILE_UPLOADED", metadata.key(), metadata.size());
+    }
+
+    @Override
+    public void onDeleted(FileMetadata metadata) {
+        auditLog.record("FILE_DELETED", metadata.key());
+    }
+
+    // Override only the methods you need — all have default no-op implementations
+}
+```
+
+### Events
+
+| Event | Fired when | Parameters |
+|-------|-----------|------------|
+| `onUploaded` | After metadata is saved | uploaded metadata |
+| `onDownloaded` | After content is loaded | downloaded metadata |
+| `onDeleted` | After storage + metadata deletion | deleted metadata |
+| `onCopied` | After copy completes | source + copy metadata |
+| `onMoved` | After move completes (copy + source deletion) | source + moved metadata |
+
+### Behavior
+
+- **Fire-and-forget**: listener exceptions are logged and swallowed — a failing listener never breaks the file operation
+- **Multiple listeners**: all registered `FileEventListener` beans are invoked in order
+- **Deduplication**: dedup hits do not fire `onUploaded`
+- **Move vs Copy**: `move()` fires only `onMoved`, never `onCopied`
+- If no listeners are registered, `FileEventPublisher` is still created (with an empty list) — zero overhead
 
 ## Encryption at Rest
 
@@ -885,6 +985,7 @@ file-kit.storage.copy-failed=File copy failed
 file-kit.storage.move-failed=File move failed
 file-kit.storage.encryption-failed=File encryption failed
 file-kit.storage.decryption-failed=File decryption failed
+file-kit.storage.quota-exceeded=Storage quota exceeded
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.

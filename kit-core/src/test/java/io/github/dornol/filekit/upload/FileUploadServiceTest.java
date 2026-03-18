@@ -4,11 +4,15 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.domain.FileSource;
+import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
+import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.spi.NoOpFileEncryptor;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
@@ -23,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -656,6 +661,169 @@ class FileUploadServiceTest {
             FileUploadService svc = new FileUploadService(
                     checksumCalculator, metadataRepository, formatExtractor,
                     storageResolver, 0, null);
+            assertNotNull(svc);
+        }
+    }
+
+    // ── Quota integration ─────────────────────────────────────────────
+
+    @Nested
+    class QuotaIntegration {
+
+        QuotaChecker quotaChecker = mock(QuotaChecker.class);
+
+        FileUploadService serviceWithQuota = new FileUploadService(
+                checksumCalculator, metadataRepository, formatExtractor,
+                storageResolver, 0, null, new NoOpFileEncryptor(),
+                quotaChecker, new FileEventPublisher(List.of()));
+
+        @Test
+        void quotaExceeded_throwsBeforeUpload() throws IOException {
+            byte[] content = "hello".getBytes();
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
+            doThrow(new FileStorageException(FileStorageException.QUOTA_EXCEEDED, "Quota exceeded"))
+                    .when(quotaChecker).check(StorageType.LOCAL, "bucket", content.length);
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> serviceWithQuota.upload(fileSource, StorageType.LOCAL, "bucket"));
+            assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
+            verify(storageResolver, never()).resolve(any());
+            verify(metadataRepository, never()).save(any());
+        }
+
+        @Test
+        void quotaPasses_uploadsNormally() throws IOException {
+            setupSuccessfulUpload("test.txt");
+
+            FileMetadata result = serviceWithQuota.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            assertNotNull(result);
+            verify(quotaChecker).check(any(), any(), any(long.class));
+            verify(metadataRepository).save(any());
+        }
+
+        @Test
+        void dedup_skipsQuotaCheck() throws IOException {
+            byte[] content = "hello".getBytes();
+            FileMetadata existing = new FileMetadata("existing-key", "test.txt", 5, "abc123",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "key", StorageType.LOCAL));
+
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
+
+            FileMetadata result = serviceWithQuota.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            assertEquals(existing, result);
+            verify(quotaChecker, never()).check(any(), any(), any(long.class));
+        }
+
+        @Test
+        void nullQuotaChecker_skipsCheck() throws IOException {
+            // Default service (quotaChecker is null) should skip quota
+            setupSuccessfulUpload("test.txt");
+
+            FileMetadata result = service.upload(fileSource, StorageType.LOCAL, "bucket");
+            assertNotNull(result);
+        }
+    }
+
+    // ── Event integration ────────────────────────────────────────────
+
+    @Nested
+    class EventIntegration {
+
+        FileEventListener listener = mock(FileEventListener.class);
+
+        FileUploadService serviceWithEvents = new FileUploadService(
+                checksumCalculator, metadataRepository, formatExtractor,
+                storageResolver, 0, null, new NoOpFileEncryptor(),
+                null, new FileEventPublisher(List.of(listener)));
+
+        @Test
+        void uploadFires_onUploaded() throws IOException {
+            setupSuccessfulUpload("test.txt");
+
+            FileMetadata result = serviceWithEvents.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            verify(listener).onUploaded(result);
+        }
+
+        @Test
+        void dedup_doesNotFireEvent() throws IOException {
+            byte[] content = "hello".getBytes();
+            FileMetadata existing = new FileMetadata("existing-key", "test.txt", 5, "abc123",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "key", StorageType.LOCAL));
+
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
+
+            serviceWithEvents.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            verify(listener, never()).onUploaded(any());
+        }
+
+        @Test
+        void eventFires_afterMetadataSaved() throws IOException {
+            setupSuccessfulUpload("test.txt");
+
+            serviceWithEvents.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            // Both save and event fire should have happened
+            verify(metadataRepository).save(any());
+            verify(listener).onUploaded(any());
+        }
+
+        @Test
+        void listenerException_doesNotBreakUpload() throws IOException {
+            setupSuccessfulUpload("test.txt");
+            doThrow(new RuntimeException("boom")).when(listener).onUploaded(any());
+
+            FileMetadata result = serviceWithEvents.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            assertNotNull(result);
+            verify(metadataRepository).save(any());
+        }
+
+        @Test
+        void callbackFailure_doesNotFireEvent() throws Exception {
+            setupSuccessfulUpload("test.txt");
+            UploadCallback callback = mock(UploadCallback.class);
+            doThrow(new RuntimeException("business error")).when(callback).onUploaded(any());
+
+            assertThrows(FileStorageException.class,
+                    () -> serviceWithEvents.upload(fileSource, StorageType.LOCAL, "bucket", callback));
+
+            verify(listener, never()).onUploaded(any());
+        }
+    }
+
+    // ── Full constructor validation ──────────────────────────────────
+
+    @Nested
+    class FullConstructorValidation {
+
+        @Test
+        void nullEventPublisher_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new FileUploadService(checksumCalculator, metadataRepository,
+                            formatExtractor, storageResolver, 0, null,
+                            new NoOpFileEncryptor(), null, null));
+        }
+
+        @Test
+        void nullQuotaChecker_allowed() {
+            FileUploadService svc = new FileUploadService(checksumCalculator, metadataRepository,
+                    formatExtractor, storageResolver, 0, null,
+                    new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
             assertNotNull(svc);
         }
     }

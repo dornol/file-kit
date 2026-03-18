@@ -3,6 +3,9 @@ package io.github.dornol.filekit.transfer;
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.quota.QuotaChecker;
+import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.io.ByteArrayInputStream;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -320,6 +324,126 @@ class FileTransferServiceTest {
         }
     }
 
+    // ── Quota integration ─────────────────────────────────────────────
+
+    @Nested
+    class QuotaIntegration {
+
+        QuotaChecker quotaChecker = mock(QuotaChecker.class);
+        FileTransferService serviceWithQuota = new FileTransferService(
+                metadataRepository, storageResolver, quotaChecker, new FileEventPublisher(List.of()));
+
+        @Test
+        void copy_quotaExceeded_throwsBeforeUpload() {
+            when(metadataRepository.getByKey("source-key")).thenReturn(sourceMetadata);
+            doThrow(new FileStorageException(FileStorageException.QUOTA_EXCEEDED, "Quota exceeded"))
+                    .when(quotaChecker).check(StorageType.S3, "target-bucket", 5L);
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> serviceWithQuota.copy("source-key", StorageType.S3, "target-bucket"));
+            assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
+            verify(targetStorage, never()).upload(any());
+        }
+
+        @Test
+        void move_quotaExceeded_throwsBeforeUpload() {
+            when(metadataRepository.getByKey("source-key")).thenReturn(sourceMetadata);
+            doThrow(new FileStorageException(FileStorageException.QUOTA_EXCEEDED, "Quota exceeded"))
+                    .when(quotaChecker).check(StorageType.S3, "target-bucket", 5L);
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> serviceWithQuota.move("source-key", StorageType.S3, "target-bucket"));
+            assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
+            verify(sourceStorage, never()).delete(any());
+        }
+
+        @Test
+        void copy_quotaPasses_uploadsNormally() {
+            setupCopyMocks();
+
+            FileMetadata copied = serviceWithQuota.copy("source-key", StorageType.S3, "target-bucket");
+
+            assertNotNull(copied);
+            verify(quotaChecker).check(StorageType.S3, "target-bucket", 5L);
+            verify(metadataRepository).save(any());
+        }
+
+        @Test
+        void nullQuotaChecker_skipsCheck() {
+            setupCopyMocks();
+
+            FileMetadata copied = service.copy("source-key", StorageType.S3, "target-bucket");
+
+            assertNotNull(copied);
+        }
+    }
+
+    // ── Event integration ────────────────────────────────────────────
+
+    @Nested
+    class EventIntegration {
+
+        FileEventListener listener = mock(FileEventListener.class);
+        FileTransferService serviceWithEvents = new FileTransferService(
+                metadataRepository, storageResolver, null, new FileEventPublisher(List.of(listener)));
+
+        @Test
+        void copy_fires_onCopied() {
+            setupCopyMocks();
+
+            FileMetadata copied = serviceWithEvents.copy("source-key", StorageType.S3, "target-bucket");
+
+            verify(listener).onCopied(sourceMetadata, copied);
+            verify(listener, never()).onMoved(any(), any());
+        }
+
+        @Test
+        void move_fires_onMoved_notCopied() {
+            setupCopyMocks();
+
+            FileMetadata moved = serviceWithEvents.move("source-key", StorageType.S3, "target-bucket");
+
+            verify(listener).onMoved(sourceMetadata, moved);
+            verify(listener, never()).onCopied(any(), any());
+        }
+
+        @Test
+        void move_deleteFailure_doesNotFireEvent() {
+            setupCopyMocks();
+            doThrow(new RuntimeException("Delete failed"))
+                    .when(sourceStorage).delete(sourceMetadata);
+
+            assertThrows(FileStorageException.class,
+                    () -> serviceWithEvents.move("source-key", StorageType.S3, "target-bucket"));
+
+            verify(listener, never()).onMoved(any(), any());
+            verify(listener, never()).onCopied(any(), any());
+        }
+
+        @Test
+        void copy_listenerException_doesNotBreakCopy() {
+            setupCopyMocks();
+            doThrow(new RuntimeException("boom")).when(listener).onCopied(any(), any());
+
+            FileMetadata copied = serviceWithEvents.copy("source-key", StorageType.S3, "target-bucket");
+
+            assertNotNull(copied);
+            verify(metadataRepository).save(any());
+        }
+
+        @Test
+        void move_listenerException_doesNotBreakMove() {
+            setupCopyMocks();
+            doThrow(new RuntimeException("boom")).when(listener).onMoved(any(), any());
+
+            FileMetadata moved = serviceWithEvents.move("source-key", StorageType.S3, "target-bucket");
+
+            assertNotNull(moved);
+            verify(sourceStorage).delete(sourceMetadata);
+            verify(metadataRepository).deleteByKey("source-key");
+        }
+    }
+
     // ── Constructor validation ──────────────────────────────────────
 
     @Nested
@@ -341,6 +465,19 @@ class FileTransferServiceTest {
         void validConstruction() {
             FileTransferService svc = new FileTransferService(metadataRepository, storageResolver);
             assertNotNull(svc);
+        }
+
+        @Test
+        void fullConstructor_nullQuotaChecker_allowed() {
+            FileTransferService svc = new FileTransferService(
+                    metadataRepository, storageResolver, null, new FileEventPublisher(List.of()));
+            assertNotNull(svc);
+        }
+
+        @Test
+        void fullConstructor_nullEventPublisher_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new FileTransferService(metadataRepository, storageResolver, null, null));
         }
     }
 }

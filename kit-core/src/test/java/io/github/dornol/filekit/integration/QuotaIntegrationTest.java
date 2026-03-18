@@ -109,5 +109,92 @@ class QuotaIntegrationTest {
                     () -> transferService.copy(source.key(), StorageType.MEMORY, "bucket-b"));
             assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
         }
+
+        @Test
+        void copy_withinQuota_succeeds() throws IOException {
+            byte[] content = "copy ok".getBytes();
+            FileMetadata source = uploadService.upload(
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket-a");
+
+            usedBytes.set(50);
+
+            FileMetadata copied = transferService.copy(source.key(), StorageType.MEMORY, "bucket-b");
+            assertNotNull(copied);
+        }
+    }
+
+    @Nested
+    class MoveQuota {
+
+        @Test
+        void move_exceedsQuota_rejected() throws IOException {
+            byte[] content = "move me".getBytes();
+            FileMetadata source = uploadService.upload(
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket-a");
+
+            usedBytes.set(95);
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> transferService.move(source.key(), StorageType.MEMORY, "bucket-b"));
+            assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
+
+            // Source should still exist
+            assertNotNull(metadataRepository.findByKey(source.key()));
+        }
+
+        @Test
+        void move_withinQuota_succeeds() throws IOException {
+            byte[] content = "move ok".getBytes();
+            FileMetadata source = uploadService.upload(
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket-a");
+            String sourceKey = source.key();
+
+            usedBytes.set(50);
+
+            FileMetadata moved = transferService.move(sourceKey, StorageType.MEMORY, "bucket-b");
+            assertNotNull(moved);
+
+            // Source should be gone
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> metadataRepository.getByKey(sourceKey));
+            assertEquals(FileStorageException.FILE_NOT_FOUND, ex.getMessageKey());
+        }
+    }
+
+    @Nested
+    class BoundaryQuota {
+
+        @Test
+        void exactlyAtQuota_succeeds() throws IOException {
+            // 100 bytes quota, file is exactly remaining
+            usedBytes.set(90);
+            byte[] content = new byte[10]; // exactly 10 bytes = 90+10=100
+
+            FileMetadata meta = uploadService.upload(
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket");
+            assertNotNull(meta);
+        }
+
+        @Test
+        void oneByteTooMany_rejected() {
+            usedBytes.set(90);
+            byte[] content = new byte[11]; // 90+11=101 > 100
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> uploadService.upload(
+                            new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket"));
+            assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
+        }
+
+        @Test
+        void quotaRejected_noFileStored() {
+            usedBytes.set(99);
+            byte[] content = "too large".getBytes();
+
+            assertThrows(FileStorageException.class,
+                    () -> uploadService.upload(
+                            new TestFileSource("file.txt", content), StorageType.MEMORY, "bucket"));
+            assertEquals(0, memoryStorage.size());
+        }
     }
 }

@@ -20,10 +20,14 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class EventIntegrationTest {
@@ -146,6 +150,85 @@ class EventIntegrationTest {
     }
 
     @Nested
+    class BatchDeleteEvent {
+
+        @Test
+        void batchDelete_firesDeletedEventPerFile() throws IOException {
+            FileMetadata meta1 = uploadService.upload(
+                    new TestFileSource("a.txt", "content A".getBytes()), StorageType.A, "bucket");
+            FileMetadata meta2 = uploadService.upload(
+                    new TestFileSource("b.txt", "content B".getBytes()), StorageType.A, "bucket");
+
+            org.mockito.Mockito.reset(listener);
+
+            deleteService.deleteAll(List.of(meta1.key(), meta2.key()));
+
+            verify(listener).onDeleted(meta1);
+            verify(listener).onDeleted(meta2);
+            assertEquals(0, storageA.size());
+        }
+
+        @Test
+        void batchDelete_doesNotFireEventForNotFound() throws IOException {
+            FileMetadata meta = uploadService.upload(
+                    new TestFileSource("a.txt", "data".getBytes()), StorageType.A, "bucket");
+
+            org.mockito.Mockito.reset(listener);
+
+            deleteService.deleteAll(List.of(meta.key(), "non-existent-key"));
+
+            verify(listener).onDeleted(meta);
+            verify(listener, times(1)).onDeleted(any());
+        }
+    }
+
+    @Nested
+    class MultipleListeners {
+
+        @Test
+        void allListenersReceiveEvents() throws IOException {
+            FileEventListener listener2 = mock(FileEventListener.class);
+            FileEventPublisher multiPublisher = new FileEventPublisher(List.of(listener, listener2));
+
+            FileUploadService uploadSvc = new FileUploadService(
+                    new Sha256ChecksumCalculator(), metadataRepository,
+                    is -> new FileFormat("text/plain", "txt", "text"),
+                    new FileStorageResolver(List.of(storageA, storageB)),
+                    0, null, new io.github.dornol.filekit.spi.NoOpFileEncryptor(),
+                    null, multiPublisher);
+
+            // Need fresh metadata repo to avoid dedup
+            FileMetadata meta = uploadSvc.upload(
+                    new TestFileSource("multi.txt", "multi listener data".getBytes()),
+                    StorageType.A, "bucket");
+
+            verify(listener).onUploaded(meta);
+            verify(listener2).onUploaded(meta);
+        }
+    }
+
+    @Nested
+    class FullLifecycle {
+
+        @Test
+        void uploadDownloadDelete_allEventsInOrder() throws IOException {
+            FileMetadata meta = uploadService.upload(
+                    new TestFileSource("lifecycle.txt", "lifecycle data".getBytes()),
+                    StorageType.A, "bucket");
+
+            verify(listener).onUploaded(meta);
+
+            downloadService.download(meta.key()).content().close();
+
+            verify(listener).onDownloaded(meta);
+
+            deleteService.delete(meta.key());
+
+            verify(listener).onDeleted(meta);
+        }
+    }
+
+    @Nested
     class ListenerException {
 
         @Test
@@ -155,9 +238,8 @@ class EventIntegrationTest {
             FileMetadata meta = uploadService.upload(
                     new TestFileSource("file.txt", "data".getBytes()), StorageType.A, "bucket");
 
-            // Upload still succeeds
-            org.junit.jupiter.api.Assertions.assertNotNull(meta);
-            org.junit.jupiter.api.Assertions.assertEquals(1, storageA.size());
+            assertNotNull(meta);
+            assertEquals(1, storageA.size());
         }
 
         @Test
@@ -169,8 +251,34 @@ class EventIntegrationTest {
 
             deleteService.delete(meta.key());
 
-            // Delete still succeeds
-            org.junit.jupiter.api.Assertions.assertEquals(0, storageA.size());
+            assertEquals(0, storageA.size());
+        }
+
+        @Test
+        void listenerException_doesNotBreakCopy() throws IOException {
+            FileMetadata source = uploadService.upload(
+                    new TestFileSource("file.txt", "data".getBytes()), StorageType.A, "bucket-a");
+
+            doThrow(new RuntimeException("boom")).when(listener).onCopied(any(), any());
+
+            FileMetadata copied = transferService.copy(source.key(), StorageType.B, "bucket-b");
+
+            assertNotNull(copied);
+            assertEquals(1, storageB.size());
+        }
+
+        @Test
+        void listenerException_doesNotBreakMove() throws IOException {
+            FileMetadata source = uploadService.upload(
+                    new TestFileSource("file.txt", "data".getBytes()), StorageType.A, "bucket-a");
+
+            doThrow(new RuntimeException("boom")).when(listener).onMoved(any(), any());
+
+            FileMetadata moved = transferService.move(source.key(), StorageType.B, "bucket-b");
+
+            assertNotNull(moved);
+            assertEquals(1, storageB.size());
+            assertEquals(0, storageA.size());
         }
     }
 }

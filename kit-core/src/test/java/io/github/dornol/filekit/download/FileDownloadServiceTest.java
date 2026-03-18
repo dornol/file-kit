@@ -4,7 +4,9 @@ import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.event.FileEventPublisher;
 import io.github.dornol.filekit.spi.FileEncryptor;
+import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
 import io.github.dornol.filekit.storage.FileStorageException;
@@ -19,12 +21,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,6 +147,75 @@ class FileDownloadServiceTest {
             FileDownloadService svc = new FileDownloadService(
                     metadataRepository, storageResolver, new NoOpFileEncryptor());
             assertNotNull(svc);
+        }
+    }
+
+    // ── Event integration ────────────────────────────────────────────
+
+    @Nested
+    class EventIntegration {
+
+        FileEventListener listener = mock(FileEventListener.class);
+        FileDownloadService serviceWithEvents = new FileDownloadService(
+                metadataRepository, storageResolver, new NoOpFileEncryptor(),
+                new FileEventPublisher(List.of(listener)));
+
+        @Test
+        void downloadFires_onDownloaded() {
+            InputStream content = new ByteArrayInputStream("hello".getBytes());
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(metadata)).thenReturn(content);
+
+            serviceWithEvents.download("file-key");
+
+            verify(listener).onDownloaded(metadata);
+        }
+
+        @Test
+        void resolveUri_doesNotFireEvent() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.resolveUri(metadata)).thenReturn("uri");
+
+            serviceWithEvents.resolveUri("file-key");
+
+            verify(listener, never()).onDownloaded(any());
+        }
+
+        @Test
+        void listenerException_doesNotBreakDownload() {
+            InputStream content = new ByteArrayInputStream("hello".getBytes());
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(metadata)).thenReturn(content);
+            doThrow(new RuntimeException("boom")).when(listener).onDownloaded(any());
+
+            DownloadResult result = serviceWithEvents.download("file-key");
+
+            assertNotNull(result);
+            assertEquals(metadata, result.metadata());
+        }
+    }
+
+    // ── Full constructor validation ──────────────────────────────────
+
+    @Nested
+    class FullConstructorValidation {
+
+        @Test
+        void fourArgConstructor_valid() {
+            FileDownloadService svc = new FileDownloadService(
+                    metadataRepository, storageResolver, new NoOpFileEncryptor(),
+                    new FileEventPublisher(List.of()));
+            assertNotNull(svc);
+        }
+
+        @Test
+        void nullEventPublisher_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new FileDownloadService(metadataRepository, storageResolver,
+                            new NoOpFileEncryptor(), null));
         }
     }
 

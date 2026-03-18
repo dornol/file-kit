@@ -3,6 +3,8 @@ package io.github.dornol.filekit.delete;
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
@@ -18,7 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -77,6 +82,113 @@ class FileDeleteServiceTest {
     void constructor_nullStorageResolver_throws() {
         assertThrows(NullPointerException.class,
                 () -> new FileDeleteService(metadataRepository, null));
+    }
+
+    // ── Event integration ────────────────────────────────────────────
+
+    @Nested
+    class EventIntegration {
+
+        FileEventListener listener = mock(FileEventListener.class);
+        FileDeleteService serviceWithEvents = new FileDeleteService(
+                metadataRepository, storageResolver, new FileEventPublisher(List.of(listener)));
+
+        @Test
+        void deleteFires_onDeleted() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+
+            serviceWithEvents.delete("file-key");
+
+            verify(listener).onDeleted(metadata);
+        }
+
+        @Test
+        void listenerException_doesNotBreakDelete() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            doThrow(new RuntimeException("boom")).when(listener).onDeleted(any());
+
+            serviceWithEvents.delete("file-key");
+
+            verify(fileStorage).delete(metadata);
+            verify(metadataRepository).deleteByKey("file-key");
+        }
+
+        @Test
+        void batchDelete_firesEventPerSuccessfulDelete() {
+            FileMetadata meta1 = new FileMetadata("key1", "a.txt", 1, "c1",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "o1", StorageType.LOCAL));
+            FileMetadata meta2 = new FileMetadata("key2", "b.txt", 2, "c2",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "o2", StorageType.LOCAL));
+
+            when(metadataRepository.getByKey("key1")).thenReturn(meta1);
+            when(metadataRepository.getByKey("key2")).thenReturn(meta2);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+
+            serviceWithEvents.deleteAll(List.of("key1", "key2"));
+
+            verify(listener).onDeleted(meta1);
+            verify(listener).onDeleted(meta2);
+        }
+
+        @Test
+        void batchDelete_doesNotFireEventForFailures() {
+            FileMetadata meta1 = new FileMetadata("key1", "a.txt", 1, "c1",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "o1", StorageType.LOCAL));
+
+            when(metadataRepository.getByKey("key1")).thenReturn(meta1);
+            when(metadataRepository.getByKey("key2")).thenThrow(
+                    new FileStorageException(FileStorageException.FILE_NOT_FOUND, "not found"));
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+
+            serviceWithEvents.deleteAll(List.of("key1", "key2"));
+
+            // Only one event fired (for key1)
+            verify(listener).onDeleted(meta1);
+        }
+
+        @Test
+        void batchDelete_listenerExceptionDoesNotSkipRemainingFiles() {
+            FileMetadata meta1 = new FileMetadata("key1", "a.txt", 1, "c1",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "o1", StorageType.LOCAL));
+            FileMetadata meta2 = new FileMetadata("key2", "b.txt", 2, "c2",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "o2", StorageType.LOCAL));
+
+            when(metadataRepository.getByKey("key1")).thenReturn(meta1);
+            when(metadataRepository.getByKey("key2")).thenReturn(meta2);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            doThrow(new RuntimeException("boom")).when(listener).onDeleted(meta1);
+
+            BatchDeleteResult result = serviceWithEvents.deleteAll(List.of("key1", "key2"));
+
+            assertTrue(result.allSucceeded());
+            assertEquals(2, result.succeeded().size());
+        }
+    }
+
+    // ── Full constructor validation ──────────────────────────────────
+
+    @Nested
+    class FullConstructorValidation {
+
+        @Test
+        void nullEventPublisher_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new FileDeleteService(metadataRepository, storageResolver, null));
+        }
+
+        @Test
+        void threeArgConstructor_valid() {
+            FileDeleteService svc = new FileDeleteService(
+                    metadataRepository, storageResolver, new FileEventPublisher(List.of()));
+            assertNotNull(svc);
+        }
     }
 
     // ── Batch Delete ────────────────────────────────────────────────
