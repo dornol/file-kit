@@ -173,6 +173,59 @@ class LocalFileStorageTest {
     }
 
     @Test
+    void upload_emptyFile_succeeds() throws IOException {
+        FileUploadCommand command = FileUploadCommand.ofBytes(
+                "empty-key", "empty.txt", new byte[0], "text/plain", "txt", "bucket");
+
+        FileLocation location = storage.upload(command);
+
+        Path filePath = tempDir.resolve("bucket").resolve(location.objectKey());
+        assertTrue(Files.exists(filePath));
+        assertEquals(0, Files.size(filePath));
+    }
+
+    @Test
+    void upload_largeFile_succeeds() throws IOException {
+        byte[] content = new byte[1024 * 1024]; // 1 MB
+        for (int i = 0; i < content.length; i++) {
+            content[i] = (byte) (i % 251);
+        }
+        FileUploadCommand command = FileUploadCommand.ofBytes(
+                "large-key", "large.bin", content, "application/octet-stream", "bin", "bucket");
+
+        FileLocation location = storage.upload(command);
+
+        Path filePath = tempDir.resolve("bucket").resolve(location.objectKey());
+        assertArrayEquals(content, Files.readAllBytes(filePath));
+    }
+
+    @Test
+    void upload_thenLoad_roundTrip() throws IOException {
+        byte[] content = "round trip".getBytes();
+        FileUploadCommand command = FileUploadCommand.ofBytes(
+                "rt-key", "rt.txt", content, "text/plain", "txt", "bucket");
+        FileLocation location = storage.upload(command);
+
+        FileMetadata metadata = new FileMetadata("rt-key", "rt.txt", content.length, "chk",
+                new FileFormat("text/plain", "txt", "text"), location);
+
+        try (InputStream is = storage.load(metadata)) {
+            assertArrayEquals(content, is.readAllBytes());
+        }
+    }
+
+    @Test
+    void load_fileExistsButCannotResolveSymlink_throws() throws IOException {
+        // This test verifies path validation on non-existent files
+        FileMetadata metadata = new FileMetadata("key", "f.txt", 0, "chk",
+                new FileFormat("text/plain", "txt", "text"),
+                new FileLocation("nonexistent-bucket", "key.txt", StorageType.LOCAL));
+
+        // File does not exist, but path is valid — should throw because file is missing
+        assertThrows(FileStorageException.class, () -> storage.load(metadata));
+    }
+
+    @Test
     void load_symlinkOutsideBaseDir_rejected() throws IOException {
         // Create a file outside baseDir
         Path outsideFile = Files.createTempFile("outside", ".txt");

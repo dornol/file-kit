@@ -14,6 +14,7 @@ import io.github.dornol.filekit.spring.download.SpringDownloadService;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.FileUploadCommand;
+import io.github.dornol.filekit.transfer.FileTransferService;
 import io.github.dornol.filekit.upload.FileUploadService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -99,6 +100,40 @@ class FileKitStorageAutoConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasSingleBean(FileUploadService.class);
                     assertThat(context).hasSingleBean(VirusScanner.class);
+                });
+    }
+
+    @Test
+    void transferService_registered_whenPortsAndStoragePresent() {
+        contextRunner
+                .withUserConfiguration(AllPortsConfig.class, FileStorageConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(FileTransferService.class);
+                });
+    }
+
+    @Test
+    void transferService_notRegistered_whenNoPortBeans() {
+        contextRunner.run(context -> {
+            assertThat(context).doesNotHaveBean(FileTransferService.class);
+        });
+    }
+
+    @Test
+    void transferService_notRegistered_whenOnlyRepositoryPresent() {
+        contextRunner
+                .withUserConfiguration(RepositoryOnlyConfig.class)
+                .run(context -> {
+                    assertThat(context).doesNotHaveBean(FileTransferService.class);
+                });
+    }
+
+    @Test
+    void transferService_registered_withRepositoryAndStorage() {
+        contextRunner
+                .withUserConfiguration(RepositoryOnlyConfig.class, FileStorageConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(FileTransferService.class);
                 });
     }
 
