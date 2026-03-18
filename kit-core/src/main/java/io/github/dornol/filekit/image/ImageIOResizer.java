@@ -15,10 +15,16 @@ public class ImageIOResizer implements ImageResizer {
 
     private final ImageMetadataExtractor metadataExtractor;
 
+    /** Creates a resizer with the default {@link ImageIOMetadataExtractor}. */
     public ImageIOResizer() {
         this(new ImageIOMetadataExtractor());
     }
 
+    /**
+     * Creates a resizer with a custom metadata extractor.
+     *
+     * @param metadataExtractor extractor used to read output image metadata
+     */
     public ImageIOResizer(ImageMetadataExtractor metadataExtractor) {
         this.metadataExtractor = metadataExtractor;
     }

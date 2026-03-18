@@ -25,6 +25,10 @@ public class FileDeleteService extends AbstractFileOperationService {
 
     private static final Logger log = LoggerFactory.getLogger(FileDeleteService.class);
 
+    /**
+     * @param metadataRepository repository for file metadata lookup and deletion
+     * @param storageResolver    resolver to find the storage backend for each file
+     */
     public FileDeleteService(FileMetadataRepository metadataRepository,
                              FileStorageResolver storageResolver) {
         super(metadataRepository, storageResolver);

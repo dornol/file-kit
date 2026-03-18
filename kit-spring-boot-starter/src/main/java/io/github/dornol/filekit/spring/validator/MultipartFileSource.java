@@ -17,6 +17,7 @@ public class MultipartFileSource implements FileSource {
 
     private final MultipartFile multipartFile;
 
+    /** @param multipartFile the Spring multipart file to wrap */
     public MultipartFileSource(MultipartFile multipartFile) {
         this.multipartFile = java.util.Objects.requireNonNull(multipartFile, "multipartFile");
     }

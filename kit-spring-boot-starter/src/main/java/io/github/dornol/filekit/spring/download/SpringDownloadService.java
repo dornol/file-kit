@@ -31,11 +31,19 @@ public class SpringDownloadService {
     private final FileStorageResolver storageResolver;
     private final FileEncryptor fileEncryptor;
 
+    /** Creates a download service without encryption. */
     public SpringDownloadService(FileMetadataRepository metadataRepository,
                                  FileStorageResolver storageResolver) {
         this(metadataRepository, storageResolver, new NoOpFileEncryptor());
     }
 
+    /**
+     * Creates a download service with the specified encryptor.
+     *
+     * @param metadataRepository repository for file metadata lookup
+     * @param storageResolver    resolver to find storage backends
+     * @param fileEncryptor      encryptor for at-rest decryption
+     */
     public SpringDownloadService(FileMetadataRepository metadataRepository,
                                  FileStorageResolver storageResolver,
                                  FileEncryptor fileEncryptor) {

@@ -37,6 +37,7 @@ public class InMemoryFileStorage implements FileStorage {
     private final Enum<?> storageType;
     private final Map<String, byte[]> store = new ConcurrentHashMap<>();
 
+    /** @param storageType enum constant identifying this storage backend */
     public InMemoryFileStorage(Enum<?> storageType) {
         this.storageType = storageType;
     }

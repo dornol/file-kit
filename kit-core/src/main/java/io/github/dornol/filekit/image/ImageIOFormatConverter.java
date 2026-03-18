@@ -14,10 +14,16 @@ public class ImageIOFormatConverter implements ImageFormatConverter {
 
     private final ImageMetadataExtractor metadataExtractor;
 
+    /** Creates a format converter with the default {@link ImageIOMetadataExtractor}. */
     public ImageIOFormatConverter() {
         this(new ImageIOMetadataExtractor());
     }
 
+    /**
+     * Creates a format converter with a custom metadata extractor.
+     *
+     * @param metadataExtractor extractor used to read output image metadata
+     */
     public ImageIOFormatConverter(ImageMetadataExtractor metadataExtractor) {
         this.metadataExtractor = metadataExtractor;
     }

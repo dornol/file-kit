@@ -31,6 +31,7 @@ public class BaseFileValidationSupport<T> {
     private Set<SafeMediaType> allowedMediaTypes;
     private long maxSize;
 
+    /** @param callbacks delegate that implements the actual validation checks */
     public BaseFileValidationSupport(FileValidationCallbacks<T> callbacks) {
         this.callbacks = callbacks;
     }

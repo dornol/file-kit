@@ -14,6 +14,10 @@ public class FileStorageResolver {
 
     private final Map<Enum<?>, FileStorage> storageMap;
 
+    /**
+     * @param storages available storage implementations; each must have a unique
+     *                 {@link FileStorage#getStorageType() storageType}
+     */
     public FileStorageResolver(List<FileStorage> storages) {
         this.storageMap = storages.stream()
                 .collect(Collectors.toMap(FileStorage::getStorageType, s -> s));

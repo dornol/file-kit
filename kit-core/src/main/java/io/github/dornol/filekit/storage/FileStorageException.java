@@ -9,6 +9,8 @@ package io.github.dornol.filekit.storage;
  */
 public class FileStorageException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     private final String messageKey;
 
     public FileStorageException(String messageKey, String message) {

@@ -19,10 +19,16 @@ public class ImageIOExifStripper implements ExifStripper {
 
     private final ImageMetadataExtractor metadataExtractor;
 
+    /** Creates an EXIF stripper with the default {@link ImageIOMetadataExtractor}. */
     public ImageIOExifStripper() {
         this(new ImageIOMetadataExtractor());
     }
 
+    /**
+     * Creates an EXIF stripper with a custom metadata extractor.
+     *
+     * @param metadataExtractor extractor used to read output image metadata
+     */
     public ImageIOExifStripper(ImageMetadataExtractor metadataExtractor) {
         this.metadataExtractor = metadataExtractor;
     }

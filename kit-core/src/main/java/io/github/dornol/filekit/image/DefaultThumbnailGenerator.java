@@ -7,6 +7,7 @@ public class DefaultThumbnailGenerator implements ThumbnailGenerator {
 
     private final ImageResizer resizer;
 
+    /** @param resizer the resizer to delegate thumbnail generation to */
     public DefaultThumbnailGenerator(ImageResizer resizer) {
         this.resizer = java.util.Objects.requireNonNull(resizer, "resizer");
     }

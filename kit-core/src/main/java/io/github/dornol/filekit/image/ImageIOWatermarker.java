@@ -18,10 +18,16 @@ public class ImageIOWatermarker implements ImageWatermarker {
 
     private final ImageMetadataExtractor metadataExtractor;
 
+    /** Creates a watermarker with the default {@link ImageIOMetadataExtractor}. */
     public ImageIOWatermarker() {
         this(new ImageIOMetadataExtractor());
     }
 
+    /**
+     * Creates a watermarker with a custom metadata extractor.
+     *
+     * @param metadataExtractor extractor used to read output image metadata
+     */
     public ImageIOWatermarker(ImageMetadataExtractor metadataExtractor) {
         this.metadataExtractor = metadataExtractor;
     }

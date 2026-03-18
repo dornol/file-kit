@@ -22,6 +22,7 @@ public class FileValidationHelper {
 
     private final MediaTypeDetector detector;
 
+    /** @param detector media type detector for MIME type identification */
     public FileValidationHelper(MediaTypeDetector detector) {
         this.detector = Objects.requireNonNull(detector, "detector");
     }

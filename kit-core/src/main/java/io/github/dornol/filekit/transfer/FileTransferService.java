@@ -22,6 +22,10 @@ public class FileTransferService extends AbstractFileOperationService {
 
     private static final Logger log = LoggerFactory.getLogger(FileTransferService.class);
 
+    /**
+     * @param metadataRepository repository for file metadata lookup and persistence
+     * @param storageResolver    resolver to find storage backends by type
+     */
     public FileTransferService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver) {
         super(metadataRepository, storageResolver);

@@ -14,6 +14,7 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
 
     private final FileValidationHelper helper;
 
+    /** @param helper validation helper for file checks */
     public FileSourceArrayValidator(FileValidationHelper helper) {
         this.helper = Objects.requireNonNull(helper, "helper");
     }
