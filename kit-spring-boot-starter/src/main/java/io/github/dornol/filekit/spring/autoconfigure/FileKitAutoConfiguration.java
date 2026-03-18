@@ -19,8 +19,10 @@ import io.github.dornol.filekit.image.ThumbnailGenerator;
 import io.github.dornol.filekit.transfer.FileTransferService;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
+import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.spi.NoOpFileEncryptor;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
@@ -123,29 +125,39 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    public FileEncryptor fileEncryptor() {
+        log.debug("Registering default NoOpFileEncryptor");
+        return new NoOpFileEncryptor();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnBean({FileMetadataRepository.class, FileFormatExtractor.class, FileStorageResolver.class})
     public FileUploadService fileUploadService(ChecksumCalculator checksumCalculator,
                                                FileMetadataRepository metadataRepository,
                                                FileFormatExtractor formatExtractor,
                                                FileStorageResolver storageResolver,
                                                FileKitProperties properties,
-                                               ObjectProvider<VirusScanner> virusScannerProvider) {
+                                               ObjectProvider<VirusScanner> virusScannerProvider,
+                                               FileEncryptor fileEncryptor) {
         long maxUploadSize = properties.getMaxUploadSize();
         VirusScanner virusScanner = virusScannerProvider.getIfAvailable();
-        log.info("Registering FileUploadService (maxUploadSize={}, virusScanner={})",
+        log.info("Registering FileUploadService (maxUploadSize={}, virusScanner={}, encryption={})",
                 maxUploadSize == 0 ? "unlimited" : maxUploadSize,
-                virusScanner != null ? virusScanner.getClass().getSimpleName() : "none");
+                virusScanner != null ? virusScanner.getClass().getSimpleName() : "none",
+                fileEncryptor.getClass().getSimpleName());
         return new FileUploadService(checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver, maxUploadSize, virusScanner);
+                storageResolver, maxUploadSize, virusScanner, fileEncryptor);
     }
 
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
     public FileDownloadService fileDownloadService(FileMetadataRepository metadataRepository,
-                                                   FileStorageResolver storageResolver) {
+                                                   FileStorageResolver storageResolver,
+                                                   FileEncryptor fileEncryptor) {
         log.info("Registering FileDownloadService");
-        return new FileDownloadService(metadataRepository, storageResolver);
+        return new FileDownloadService(metadataRepository, storageResolver, fileEncryptor);
     }
 
     @Bean
@@ -161,9 +173,10 @@ public class FileKitAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnBean({FileMetadataRepository.class, FileStorageResolver.class})
     public SpringDownloadService springDownloadService(FileMetadataRepository metadataRepository,
-                                                       FileStorageResolver storageResolver) {
+                                                       FileStorageResolver storageResolver,
+                                                       FileEncryptor fileEncryptor) {
         log.info("Registering SpringDownloadService");
-        return new SpringDownloadService(metadataRepository, storageResolver);
+        return new SpringDownloadService(metadataRepository, storageResolver, fileEncryptor);
     }
 
     @Bean

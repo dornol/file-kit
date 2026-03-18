@@ -3,6 +3,8 @@ package io.github.dornol.filekit.spring.autoconfigure;
 import io.github.dornol.filekit.archive.ArchiveMetadata;
 import io.github.dornol.filekit.archive.ArchiveMetadataExtractor;
 import io.github.dornol.filekit.archive.ZipArchiveMetadataExtractor;
+import io.github.dornol.filekit.spi.FileEncryptor;
+import io.github.dornol.filekit.spi.NoOpFileEncryptor;
 import io.github.dornol.filekit.image.ConvertOption;
 import io.github.dornol.filekit.image.ConvertResult;
 import io.github.dornol.filekit.image.DefaultThumbnailGenerator;
@@ -229,6 +231,28 @@ class FileKitAutoConfigurationTest {
                 });
     }
 
+    // ── FileEncryptor bean ──────────────────────────────────────────
+
+    @Test
+    void registersDefaultFileEncryptor() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(FileEncryptor.class);
+            assertThat(context.getBean(FileEncryptor.class))
+                    .isInstanceOf(NoOpFileEncryptor.class);
+        });
+    }
+
+    @Test
+    void userDefinedFileEncryptor_takesPriority() {
+        contextRunner
+                .withUserConfiguration(CustomFileEncryptorConfig.class)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(FileEncryptor.class);
+                    assertThat(context.getBean(FileEncryptor.class))
+                            .isSameAs(context.getBean("customFileEncryptor"));
+                });
+    }
+
     // ── Archive bean ────────────────────────────────────────────────
 
     @Test
@@ -358,6 +382,14 @@ class FileKitAutoConfigurationTest {
         ThumbnailGenerator customThumbnailGenerator() {
             return (imageBytes, option) -> new ResizeResult(
                     new byte[0], new ImageMetadata(1, 1, "custom"));
+        }
+    }
+
+    @Configuration
+    static class CustomFileEncryptorConfig {
+        @Bean
+        FileEncryptor customFileEncryptor() {
+            return new NoOpFileEncryptor();
         }
     }
 

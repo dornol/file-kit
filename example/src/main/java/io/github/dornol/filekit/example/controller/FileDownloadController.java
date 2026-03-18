@@ -1,5 +1,6 @@
 package io.github.dornol.filekit.example.controller;
 
+import io.github.dornol.filekit.delete.BatchDeleteResult;
 import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -99,6 +101,18 @@ public class FileDownloadController {
         return FileResponseBuilder.inline(result.metadata())
                 .range(rangeHeader)
                 .body(new InputStreamResource(result.content()));
+    }
+
+    @DeleteMapping("/files/batch")
+    public ResponseEntity<Map<String, Object>> batchDelete(@RequestBody List<String> fileKeys) {
+        BatchDeleteResult result = fileDeleteService.deleteAll(fileKeys);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("totalRequested", result.totalRequested());
+        response.put("succeededCount", result.succeeded().size());
+        response.put("failedCount", result.failed().size());
+        response.put("succeeded", result.succeeded());
+        response.put("failed", result.failed());
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/files/{fileKey}/copy")

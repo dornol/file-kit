@@ -7,8 +7,10 @@ import io.github.dornol.filekit.domain.FileSource;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
+import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
+import io.github.dornol.filekit.spi.NoOpFileEncryptor;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
@@ -20,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -52,6 +55,7 @@ public class FileUploadService {
     private final FileStorageResolver storageResolver;
     private final long maxUploadSize;
     private final @Nullable VirusScanner virusScanner;
+    private final FileEncryptor fileEncryptor;
 
     /**
      * Creates an upload service with no file size limit and no virus scanner.
@@ -60,7 +64,7 @@ public class FileUploadService {
                              FileMetadataRepository metadataRepository,
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, 0, null);
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, 0, null, new NoOpFileEncryptor());
     }
 
     /**
@@ -73,7 +77,7 @@ public class FileUploadService {
                              FileFormatExtractor formatExtractor,
                              FileStorageResolver storageResolver,
                              long maxUploadSize) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, maxUploadSize, null);
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, maxUploadSize, null, new NoOpFileEncryptor());
     }
 
     /**
@@ -88,12 +92,30 @@ public class FileUploadService {
                              FileStorageResolver storageResolver,
                              long maxUploadSize,
                              @Nullable VirusScanner virusScanner) {
+        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver, maxUploadSize, virusScanner, new NoOpFileEncryptor());
+    }
+
+    /**
+     * Creates an upload service with a maximum upload size, optional virus scanner, and file encryptor.
+     *
+     * @param maxUploadSize maximum file size in bytes (0 = unlimited)
+     * @param virusScanner  optional virus scanner; if non-null, files are scanned before upload
+     * @param fileEncryptor encryptor for at-rest encryption
+     */
+    public FileUploadService(ChecksumCalculator checksumCalculator,
+                             FileMetadataRepository metadataRepository,
+                             FileFormatExtractor formatExtractor,
+                             FileStorageResolver storageResolver,
+                             long maxUploadSize,
+                             @Nullable VirusScanner virusScanner,
+                             FileEncryptor fileEncryptor) {
         this.checksumCalculator = Objects.requireNonNull(checksumCalculator, "checksumCalculator");
         this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
         this.formatExtractor = Objects.requireNonNull(formatExtractor, "formatExtractor");
         this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
         this.maxUploadSize = maxUploadSize;
         this.virusScanner = virusScanner;
+        this.fileEncryptor = Objects.requireNonNull(fileEncryptor, "fileEncryptor");
     }
 
     /**
@@ -130,6 +152,7 @@ public class FileUploadService {
         validateFilename(fileSource.getOriginalFilename());
 
         Path tempFile = Files.createTempFile("file-kit-upload-", ".tmp");
+        Path encryptedFile = null;
         try {
             long bytesWritten;
             try (InputStream is = fileSource.getInputStream()) {
@@ -159,11 +182,16 @@ public class FileUploadService {
                     ? fileSource.getOriginalFilename()
                     : key + "." + format.extension();
 
+            // Encrypt content to a separate temp file
+            encryptedFile = Files.createTempFile("file-kit-encrypted-", ".tmp");
+            encryptFile(tempFile, encryptedFile);
+            long encryptedSize = Files.size(encryptedFile);
+
             FileStorage storage = storageResolver.resolve(storageType);
             FileLocation location;
-            try (InputStream is = Files.newInputStream(tempFile)) {
+            try (InputStream is = Files.newInputStream(encryptedFile)) {
                 location = storage.upload(new FileUploadCommand(
-                        key, fileSource.getOriginalFilename(), is, bytesWritten,
+                        key, fileSource.getOriginalFilename(), is, encryptedSize,
                         format.mimeType(), format.extension(), bucket));
             }
 
@@ -176,6 +204,9 @@ public class FileUploadService {
             return saved;
         } finally {
             Files.deleteIfExists(tempFile);
+            if (encryptedFile != null) {
+                Files.deleteIfExists(encryptedFile);
+            }
         }
     }
 
@@ -220,6 +251,16 @@ public class FileUploadService {
                 throw new FileStorageException(FileStorageException.VIRUS_SCAN_ERROR,
                         "Virus scan error: " + result.message());
             }
+        }
+    }
+
+    private void encryptFile(Path plainFile, Path encryptedFile) {
+        try (InputStream in = Files.newInputStream(plainFile);
+             OutputStream out = Files.newOutputStream(encryptedFile)) {
+            fileEncryptor.encrypt(in, out);
+        } catch (IOException e) {
+            throw new FileStorageException(FileStorageException.ENCRYPTION_FAILED,
+                    "Failed to encrypt file content", e);
         }
     }
 

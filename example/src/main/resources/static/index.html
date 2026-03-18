@@ -150,6 +150,9 @@
     <div class="card">
         <h2>Uploaded Files</h2>
         <p class="desc" id="fileCount">Loading...</p>
+        <div style="margin-bottom:12px;">
+            <button onclick="deleteSelected()" style="background:#dc2626;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;">Delete Selected</button>
+        </div>
         <div id="fileList"></div>
     </div>
 </div>
@@ -188,9 +191,10 @@
                 return;
             }
 
-            let html = '<table><thead><tr><th>Filename</th><th>Size</th><th>Type</th><th>Storage</th><th></th></tr></thead><tbody>';
+            let html = '<table><thead><tr><th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th><th>Filename</th><th>Size</th><th>Type</th><th>Storage</th><th></th></tr></thead><tbody>';
             for (const f of files) {
                 html += '<tr>'
+                    + '<td><input type="checkbox" class="file-checkbox" value="' + f.fileKey + '"></td>'
                     + '<td class="filename">' + escapeHtml(f.filename) + '</td>'
                     + '<td class="size">' + formatSize(f.size) + '</td>'
                     + '<td class="mime">' + escapeHtml(f.mimeType) + '</td>'
@@ -461,6 +465,36 @@
         } catch (err) { showToast('Error: ' + err.message, 'error'); }
         finally { btn.disabled = false; btn.textContent = 'Extract Metadata'; }
     });
+
+    // select all toggle
+    function toggleSelectAll(el) {
+        document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = el.checked);
+    }
+
+    // batch delete
+    async function deleteSelected() {
+        const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+        if (checkboxes.length === 0) { showToast('No files selected.', 'error'); return; }
+        if (!confirm('Delete ' + checkboxes.length + ' selected file(s)?')) return;
+
+        const fileKeys = Array.from(checkboxes).map(cb => cb.value);
+        try {
+            const res = await fetch('/files/batch', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fileKeys)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showToast(data.succeededCount + ' deleted, ' + data.failedCount + ' failed', 'success');
+                loadFiles();
+            } else {
+                showToast(data.message || 'Batch delete failed', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
 
     // copy file
     async function copyFile(fileKey) {

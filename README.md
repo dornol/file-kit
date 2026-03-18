@@ -15,7 +15,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.8'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.0.9'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -29,7 +29,7 @@ implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.0.8</version>
+    <version>0.0.9</version>
 </dependency>
 ```
 
@@ -535,6 +535,7 @@ The following beans are registered automatically when their dependencies are pre
 | `ExifStripper` | Always (`ImageIOExifStripper` default, overridable) |
 | `ImageFormatConverter` | Always (`ImageIOFormatConverter` default, overridable) |
 | `FileTransferService` | `FileMetadataRepository` + `FileStorageResolver` |
+| `FileEncryptor` | Always (`NoOpFileEncryptor` default, overridable) |
 
 ## Image Processing
 
@@ -789,6 +790,53 @@ FileMetadata moved = transferService.move(fileKey, StorageType.S3, "archive-buck
 
 Copy preserves the original filename, checksum, and format while assigning a new UUID key and storage location. Move performs a copy followed by source deletion — if source deletion fails after a successful copy, a `FileStorageException` with `MOVE_FAILED` is thrown.
 
+## Batch Delete
+
+Delete multiple files at once with best-effort strategy:
+
+```java
+@Autowired FileDeleteService deleteService;
+
+BatchDeleteResult result = deleteService.deleteAll(List.of("key1", "key2", "key3"));
+
+result.succeeded();      // List of successfully deleted keys
+result.failed();         // Map of failed keys to error messages
+result.allSucceeded();   // true if no failures
+result.totalRequested(); // total count requested
+```
+
+The method attempts every deletion and collects results — it does not stop on first failure. This is intentional because file storage operations are not transactional.
+
+## Encryption at Rest
+
+file-kit supports optional at-rest encryption via the `FileEncryptor` SPI. When a custom `FileEncryptor` is registered, files are automatically encrypted before storage and decrypted on download.
+
+```java
+@Component
+public class AesFileEncryptor implements FileEncryptor {
+
+    private final SecretKey key;
+
+    @Override
+    public void encrypt(InputStream plainInput, OutputStream cipherOutput) throws IOException {
+        // Use CipherOutputStream with AES
+    }
+
+    @Override
+    public void decrypt(InputStream cipherInput, OutputStream plainOutput) throws IOException {
+        // Use CipherInputStream with AES
+    }
+}
+```
+
+**How it works:**
+- Upload: checksum is computed on **plaintext** (preserving deduplication), then content is encrypted to a temp file before storage
+- Download: encrypted content is loaded from storage, then decrypted before returning to the caller
+- The `NoOpFileEncryptor` default performs no encryption (pass-through)
+- `FileMetadata.size` stores the **original** plaintext size; the encrypted size is used only for `FileUploadCommand.contentLength`
+
+If no custom `FileEncryptor` bean is registered, encryption is skipped entirely.
+
 ## Validation Checks
 
 | Check | Description |
@@ -835,6 +883,8 @@ file-kit.pdf.processing-failed=PDF processing failed
 file-kit.archive.processing-failed=Archive processing failed
 file-kit.storage.copy-failed=File copy failed
 file-kit.storage.move-failed=File move failed
+file-kit.storage.encryption-failed=File encryption failed
+file-kit.storage.decryption-failed=File decryption failed
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.
@@ -884,6 +934,7 @@ PdfMetadataExtractor pdfExtractor = new PdfBoxMetadataExtractor();
 ExifStripper exifStripper = new ImageIOExifStripper();
 ImageFormatConverter formatConverter = new ImageIOFormatConverter();
 ArchiveMetadataExtractor archiveExtractor = new ZipArchiveMetadataExtractor();
+FileEncryptor encryptor = new NoOpFileEncryptor(); // or your custom implementation
 ```
 
 ## Running the Example
@@ -924,6 +975,7 @@ MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 | `/archive/metadata` | POST | Extract ZIP archive metadata |
 | `/files/{fileKey}/copy` | POST | Copy a file to a new location |
 | `/files/{fileKey}/move` | POST | Move a file to a new location |
+| `/files/batch` | DELETE | Batch delete multiple files |
 
 ## Security Considerations
 

@@ -81,4 +81,10 @@ public class FileStorageException extends RuntimeException {
     /** File move operation failed. */
     public static final String MOVE_FAILED = "file-kit.storage.move-failed";
 
+    /** File encryption failed. */
+    public static final String ENCRYPTION_FAILED = "file-kit.storage.encryption-failed";
+
+    /** File decryption failed. */
+    public static final String DECRYPTION_FAILED = "file-kit.storage.decryption-failed";
+
 }
