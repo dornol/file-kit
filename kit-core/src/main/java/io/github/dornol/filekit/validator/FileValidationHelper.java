@@ -34,6 +34,8 @@ public class FileValidationHelper {
      * @return {@code null} if valid, or the message key for the failed check
      */
     public @Nullable String validateMediaTypeAndExtension(FileSource value, Set<SafeMediaType> allowed) {
+        Objects.requireNonNull(value, "value");
+        Objects.requireNonNull(allowed, "allowed");
         String originalFilename = value.getOriginalFilename();
 
         String detected;
@@ -84,6 +86,8 @@ public class FileValidationHelper {
      * @return {@code true} if the media type is allowed
      */
     public boolean isValidMediaType(FileSource value, Set<SafeMediaType> allowed) {
+        Objects.requireNonNull(value, "value");
+        Objects.requireNonNull(allowed, "allowed");
         String detected;
 
         try {
@@ -107,6 +111,7 @@ public class FileValidationHelper {
      * Returns {@code true} if the file is empty.
      */
     public boolean isFileEmpty(FileSource value) {
+        Objects.requireNonNull(value, "value");
         return value.isEmpty();
     }
 
@@ -117,6 +122,7 @@ public class FileValidationHelper {
      * @param maxSize maximum size in bytes (0 = no limit)
      */
     public boolean isFileSizeExceeded(FileSource value, long maxSize) {
+        Objects.requireNonNull(value, "value");
         if (maxSize > 0 && value.getSize() > maxSize) {
             log.debug("File size {} exceeds maximum {}", value.getSize(), maxSize);
             return true;
@@ -131,6 +137,7 @@ public class FileValidationHelper {
      * @return {@code true} if the filename is safe
      */
     public boolean isValidFilename(FileSource value) {
+        Objects.requireNonNull(value, "value");
         String name = value.getOriginalFilename();
 
         if (!FilenameValidator.isSafe(name)) {
@@ -153,6 +160,7 @@ public class FileValidationHelper {
      * Returns {@code true} if any file in the iterable is empty.
      */
     public boolean isAnyFileEmpty(Iterable<? extends FileSource> files) {
+        Objects.requireNonNull(files, "files");
         for (FileSource file : files) {
             if (isFileEmpty(file)) {
                 return true;
@@ -165,6 +173,7 @@ public class FileValidationHelper {
      * Returns {@code true} if any file in the iterable exceeds the given maximum size.
      */
     public boolean isAnyFileSizeExceeded(Iterable<? extends FileSource> files, long maxSize) {
+        Objects.requireNonNull(files, "files");
         for (FileSource file : files) {
             if (isFileSizeExceeded(file, maxSize)) {
                 return true;
@@ -177,6 +186,7 @@ public class FileValidationHelper {
      * Returns {@code true} if all filenames in the iterable are valid.
      */
     public boolean isAllValidFilenames(Iterable<? extends FileSource> files) {
+        Objects.requireNonNull(files, "files");
         for (FileSource file : files) {
             if (!isValidFilename(file)) {
                 return false;
@@ -192,6 +202,8 @@ public class FileValidationHelper {
      */
     public @Nullable String validateAllMediaTypeAndExtension(Iterable<? extends FileSource> files,
                                                               Set<SafeMediaType> allowed) {
+        Objects.requireNonNull(files, "files");
+        Objects.requireNonNull(allowed, "allowed");
         for (FileSource file : files) {
             String result = validateMediaTypeAndExtension(file, allowed);
             if (result != null) {

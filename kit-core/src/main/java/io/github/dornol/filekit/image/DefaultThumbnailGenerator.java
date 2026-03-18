@@ -8,7 +8,7 @@ public class DefaultThumbnailGenerator implements ThumbnailGenerator {
     private final ImageResizer resizer;
 
     public DefaultThumbnailGenerator(ImageResizer resizer) {
-        this.resizer = resizer;
+        this.resizer = java.util.Objects.requireNonNull(resizer, "resizer");
     }
 
     @Override

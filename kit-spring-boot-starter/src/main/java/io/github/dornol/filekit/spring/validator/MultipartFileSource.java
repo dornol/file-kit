@@ -18,7 +18,7 @@ public class MultipartFileSource implements FileSource {
     private final MultipartFile multipartFile;
 
     public MultipartFileSource(MultipartFile multipartFile) {
-        this.multipartFile = multipartFile;
+        this.multipartFile = java.util.Objects.requireNonNull(multipartFile, "multipartFile");
     }
 
     @Override
