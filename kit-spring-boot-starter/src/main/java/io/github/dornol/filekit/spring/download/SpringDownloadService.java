@@ -81,8 +81,9 @@ public class SpringDownloadService {
     }
 
     private InputStream decryptToStream(InputStream encryptedContent) {
+        Path decryptedFile = null;
         try {
-            Path decryptedFile = Files.createTempFile("file-kit-decrypted-", ".tmp");
+            decryptedFile = Files.createTempFile("file-kit-decrypted-", ".tmp");
             try (InputStream in = encryptedContent;
                  OutputStream out = Files.newOutputStream(decryptedFile)) {
                 fileEncryptor.decrypt(in, out);
@@ -90,6 +91,13 @@ public class SpringDownloadService {
             // Return an InputStream that deletes temp file on close
             return new DeleteOnCloseInputStream(decryptedFile);
         } catch (IOException e) {
+            if (decryptedFile != null) {
+                try {
+                    Files.deleteIfExists(decryptedFile);
+                } catch (IOException deleteEx) {
+                    e.addSuppressed(deleteEx);
+                }
+            }
             throw new FileStorageException(FileStorageException.DECRYPTION_FAILED,
                     "Failed to decrypt file content", e);
         }

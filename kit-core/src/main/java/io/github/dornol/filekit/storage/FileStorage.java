@@ -74,6 +74,11 @@ public interface FileStorage {
         try {
             is.skipNBytes(start);
         } catch (java.io.IOException e) {
+            try {
+                is.close();
+            } catch (java.io.IOException closeEx) {
+                e.addSuppressed(closeEx);
+            }
             throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
                     "Failed to skip to byte offset " + start, e);
         }

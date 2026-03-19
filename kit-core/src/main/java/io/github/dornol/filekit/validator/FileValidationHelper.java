@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -40,8 +41,8 @@ public class FileValidationHelper {
         String originalFilename = value.getOriginalFilename();
 
         String detected;
-        try {
-            detected = detector.detect(originalFilename, value.getInputStream());
+        try (InputStream is = value.getInputStream()) {
+            detected = detector.detect(originalFilename, is);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to detect media type", e);
         }
@@ -91,8 +92,8 @@ public class FileValidationHelper {
         Objects.requireNonNull(allowed, "allowed");
         String detected;
 
-        try {
-            detected = detector.detect(value.getOriginalFilename(), value.getInputStream());
+        try (InputStream is = value.getInputStream()) {
+            detected = detector.detect(value.getOriginalFilename(), is);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to detect media type", e);
         }
