@@ -194,6 +194,30 @@ class SpringDownloadServiceTest {
         }
 
         @Test
+        void decryptionFailure_throwsDecryptionFailed() {
+            FileEncryptor failingEncryptor = new FileEncryptor() {
+                @Override
+                public void encrypt(InputStream plainInput, OutputStream cipherOutput) {}
+                @Override
+                public void decrypt(InputStream cipherInput, OutputStream plainOutput) throws IOException {
+                    throw new IOException("decryption error");
+                }
+            };
+
+            SpringDownloadService failingService = new SpringDownloadService(
+                    metadataRepository, storageResolver, failingEncryptor);
+
+            FileStorage plainStorage = mock(FileStorage.class);
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(plainStorage);
+            when(plainStorage.load(metadata)).thenReturn(new ByteArrayInputStream("data".getBytes()));
+
+            assertThatThrownBy(() -> failingService.loadResource("file-key"))
+                    .isInstanceOf(FileStorageException.class)
+                    .hasMessageContaining("Failed to decrypt file content");
+        }
+
+        @Test
         void springStorage_resourceReadFails_throwsDownloadFailed() throws IOException {
             SpringFileStorage springStorage = mock(SpringFileStorage.class);
             Resource badResource = mock(Resource.class);

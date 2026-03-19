@@ -276,6 +276,35 @@ class FileDownloadServiceTest {
         }
 
         @Test
+        void decryptedStream_closeCleansUpTempFile() throws IOException {
+            // Simple pass-through encryptor to trigger decryption path
+            FileEncryptor passThrough = new FileEncryptor() {
+                @Override
+                public void encrypt(InputStream plainInput, OutputStream cipherOutput) throws IOException {
+                    plainInput.transferTo(cipherOutput);
+                }
+                @Override
+                public void decrypt(InputStream cipherInput, OutputStream plainOutput) throws IOException {
+                    cipherInput.transferTo(plainOutput);
+                }
+            };
+
+            FileDownloadService passThroughService = new FileDownloadService(
+                    metadataRepository, storageResolver, passThrough);
+
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(metadata)).thenReturn(new ByteArrayInputStream("hello".getBytes()));
+
+            DownloadResult result = passThroughService.download("file-key");
+
+            // Read and close — should clean up temp file without errors
+            try (InputStream is = result.content()) {
+                assertArrayEquals("hello".getBytes(), is.readAllBytes());
+            }
+        }
+
+        @Test
         void decryptionFailure_throwsDecryptionFailed() {
             FileEncryptor failingEncryptor = new FileEncryptor() {
                 @Override

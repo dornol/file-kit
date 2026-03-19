@@ -11,10 +11,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link FileStorage} default methods: generatePresignedUrl and loadRange.
@@ -105,6 +107,28 @@ class FileStorageDefaultMethodsTest {
 
             assertThrows(FileStorageException.class,
                     () -> storage.loadRange(metadata, 10, 20));
+        }
+
+        @Test
+        void skipFails_closesInputStream() {
+            AtomicBoolean closed = new AtomicBoolean(false);
+            FileStorage storage = new FileStorage() {
+                @Override public Enum<?> getStorageType() { return StorageType.TEST; }
+                @Override public FileLocation upload(FileUploadCommand command) { throw new UnsupportedOperationException(); }
+                @Override public InputStream load(FileMetadata metadata) {
+                    return new InputStream() {
+                        @Override public int read() throws IOException { throw new IOException("skip failed"); }
+                        @Override public long skip(long n) throws IOException { throw new IOException("skip failed"); }
+                        @Override public void close() throws IOException { closed.set(true); }
+                    };
+                }
+                @Override public void delete(FileMetadata metadata) {}
+                @Override public String resolveUri(FileMetadata metadata) { return "test://"; }
+            };
+
+            assertThrows(FileStorageException.class,
+                    () -> storage.loadRange(metadata, 10, 20));
+            assertTrue(closed.get(), "InputStream should be closed when skip fails");
         }
     }
 

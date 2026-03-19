@@ -1126,6 +1126,14 @@ The checksum-based deduplication (`findByChecksum` → `save`) is not atomic. Un
 
 file-kit does **not** handle download authorization. Access control (e.g., verifying that the requesting user owns the file) is the application's responsibility. Wrap `FileDownloadService` or `SpringDownloadService` calls with your own authorization logic.
 
+### Resource management
+
+All internal streams and temporary files are properly closed/deleted on both success and error paths. Specifically:
+- Upload temp files are cleaned up in a `finally` block, even if callbacks or storage operations fail
+- Decryption temp files are deleted if decryption fails (not just on stream close)
+- Range request streams are closed if byte seeking fails
+- Validation streams are closed after media type detection
+
 ### Thread safety
 
 - `FileUploadService`, `FileDownloadService`, `FileDeleteService`, `FileTransferService`, and `LocalFileStorage` are thread-safe and can be used as singletons.
