@@ -48,6 +48,6 @@ public class MultipartFileArrayValidator extends AbstractMultipartFileValidator<
     }
 
     private static List<FileSource> toSources(MultipartFile[] files) {
-        return Arrays.stream(files).map(MultipartFileSource::new).map(FileSource.class::cast).toList();
+        return Arrays.stream(files).<FileSource>map(MultipartFileSource::new).toList();
     }
 }

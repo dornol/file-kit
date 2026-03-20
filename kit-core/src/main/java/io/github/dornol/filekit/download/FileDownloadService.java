@@ -120,7 +120,12 @@ public class FileDownloadService extends AbstractFileOperationService {
 
         DeleteOnCloseInputStream(Path tempFile) throws IOException {
             this.tempFile = tempFile;
-            this.delegate = Files.newInputStream(tempFile);
+            try {
+                this.delegate = Files.newInputStream(tempFile);
+            } catch (IOException e) {
+                Files.deleteIfExists(tempFile);
+                throw e;
+            }
         }
 
         @Override

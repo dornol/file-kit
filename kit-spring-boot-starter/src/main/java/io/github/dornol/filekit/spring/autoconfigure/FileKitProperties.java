@@ -24,6 +24,9 @@ public class FileKitProperties {
     }
 
     public void setMaxUploadSize(long maxUploadSize) {
+        if (maxUploadSize < 0) {
+            throw new IllegalArgumentException("maxUploadSize must not be negative: " + maxUploadSize);
+        }
         this.maxUploadSize = maxUploadSize;
     }
 

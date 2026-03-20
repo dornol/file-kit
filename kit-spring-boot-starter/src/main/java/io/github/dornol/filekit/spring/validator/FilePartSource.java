@@ -55,7 +55,17 @@ public class FilePartSource implements FileSource, Closeable {
                         .then(Mono.fromCallable(() -> {
                             long size = Files.size(temp);
                             return new FilePartSource(filePart.filename(), temp, size);
-                        })));
+                        }))
+                        .onErrorResume(e -> Mono.fromRunnable(() -> deleteSilently(temp))
+                                .then(Mono.error(e))));
+    }
+
+    private static void deleteSilently(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
+            // best-effort cleanup
+        }
     }
 
     @Override

@@ -20,7 +20,15 @@ public class FileStorageResolver {
      */
     public FileStorageResolver(List<FileStorage> storages) {
         this.storageMap = storages.stream()
-                .collect(Collectors.toMap(FileStorage::getStorageType, s -> s));
+                .collect(Collectors.toMap(
+                        FileStorage::getStorageType,
+                        s -> s,
+                        (existing, duplicate) -> {
+                            throw new IllegalArgumentException(
+                                    "Duplicate storageType: " + existing.getStorageType()
+                                            + " (classes: " + existing.getClass().getName()
+                                            + ", " + duplicate.getClass().getName() + ")");
+                        }));
     }
 
     public FileStorage resolve(Enum<?> storageType) {

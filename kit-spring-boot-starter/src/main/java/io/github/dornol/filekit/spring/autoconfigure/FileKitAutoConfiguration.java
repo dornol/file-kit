@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.util.ClassUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -79,15 +80,13 @@ public class FileKitAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public MediaTypeDetector mediaTypeDetector() {
-        try {
-            Class.forName("org.apache.tika.Tika");
+        if (ClassUtils.isPresent("org.apache.tika.Tika", getClass().getClassLoader())) {
             log.info("Registering TikaMediaTypeDetector (Apache Tika detected on classpath)");
             return new TikaMediaTypeDetector();
-        } catch (ClassNotFoundException e) {
-            log.warn("Registering DefaultMediaTypeDetector (Java URLConnection-based). "
-                    + "For better accuracy, add Apache Tika to your classpath.");
-            return new DefaultMediaTypeDetector();
         }
+        log.warn("Registering DefaultMediaTypeDetector (Java URLConnection-based). "
+                + "For better accuracy, add Apache Tika to your classpath.");
+        return new DefaultMediaTypeDetector();
     }
 
     @Bean

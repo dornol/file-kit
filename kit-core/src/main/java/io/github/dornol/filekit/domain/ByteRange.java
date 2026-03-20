@@ -70,6 +70,10 @@ public record ByteRange(long start, long end, long totalSize) {
             if (rangeSpec.startsWith("-")) {
                 // Suffix range: -500 means last 500 bytes
                 long suffix = Long.parseLong(rangeSpec.substring(1));
+                if (suffix <= 0) {
+                    throw new FileStorageException(FileStorageException.RANGE_NOT_SATISFIABLE,
+                            "Suffix length must be positive: " + rangeHeader);
+                }
                 start = Math.max(0, totalSize - suffix);
                 end = totalSize - 1;
             } else if (rangeSpec.endsWith("-")) {
