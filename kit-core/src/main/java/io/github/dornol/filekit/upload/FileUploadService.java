@@ -63,91 +63,89 @@ public class FileUploadService {
     private final FileEventPublisher eventPublisher;
 
     /**
-     * Creates an upload service with no file size limit and no virus scanner.
+     * Creates a builder with the four required dependencies.
+     *
+     * @param checksumCalculator calculator for file checksums
+     * @param metadataRepository repository for file metadata persistence
+     * @param formatExtractor    extractor for detecting file format
+     * @param storageResolver    resolver for mapping storage type to storage backend
+     * @return a new builder instance
      */
-    public FileUploadService(ChecksumCalculator checksumCalculator,
-                             FileMetadataRepository metadataRepository,
-                             FileFormatExtractor formatExtractor,
-                             FileStorageResolver storageResolver) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
-                0, null, new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
+    public static Builder builder(ChecksumCalculator checksumCalculator,
+                                  FileMetadataRepository metadataRepository,
+                                  FileFormatExtractor formatExtractor,
+                                  FileStorageResolver storageResolver) {
+        return new Builder(checksumCalculator, metadataRepository, formatExtractor, storageResolver);
     }
 
-    /**
-     * Creates an upload service with a maximum upload size and no virus scanner.
-     *
-     * @param maxUploadSize maximum file size in bytes (0 = unlimited)
-     */
-    public FileUploadService(ChecksumCalculator checksumCalculator,
-                             FileMetadataRepository metadataRepository,
-                             FileFormatExtractor formatExtractor,
-                             FileStorageResolver storageResolver,
-                             long maxUploadSize) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
-                maxUploadSize, null, new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
+    private FileUploadService(Builder b) {
+        this.checksumCalculator = Objects.requireNonNull(b.checksumCalculator, "checksumCalculator");
+        this.metadataRepository = Objects.requireNonNull(b.metadataRepository, "metadataRepository");
+        this.formatExtractor = Objects.requireNonNull(b.formatExtractor, "formatExtractor");
+        this.storageResolver = Objects.requireNonNull(b.storageResolver, "storageResolver");
+        this.maxUploadSize = b.maxUploadSize;
+        this.virusScanner = b.virusScanner;
+        this.fileEncryptor = Objects.requireNonNull(b.fileEncryptor, "fileEncryptor");
+        this.quotaChecker = b.quotaChecker;
+        this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
     }
 
-    /**
-     * Creates an upload service with a maximum upload size and optional virus scanner.
-     *
-     * @param maxUploadSize maximum file size in bytes (0 = unlimited)
-     * @param virusScanner  optional virus scanner; if non-null, files are scanned before upload
-     */
-    public FileUploadService(ChecksumCalculator checksumCalculator,
-                             FileMetadataRepository metadataRepository,
-                             FileFormatExtractor formatExtractor,
-                             FileStorageResolver storageResolver,
-                             long maxUploadSize,
-                             @Nullable VirusScanner virusScanner) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
-                maxUploadSize, virusScanner, new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
-    }
+    public static final class Builder {
 
-    /**
-     * Creates an upload service with a maximum upload size, optional virus scanner, and file encryptor.
-     *
-     * @param maxUploadSize maximum file size in bytes (0 = unlimited)
-     * @param virusScanner  optional virus scanner; if non-null, files are scanned before upload
-     * @param fileEncryptor encryptor for at-rest encryption
-     */
-    public FileUploadService(ChecksumCalculator checksumCalculator,
-                             FileMetadataRepository metadataRepository,
-                             FileFormatExtractor formatExtractor,
-                             FileStorageResolver storageResolver,
-                             long maxUploadSize,
-                             @Nullable VirusScanner virusScanner,
-                             FileEncryptor fileEncryptor) {
-        this(checksumCalculator, metadataRepository, formatExtractor, storageResolver,
-                maxUploadSize, virusScanner, fileEncryptor, null, new FileEventPublisher(List.of()));
-    }
+        private final ChecksumCalculator checksumCalculator;
+        private final FileMetadataRepository metadataRepository;
+        private final FileFormatExtractor formatExtractor;
+        private final FileStorageResolver storageResolver;
 
-    /**
-     * Creates an upload service with all options including quota checking and event publishing.
-     *
-     * @param maxUploadSize  maximum file size in bytes (0 = unlimited)
-     * @param virusScanner   optional virus scanner; if non-null, files are scanned before upload
-     * @param fileEncryptor  encryptor for at-rest encryption
-     * @param quotaChecker   optional quota checker; if non-null, quota is verified before upload
-     * @param eventPublisher publisher for file lifecycle events
-     */
-    public FileUploadService(ChecksumCalculator checksumCalculator,
-                             FileMetadataRepository metadataRepository,
-                             FileFormatExtractor formatExtractor,
-                             FileStorageResolver storageResolver,
-                             long maxUploadSize,
-                             @Nullable VirusScanner virusScanner,
-                             FileEncryptor fileEncryptor,
-                             @Nullable QuotaChecker quotaChecker,
-                             FileEventPublisher eventPublisher) {
-        this.checksumCalculator = Objects.requireNonNull(checksumCalculator, "checksumCalculator");
-        this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
-        this.formatExtractor = Objects.requireNonNull(formatExtractor, "formatExtractor");
-        this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
-        this.maxUploadSize = maxUploadSize;
-        this.virusScanner = virusScanner;
-        this.fileEncryptor = Objects.requireNonNull(fileEncryptor, "fileEncryptor");
-        this.quotaChecker = quotaChecker;
-        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
+        private long maxUploadSize;
+        private @Nullable VirusScanner virusScanner;
+        private FileEncryptor fileEncryptor = new NoOpFileEncryptor();
+        private @Nullable QuotaChecker quotaChecker;
+        private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
+
+        private Builder(ChecksumCalculator checksumCalculator,
+                        FileMetadataRepository metadataRepository,
+                        FileFormatExtractor formatExtractor,
+                        FileStorageResolver storageResolver) {
+            this.checksumCalculator = checksumCalculator;
+            this.metadataRepository = metadataRepository;
+            this.formatExtractor = formatExtractor;
+            this.storageResolver = storageResolver;
+        }
+
+        /** @param maxUploadSize maximum file size in bytes (0 = unlimited) */
+        public Builder maxUploadSize(long maxUploadSize) {
+            this.maxUploadSize = maxUploadSize;
+            return this;
+        }
+
+        /** @param virusScanner optional virus scanner; files are scanned before upload */
+        public Builder virusScanner(@Nullable VirusScanner virusScanner) {
+            this.virusScanner = virusScanner;
+            return this;
+        }
+
+        /** @param fileEncryptor encryptor for at-rest encryption */
+        public Builder fileEncryptor(FileEncryptor fileEncryptor) {
+            this.fileEncryptor = fileEncryptor;
+            return this;
+        }
+
+        /** @param quotaChecker optional quota checker; quota is verified before upload */
+        public Builder quotaChecker(@Nullable QuotaChecker quotaChecker) {
+            this.quotaChecker = quotaChecker;
+            return this;
+        }
+
+        /** @param eventPublisher publisher for file lifecycle events */
+        public Builder eventPublisher(FileEventPublisher eventPublisher) {
+            this.eventPublisher = eventPublisher;
+            return this;
+        }
+
+        public FileUploadService build() {
+            return new FileUploadService(this);
+        }
     }
 
     /**

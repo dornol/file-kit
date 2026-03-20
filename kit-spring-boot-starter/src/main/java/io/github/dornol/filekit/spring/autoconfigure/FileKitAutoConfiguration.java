@@ -173,8 +173,13 @@ public class FileKitAutoConfiguration {
                 virusScanner != null ? virusScanner.getClass().getSimpleName() : "none",
                 fileEncryptor.getClass().getSimpleName(),
                 quotaChecker != null ? "enabled" : "none");
-        return new FileUploadService(checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver, maxUploadSize, virusScanner, fileEncryptor, quotaChecker, eventPublisher);
+        return FileUploadService.builder(checksumCalculator, metadataRepository, formatExtractor, storageResolver)
+                .maxUploadSize(maxUploadSize)
+                .virusScanner(virusScanner)
+                .fileEncryptor(fileEncryptor)
+                .quotaChecker(quotaChecker)
+                .eventPublisher(eventPublisher)
+                .build();
     }
 
     @Bean

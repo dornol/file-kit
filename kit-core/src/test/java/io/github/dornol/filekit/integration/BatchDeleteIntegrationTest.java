@@ -43,8 +43,8 @@ class BatchDeleteIntegrationTest {
         metadataRepository = new InMemoryMetadataRepository();
         FileStorageResolver storageResolver = new FileStorageResolver(List.of(memoryStorage));
 
-        uploadService = new FileUploadService(new Sha256ChecksumCalculator(), metadataRepository,
-                is -> new FileFormat("text/plain", "txt", "text"), storageResolver);
+        uploadService = FileUploadService.builder(new Sha256ChecksumCalculator(), metadataRepository,
+                is -> new FileFormat("text/plain", "txt", "text"), storageResolver).build();
         downloadService = new FileDownloadService(metadataRepository, storageResolver);
         deleteService = new FileDeleteService(metadataRepository, storageResolver);
     }

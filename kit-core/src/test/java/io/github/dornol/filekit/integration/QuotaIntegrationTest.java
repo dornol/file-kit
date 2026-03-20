@@ -48,11 +48,10 @@ class QuotaIntegrationTest {
         QuotaChecker quotaChecker = new QuotaChecker(policy, usageProvider);
         FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
 
-        uploadService = new FileUploadService(
+        uploadService = FileUploadService.builder(
                 new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("text/plain", "txt", "text"),
-                storageResolver, 0, null, new io.github.dornol.filekit.spi.NoOpFileEncryptor(),
-                quotaChecker, eventPublisher);
+                storageResolver).quotaChecker(quotaChecker).eventPublisher(eventPublisher).build();
 
         transferService = new FileTransferService(metadataRepository, storageResolver,
                 quotaChecker, eventPublisher);

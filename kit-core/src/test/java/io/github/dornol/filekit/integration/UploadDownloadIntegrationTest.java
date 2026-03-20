@@ -55,8 +55,8 @@ class UploadDownloadIntegrationTest {
         FileFormatExtractor formatExtractor = is -> new FileFormat("text/plain", "txt", "text");
         FileStorageResolver storageResolver = new FileStorageResolver(List.of(memoryStorage));
 
-        uploadService = new FileUploadService(checksumCalculator, metadataRepository,
-                formatExtractor, storageResolver);
+        uploadService = FileUploadService.builder(checksumCalculator, metadataRepository,
+                formatExtractor, storageResolver).build();
         downloadService = new FileDownloadService(metadataRepository, storageResolver);
         deleteService = new FileDeleteService(metadataRepository, storageResolver);
     }
@@ -241,10 +241,10 @@ class UploadDownloadIntegrationTest {
 
         @Test
         void withinLimit_succeeds() throws IOException {
-            FileUploadService limited = new FileUploadService(
+            FileUploadService limited = FileUploadService.builder(
                     new Sha256ChecksumCalculator(), metadataRepository,
                     is -> new FileFormat("text/plain", "txt", "text"),
-                    new FileStorageResolver(List.of(memoryStorage)), 100);
+                    new FileStorageResolver(List.of(memoryStorage))).maxUploadSize(100).build();
 
             FileSource source = new TestFileSource("small.txt", "hi".getBytes());
             FileMetadata meta = limited.upload(source, StorageType.MEMORY, "bucket");
@@ -254,10 +254,10 @@ class UploadDownloadIntegrationTest {
 
         @Test
         void exceedsLimit_rejected() {
-            FileUploadService limited = new FileUploadService(
+            FileUploadService limited = FileUploadService.builder(
                     new Sha256ChecksumCalculator(), metadataRepository,
                     is -> new FileFormat("text/plain", "txt", "text"),
-                    new FileStorageResolver(List.of(memoryStorage)), 5);
+                    new FileStorageResolver(List.of(memoryStorage))).maxUploadSize(5).build();
 
             FileSource source = new TestFileSource("big.txt", "this is too long".getBytes());
 

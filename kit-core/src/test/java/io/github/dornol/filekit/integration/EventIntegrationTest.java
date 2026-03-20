@@ -52,11 +52,10 @@ class EventIntegrationTest {
         FileStorageResolver storageResolver = new FileStorageResolver(List.of(storageA, storageB));
         FileEventPublisher eventPublisher = new FileEventPublisher(List.of(listener));
 
-        uploadService = new FileUploadService(
+        uploadService = FileUploadService.builder(
                 new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("text/plain", "txt", "text"),
-                storageResolver, 0, null, new io.github.dornol.filekit.spi.NoOpFileEncryptor(),
-                null, eventPublisher);
+                storageResolver).eventPublisher(eventPublisher).build();
         downloadService = new FileDownloadService(metadataRepository, storageResolver,
                 new io.github.dornol.filekit.spi.NoOpFileEncryptor(), eventPublisher);
         deleteService = new FileDeleteService(metadataRepository, storageResolver, eventPublisher);
@@ -190,12 +189,11 @@ class EventIntegrationTest {
             FileEventListener listener2 = mock(FileEventListener.class);
             FileEventPublisher multiPublisher = new FileEventPublisher(List.of(listener, listener2));
 
-            FileUploadService uploadSvc = new FileUploadService(
+            FileUploadService uploadSvc = FileUploadService.builder(
                     new Sha256ChecksumCalculator(), metadataRepository,
                     is -> new FileFormat("text/plain", "txt", "text"),
-                    new FileStorageResolver(List.of(storageA, storageB)),
-                    0, null, new io.github.dornol.filekit.spi.NoOpFileEncryptor(),
-                    null, multiPublisher);
+                    new FileStorageResolver(List.of(storageA, storageB)))
+                    .eventPublisher(multiPublisher).build();
 
             // Need fresh metadata repo to avoid dedup
             FileMetadata meta = uploadSvc.upload(

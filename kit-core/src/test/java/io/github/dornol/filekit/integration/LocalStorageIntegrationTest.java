@@ -55,10 +55,10 @@ class LocalStorageIntegrationTest {
         metadataRepository = new InMemoryMetadataRepository();
         FileStorageResolver storageResolver = new FileStorageResolver(List.of(localStorage));
 
-        uploadService = new FileUploadService(
+        uploadService = FileUploadService.builder(
                 new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("application/octet-stream", "bin", "application"),
-                storageResolver);
+                storageResolver).build();
         downloadService = new FileDownloadService(metadataRepository, storageResolver);
         deleteService = new FileDeleteService(metadataRepository, storageResolver);
     }
@@ -123,10 +123,10 @@ class LocalStorageIntegrationTest {
             LocalFileStorage hashedStorage = new LocalFileStorage(
                     tempDir.resolve("hashed"), StorageType.LOCAL, ObjectKeyStrategy.hashPrefixed(2));
             FileStorageResolver resolver = new FileStorageResolver(List.of(hashedStorage));
-            FileUploadService hashedUploadService = new FileUploadService(
+            FileUploadService hashedUploadService = FileUploadService.builder(
                     new Sha256ChecksumCalculator(), metadataRepository,
                     is -> new FileFormat("text/plain", "txt", "text"),
-                    resolver);
+                    resolver).build();
 
             FileMetadata meta = hashedUploadService.upload(
                     new TestFileSource("doc.txt", "hash me".getBytes()), StorageType.LOCAL, "data");

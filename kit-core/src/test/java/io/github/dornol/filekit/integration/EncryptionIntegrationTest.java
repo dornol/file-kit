@@ -56,8 +56,8 @@ class EncryptionIntegrationTest {
 
         AesFileEncryptor encryptor = new AesFileEncryptor();
 
-        uploadService = new FileUploadService(checksumCalculator, metadataRepository,
-                formatExtractor, storageResolver, 0, null, encryptor);
+        uploadService = FileUploadService.builder(checksumCalculator, metadataRepository,
+                formatExtractor, storageResolver).fileEncryptor(encryptor).build();
         downloadService = new FileDownloadService(metadataRepository, storageResolver, encryptor);
     }
 

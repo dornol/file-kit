@@ -57,45 +57,46 @@ class FileUploadServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FileUploadService(checksumCalculator, metadataRepository,
-                formatExtractor, storageResolver);
-        serviceLimited = new FileUploadService(checksumCalculator, metadataRepository,
-                formatExtractor, storageResolver, 10);
+        service = FileUploadService.builder(checksumCalculator, metadataRepository,
+                formatExtractor, storageResolver).build();
+        serviceLimited = FileUploadService.builder(checksumCalculator, metadataRepository,
+                formatExtractor, storageResolver).maxUploadSize(10).build();
     }
 
     // ── Constructor validation ───────────────────────────────────────
 
     @Nested
-    class ConstructorValidation {
+    class BuilderValidation {
 
         @Test
         void nullChecksumCalculator_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileUploadService(null, metadataRepository, formatExtractor, storageResolver));
+                    () -> FileUploadService.builder(null, metadataRepository, formatExtractor, storageResolver).build());
         }
 
         @Test
         void nullMetadataRepository_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileUploadService(checksumCalculator, null, formatExtractor, storageResolver));
+                    () -> FileUploadService.builder(checksumCalculator, null, formatExtractor, storageResolver).build());
         }
 
         @Test
         void nullFormatExtractor_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileUploadService(checksumCalculator, metadataRepository, null, storageResolver));
+                    () -> FileUploadService.builder(checksumCalculator, metadataRepository, null, storageResolver).build());
         }
 
         @Test
         void nullStorageResolver_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileUploadService(checksumCalculator, metadataRepository, formatExtractor, null));
+                    () -> FileUploadService.builder(checksumCalculator, metadataRepository, formatExtractor, null).build());
         }
 
         @Test
         void nullChecksumCalculator_withMaxSize_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileUploadService(null, metadataRepository, formatExtractor, storageResolver, 100));
+                    () -> FileUploadService.builder(null, metadataRepository, formatExtractor, storageResolver)
+                            .maxUploadSize(100).build());
         }
     }
 
@@ -509,9 +510,9 @@ class FileUploadServiceTest {
 
         VirusScanner virusScanner = mock(VirusScanner.class);
 
-        FileUploadService serviceWithScanner = new FileUploadService(
+        FileUploadService serviceWithScanner = FileUploadService.builder(
                 checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver, 0, virusScanner);
+                storageResolver).virusScanner(virusScanner).build();
 
         @Test
         void infected_throwsAndDoesNotUpload() throws IOException {
@@ -658,9 +659,9 @@ class FileUploadServiceTest {
 
         @Test
         void constructorAcceptsNullScanner() {
-            FileUploadService svc = new FileUploadService(
+            FileUploadService svc = FileUploadService.builder(
                     checksumCalculator, metadataRepository, formatExtractor,
-                    storageResolver, 0, null);
+                    storageResolver).virusScanner(null).build();
             assertNotNull(svc);
         }
     }
@@ -672,10 +673,9 @@ class FileUploadServiceTest {
 
         QuotaChecker quotaChecker = mock(QuotaChecker.class);
 
-        FileUploadService serviceWithQuota = new FileUploadService(
+        FileUploadService serviceWithQuota = FileUploadService.builder(
                 checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver, 0, null, new NoOpFileEncryptor(),
-                quotaChecker, new FileEventPublisher(List.of()));
+                storageResolver).quotaChecker(quotaChecker).build();
 
         @Test
         void quotaExceeded_throwsBeforeUpload() throws IOException {
@@ -740,10 +740,9 @@ class FileUploadServiceTest {
 
         FileEventListener listener = mock(FileEventListener.class);
 
-        FileUploadService serviceWithEvents = new FileUploadService(
+        FileUploadService serviceWithEvents = FileUploadService.builder(
                 checksumCalculator, metadataRepository, formatExtractor,
-                storageResolver, 0, null, new NoOpFileEncryptor(),
-                null, new FileEventPublisher(List.of(listener)));
+                storageResolver).eventPublisher(new FileEventPublisher(List.of(listener))).build();
 
         @Test
         void uploadFires_onUploaded() throws IOException {
@@ -809,21 +808,19 @@ class FileUploadServiceTest {
     // ── Full constructor validation ──────────────────────────────────
 
     @Nested
-    class FullConstructorValidation {
+    class FullBuilderValidation {
 
         @Test
         void nullEventPublisher_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileUploadService(checksumCalculator, metadataRepository,
-                            formatExtractor, storageResolver, 0, null,
-                            new NoOpFileEncryptor(), null, null));
+                    () -> FileUploadService.builder(checksumCalculator, metadataRepository,
+                            formatExtractor, storageResolver).eventPublisher(null).build());
         }
 
         @Test
         void nullQuotaChecker_allowed() {
-            FileUploadService svc = new FileUploadService(checksumCalculator, metadataRepository,
-                    formatExtractor, storageResolver, 0, null,
-                    new NoOpFileEncryptor(), null, new FileEventPublisher(List.of()));
+            FileUploadService svc = FileUploadService.builder(checksumCalculator, metadataRepository,
+                    formatExtractor, storageResolver).quotaChecker(null).build();
             assertNotNull(svc);
         }
     }

@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * Publishes file lifecycle events to registered {@link FileEventListener}s.
@@ -28,51 +30,31 @@ public class FileEventPublisher {
     }
 
     public void fireUploaded(FileMetadata metadata) {
-        for (FileEventListener listener : listeners) {
-            try {
-                listener.onUploaded(metadata);
-            } catch (Exception e) {
-                log.warn("FileEventListener.onUploaded failed: {}", e.getMessage(), e);
-            }
-        }
+        dispatch("onUploaded", listener -> listener.onUploaded(metadata));
     }
 
     public void fireDownloaded(FileMetadata metadata) {
-        for (FileEventListener listener : listeners) {
-            try {
-                listener.onDownloaded(metadata);
-            } catch (Exception e) {
-                log.warn("FileEventListener.onDownloaded failed: {}", e.getMessage(), e);
-            }
-        }
+        dispatch("onDownloaded", listener -> listener.onDownloaded(metadata));
     }
 
     public void fireDeleted(FileMetadata metadata) {
-        for (FileEventListener listener : listeners) {
-            try {
-                listener.onDeleted(metadata);
-            } catch (Exception e) {
-                log.warn("FileEventListener.onDeleted failed: {}", e.getMessage(), e);
-            }
-        }
+        dispatch("onDeleted", listener -> listener.onDeleted(metadata));
     }
 
     public void fireCopied(FileMetadata source, FileMetadata copy) {
-        for (FileEventListener listener : listeners) {
-            try {
-                listener.onCopied(source, copy);
-            } catch (Exception e) {
-                log.warn("FileEventListener.onCopied failed: {}", e.getMessage(), e);
-            }
-        }
+        dispatch("onCopied", listener -> listener.onCopied(source, copy));
     }
 
     public void fireMoved(FileMetadata source, FileMetadata moved) {
+        dispatch("onMoved", listener -> listener.onMoved(source, moved));
+    }
+
+    private void dispatch(String eventName, Consumer<FileEventListener> action) {
         for (FileEventListener listener : listeners) {
             try {
-                listener.onMoved(source, moved);
+                action.accept(listener);
             } catch (Exception e) {
-                log.warn("FileEventListener.onMoved failed: {}", e.getMessage(), e);
+                log.warn("FileEventListener.{} failed: {}", eventName, e.getMessage(), e);
             }
         }
     }

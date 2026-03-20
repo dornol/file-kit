@@ -1114,8 +1114,10 @@ file-kit:
 Or when using `kit-core` directly:
 
 ```java
-new FileUploadService(checksumCalculator, metadataRepository,
-        formatExtractor, storageResolver, 50 * 1024 * 1024);
+FileUploadService.builder(checksumCalculator, metadataRepository,
+        formatExtractor, storageResolver)
+        .maxUploadSize(50 * 1024 * 1024)
+        .build();
 ```
 
 ### Checksum deduplication and concurrency (TOCTOU)
