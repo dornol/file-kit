@@ -184,6 +184,41 @@ class FilePartSourceTest {
         }
     }
 
+    // ── Error cleanup ────────────────────────────────────────────────
+
+    @Nested
+    class ErrorCleanup {
+
+        @Test
+        void transferToFailure_cleansTempFile() {
+            FilePart filePart = mock(FilePart.class);
+            when(filePart.filename()).thenReturn("fail.txt");
+            when(filePart.transferTo(any(Path.class))).thenReturn(
+                    Mono.error(new RuntimeException("transfer failed")));
+
+            // Should not leave orphaned temp files
+            assertThatThrownBy(() -> FilePartSource.from(filePart).block())
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("transfer failed");
+        }
+
+        @Test
+        void fileSizeFailure_cleansTempFile() {
+            FilePart filePart = mock(FilePart.class);
+            when(filePart.filename()).thenReturn("fail.txt");
+            when(filePart.transferTo(any(Path.class))).thenAnswer(invocation -> {
+                Path target = invocation.getArgument(0);
+                // Write content, then delete the file to make Files.size() fail
+                Files.write(target, "data".getBytes(StandardCharsets.UTF_8));
+                Files.delete(target);
+                return Mono.empty();
+            });
+
+            assertThatThrownBy(() -> FilePartSource.from(filePart).block())
+                    .hasCauseInstanceOf(java.nio.file.NoSuchFileException.class);
+        }
+    }
+
     // ── FileSource contract ─────────────────────────────────────────
 
     @Nested

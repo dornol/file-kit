@@ -422,4 +422,131 @@ class ZipArchiveMetadataExtractorTest {
             assertEquals(0, metadata.entryCount());
         }
     }
+
+    // ── Zip bomb protection ────────────────────────────────────────
+
+    @Nested
+    class ZipBombProtection {
+
+        @Test
+        void rejectsArchiveExceedingMaxUncompressedSize() throws IOException {
+            // Create extractor with 100-byte limit
+            ZipArchiveMetadataExtractor limited = new ZipArchiveMetadataExtractor(100, 65_535);
+
+            byte[] zipBytes = createZip(zos -> {
+                zos.putNextEntry(new ZipEntry("big.txt"));
+                zos.write(new byte[200]); // 200 bytes > 100 limit
+                zos.closeEntry();
+            });
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> limited.extract(zipBytes));
+            assertEquals(FileStorageException.ARCHIVE_PROCESSING_FAILED, ex.getMessageKey());
+            assertTrue(ex.getMessage().contains("maximum uncompressed size"));
+        }
+
+        @Test
+        void rejectsArchiveExceedingMaxEntries() throws IOException {
+            // Create extractor with 3-entry limit
+            ZipArchiveMetadataExtractor limited = new ZipArchiveMetadataExtractor(Long.MAX_VALUE, 3);
+
+            byte[] zipBytes = createZip(zos -> {
+                for (int i = 0; i < 5; i++) {
+                    zos.putNextEntry(new ZipEntry("file-" + i + ".txt"));
+                    zos.write(("content-" + i).getBytes());
+                    zos.closeEntry();
+                }
+            });
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> limited.extract(zipBytes));
+            assertEquals(FileStorageException.ARCHIVE_PROCESSING_FAILED, ex.getMessageKey());
+            assertTrue(ex.getMessage().contains("maximum entry count"));
+        }
+
+        @Test
+        void acceptsArchiveWithinLimits() throws IOException {
+            ZipArchiveMetadataExtractor limited = new ZipArchiveMetadataExtractor(1000, 10);
+
+            byte[] zipBytes = createZip(zos -> {
+                zos.putNextEntry(new ZipEntry("small.txt"));
+                zos.write("hello".getBytes());
+                zos.closeEntry();
+            });
+
+            ArchiveMetadata metadata = limited.extract(zipBytes);
+            assertEquals(1, metadata.entryCount());
+        }
+
+        @Test
+        void rejectsExceedingCumulativeSize() throws IOException {
+            // 50 bytes total limit, two 30-byte entries → cumulative 60 > 50
+            ZipArchiveMetadataExtractor limited = new ZipArchiveMetadataExtractor(50, 100);
+
+            byte[] zipBytes = createZip(zos -> {
+                zos.putNextEntry(new ZipEntry("a.txt"));
+                zos.write(new byte[30]);
+                zos.closeEntry();
+
+                zos.putNextEntry(new ZipEntry("b.txt"));
+                zos.write(new byte[30]);
+                zos.closeEntry();
+            });
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> limited.extract(zipBytes));
+            assertTrue(ex.getMessage().contains("maximum uncompressed size"));
+        }
+
+        @Test
+        void defaultLimitsAllowNormalArchives() throws IOException {
+            // Default extractor should handle normal archives
+            byte[] zipBytes = createZip(zos -> {
+                for (int i = 0; i < 100; i++) {
+                    zos.putNextEntry(new ZipEntry("file-" + i + ".txt"));
+                    zos.write(("content-" + i).getBytes());
+                    zos.closeEntry();
+                }
+            });
+
+            ArchiveMetadata metadata = extractor.extract(zipBytes);
+            assertEquals(100, metadata.entryCount());
+        }
+    }
+
+    // ── Constructor validation ─────────────────────────────────────
+
+    @Nested
+    class ConstructorValidation {
+
+        @Test
+        void zeroMaxUncompressedSize_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ZipArchiveMetadataExtractor(0, 100));
+        }
+
+        @Test
+        void negativeMaxUncompressedSize_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ZipArchiveMetadataExtractor(-1, 100));
+        }
+
+        @Test
+        void zeroMaxEntries_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ZipArchiveMetadataExtractor(1000, 0));
+        }
+
+        @Test
+        void negativeMaxEntries_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ZipArchiveMetadataExtractor(1000, -1));
+        }
+
+        @Test
+        void validParameters_doesNotThrow() {
+            ZipArchiveMetadataExtractor custom = new ZipArchiveMetadataExtractor(1024, 10);
+            assertNotNull(custom);
+        }
+    }
 }

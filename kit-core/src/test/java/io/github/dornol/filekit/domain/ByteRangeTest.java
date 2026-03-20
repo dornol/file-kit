@@ -301,5 +301,20 @@ class ByteRangeTest {
             assertThrows(FileStorageException.class,
                     () -> ByteRange.parse("bytes=", 1000));
         }
+
+        @Test
+        void suffixZero_throws() {
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> ByteRange.parse("bytes=-0", 1000));
+            assertEquals(FileStorageException.RANGE_NOT_SATISFIABLE, ex.getMessageKey());
+        }
+
+        @Test
+        void suffixNegative_throws() {
+            // "bytes=--5" is parsed as suffix with substring(1) = "-5", Long.parseLong("-5") = -5, which is <= 0
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> ByteRange.parse("bytes=--5", 1000));
+            assertEquals(FileStorageException.RANGE_NOT_SATISFIABLE, ex.getMessageKey());
+        }
     }
 }

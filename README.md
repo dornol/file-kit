@@ -15,7 +15,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.1.1'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.1.2'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -29,7 +29,7 @@ implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.1.1</version>
+    <version>0.1.2</version>
 </dependency>
 ```
 
@@ -254,7 +254,7 @@ public class S3FileStorage implements FileStorage {
 
 ### Multiple storage backends
 
-Register multiple `FileStorage` beans to support different backends simultaneously. The `FileStorageResolver` routes to the correct one based on `storageType`:
+Register multiple `FileStorage` beans to support different backends simultaneously. The `FileStorageResolver` routes to the correct one based on `storageType`. Each storage must have a unique `storageType` — duplicate types cause an `IllegalArgumentException` at startup:
 
 ```java
 public enum StorageType { LOCAL, S3 }
@@ -776,7 +776,19 @@ try (InputStream is = Files.newInputStream(Path.of("archive.zip"))) {
 }
 ```
 
-The default `ZipArchiveMetadataExtractor` uses `java.util.zip.ZipInputStream` — no external dependencies required.
+The default `ZipArchiveMetadataExtractor` uses `java.util.zip.ZipInputStream` — no external dependencies required. It includes built-in zip bomb protection with configurable limits:
+
+```java
+// Default limits: 1 GB max uncompressed size, 65,535 max entries
+ArchiveMetadataExtractor extractor = new ZipArchiveMetadataExtractor();
+
+// Custom limits
+ArchiveMetadataExtractor strict = new ZipArchiveMetadataExtractor(
+        100 * 1024 * 1024,  // 100 MB max uncompressed size
+        1000);               // max 1,000 entries
+```
+
+Archives exceeding either limit throw `FileStorageException` with `ARCHIVE_PROCESSING_FAILED`.
 
 ## File Copy/Move
 
@@ -1128,11 +1140,21 @@ The checksum-based deduplication (`findByChecksum` → `save`) is not atomic. Un
 
 file-kit does **not** handle download authorization. Access control (e.g., verifying that the requesting user owns the file) is the application's responsibility. Wrap `FileDownloadService` or `SpringDownloadService` calls with your own authorization logic.
 
+### ZIP bomb protection
+
+`ZipArchiveMetadataExtractor` enforces two limits to prevent zip bomb attacks:
+- **Maximum total uncompressed size**: 1 GB (default). Rejects archives whose cumulative uncompressed content exceeds this limit.
+- **Maximum entry count**: 65,535 (default). Rejects archives with more entries than this threshold.
+
+Both limits are configurable via the constructor. When exceeded, a `FileStorageException` with `ARCHIVE_PROCESSING_FAILED` is thrown immediately, without processing the remaining entries.
+
 ### Resource management
 
 All internal streams and temporary files are properly closed/deleted on both success and error paths. Specifically:
 - Upload temp files are cleaned up in a `finally` block, even if callbacks or storage operations fail
 - Decryption temp files are deleted if decryption fails (not just on stream close)
+- `DeleteOnCloseInputStream` cleans up the temp file even if opening the stream fails in the constructor
+- WebFlux `FilePartSource` cleans up temp files on `transferTo()` or `Files.size()` failure via `onErrorResume`
 - Range request streams are closed if byte seeking fails
 - Validation streams are closed after media type detection
 

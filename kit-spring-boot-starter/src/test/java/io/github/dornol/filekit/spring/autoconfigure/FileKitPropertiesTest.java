@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FileKitPropertiesTest {
 
@@ -22,6 +23,21 @@ class FileKitPropertiesTest {
         FileKitProperties props = new FileKitProperties();
         props.setMaxUploadSize(10 * 1024 * 1024);
         assertThat(props.getMaxUploadSize()).isEqualTo(10 * 1024 * 1024);
+    }
+
+    @Test
+    void negativeMaxUploadSize_throws() {
+        FileKitProperties props = new FileKitProperties();
+        assertThatThrownBy(() -> props.setMaxUploadSize(-1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not be negative");
+    }
+
+    @Test
+    void zeroMaxUploadSize_isAllowed() {
+        FileKitProperties props = new FileKitProperties();
+        props.setMaxUploadSize(0);
+        assertThat(props.getMaxUploadSize()).isEqualTo(0L);
     }
 
     @Test

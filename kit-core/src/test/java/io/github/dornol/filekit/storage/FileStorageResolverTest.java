@@ -10,6 +10,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FileStorageResolverTest {
 
@@ -42,6 +43,17 @@ class FileStorageResolverTest {
         FileStorageResolver resolver = new FileStorageResolver(List.of(storage));
 
         assertEquals(storage, resolver.resolve(TestStorageType.S3));
+    }
+
+    @Test
+    void duplicateStorageType_throws() {
+        FileStorage first = stubStorage(TestStorageType.LOCAL);
+        FileStorage second = stubStorage(TestStorageType.LOCAL);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> new FileStorageResolver(List.of(first, second)));
+        assertTrue(ex.getMessage().contains("Duplicate storageType"));
+        assertTrue(ex.getMessage().contains("LOCAL"));
     }
 
     private FileStorage stubStorage(Enum<?> type) {
