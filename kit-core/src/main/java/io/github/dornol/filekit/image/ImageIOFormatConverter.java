@@ -12,20 +12,19 @@ import java.io.IOException;
  */
 public class ImageIOFormatConverter implements ImageFormatConverter {
 
-    private final ImageMetadataExtractor metadataExtractor;
-
-    /** Creates a format converter with the default {@link ImageIOMetadataExtractor}. */
-    public ImageIOFormatConverter() {
-        this(new ImageIOMetadataExtractor());
+    /**
+     * Creates a format converter.
+     *
+     * @deprecated Use the no-arg constructor. The {@code metadataExtractor} parameter is unused.
+     * @param metadataExtractor ignored (kept for binary compatibility)
+     */
+    @Deprecated(forRemoval = true)
+    public ImageIOFormatConverter(ImageMetadataExtractor metadataExtractor) {
+        // metadataExtractor is not needed — output format comes from ConvertOption
     }
 
-    /**
-     * Creates a format converter with a custom metadata extractor.
-     *
-     * @param metadataExtractor extractor used to read output image metadata
-     */
-    public ImageIOFormatConverter(ImageMetadataExtractor metadataExtractor) {
-        this.metadataExtractor = metadataExtractor;
+    /** Creates a format converter. */
+    public ImageIOFormatConverter() {
     }
 
     @Override

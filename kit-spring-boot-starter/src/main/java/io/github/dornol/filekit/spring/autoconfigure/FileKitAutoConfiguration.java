@@ -258,9 +258,9 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public ImageFormatConverter imageFormatConverter(ImageMetadataExtractor metadataExtractor) {
+    public ImageFormatConverter imageFormatConverter() {
         log.debug("Registering default ImageIOFormatConverter");
-        return new ImageIOFormatConverter(metadataExtractor);
+        return new ImageIOFormatConverter();
     }
 
     @Bean

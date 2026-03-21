@@ -56,6 +56,7 @@ public final class FileResponseBuilder {
      * @param metadata file metadata (uses name, format, size)
      */
     public static FileResponseBuilder download(FileMetadata metadata) {
+        Objects.requireNonNull(metadata, "metadata");
         FileResponseBuilder builder = new FileResponseBuilder(metadata.name(), FileFetchAction.DOWNLOAD);
         builder.contentType = metadata.format().mimeType();
         builder.contentLength = metadata.size();
@@ -78,6 +79,7 @@ public final class FileResponseBuilder {
      * @param metadata file metadata (uses name, format, size)
      */
     public static FileResponseBuilder inline(FileMetadata metadata) {
+        Objects.requireNonNull(metadata, "metadata");
         FileResponseBuilder builder = new FileResponseBuilder(metadata.name(), FileFetchAction.INLINE);
         builder.contentType = metadata.format().mimeType();
         builder.contentLength = metadata.size();
