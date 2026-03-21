@@ -88,6 +88,10 @@ final class ImageIOUtils {
 
         ImageWriter writer = writers.next();
         try (ImageOutputStream ios = ImageIO.createImageOutputStream(baos)) {
+            if (ios == null) {
+                throw new FileStorageException(FileStorageException.IMAGE_PROCESSING_FAILED,
+                        "Unable to create image output stream");
+            }
             writer.setOutput(ios);
 
             ImageWriteParam param = writer.getDefaultWriteParam();
