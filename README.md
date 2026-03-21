@@ -199,17 +199,57 @@ public FileStorage memoryStorage() {
 }
 ```
 
-### Custom storage (S3, GCS, etc.)
+### Custom storage (S3 example)
 
-Implement `FileStorage` to integrate with any storage backend. `FileUploadCommand.content()` provides an `InputStream` for streaming — no need to load the entire file into memory:
+Implement `FileStorage` to integrate with any storage backend. Below is a full S3 implementation with error handling and pre-signed URL support.
+
+#### 1. Add AWS SDK dependency
+
+```groovy
+// Gradle
+implementation platform('software.amazon.awssdk:bom:2.31.x')
+implementation 'software.amazon.awssdk:s3'
+```
+
+```xml
+<!-- Maven -->
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>bom</artifactId>
+            <version>2.31.x</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+<dependency>
+    <groupId>software.amazon.awssdk</groupId>
+    <artifactId>s3</artifactId>
+</dependency>
+```
+
+#### 2. Define storage type
 
 ```java
-public enum StorageType { S3 }
+public enum StorageType { LOCAL, S3 }
+```
 
-@Component
+#### 3. Implement FileStorage
+
+`FileUploadCommand.content()` provides an `InputStream` for streaming — no need to load the entire file into memory:
+
+```java
 public class S3FileStorage implements FileStorage {
 
-    private final S3Client s3;
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
+
+    public S3FileStorage(S3Client s3Client, S3Presigner s3Presigner) {
+        this.s3Client = s3Client;
+        this.s3Presigner = s3Presigner;
+    }
 
     @Override
     public Enum<?> getStorageType() { return StorageType.S3; }
@@ -217,40 +257,129 @@ public class S3FileStorage implements FileStorage {
     @Override
     public FileLocation upload(FileUploadCommand command) {
         String objectKey = command.key() + "." + command.extension();
-        s3.putObject(
-                PutObjectRequest.builder()
-                        .bucket(command.bucket())
-                        .key(objectKey)
-                        .contentType(command.mimeType())
-                        .contentLength(command.contentLength())
-                        .build(),
-                RequestBody.fromInputStream(command.content(), command.contentLength()));
-        return new FileLocation(command.bucket(), objectKey, StorageType.S3);
-    }
-
-    @Override
-    public void delete(FileMetadata metadata) {
-        s3.deleteObject(DeleteObjectRequest.builder()
-                .bucket(metadata.location().bucket())
-                .key(metadata.location().objectKey())
-                .build());
+        try {
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(command.bucket())
+                            .key(objectKey)
+                            .contentType(command.mimeType())
+                            .contentLength(command.contentLength())
+                            .build(),
+                    RequestBody.fromInputStream(command.content(), command.contentLength()));
+            return new FileLocation(command.bucket(), objectKey, StorageType.S3);
+        } catch (Exception e) {
+            throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
+                    "S3 upload failed: " + objectKey, e);
+        }
     }
 
     @Override
     public InputStream load(FileMetadata metadata) {
-        return s3.getObject(GetObjectRequest.builder()
-                .bucket(metadata.location().bucket())
-                .key(metadata.location().objectKey())
-                .build());
+        try {
+            return s3Client.getObject(GetObjectRequest.builder()
+                    .bucket(metadata.location().bucket())
+                    .key(metadata.location().objectKey())
+                    .build());
+        } catch (Exception e) {
+            throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
+                    "S3 download failed: " + metadata.location().objectKey(), e);
+        }
+    }
+
+    @Override
+    public void delete(FileMetadata metadata) {
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(metadata.location().bucket())
+                    .key(metadata.location().objectKey())
+                    .build());
+        } catch (Exception e) {
+            throw new FileStorageException(FileStorageException.DELETE_FAILED,
+                    "S3 delete failed: " + metadata.location().objectKey(), e);
+        }
     }
 
     @Override
     public String resolveUri(FileMetadata metadata) {
-        return "https://" + metadata.location().bucket()
-                + ".s3.amazonaws.com/" + metadata.location().objectKey();
+        return "/files/" + metadata.key() + "/download";
+    }
+
+    @Override
+    public String generatePresignedUrl(FileMetadata metadata, Duration expiration) {
+        try {
+            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(expiration)
+                    .getObjectRequest(GetObjectRequest.builder()
+                            .bucket(metadata.location().bucket())
+                            .key(metadata.location().objectKey())
+                            .build())
+                    .build();
+            return s3Presigner.presignGetObject(presignRequest).url().toString();
+        } catch (Exception e) {
+            throw new FileStorageException(FileStorageException.PRESIGNED_URL_FAILED,
+                    "Failed to generate pre-signed URL: " + metadata.location().objectKey(), e);
+        }
     }
 }
 ```
+
+#### 4. Configure S3Client and register the bean
+
+```java
+@Configuration
+public class S3Config {
+
+    @Bean
+    public S3Client s3Client(
+            @Value("${app.s3.endpoint}") String endpoint,
+            @Value("${app.s3.region}") String region,
+            @Value("${app.s3.access-key}") String accessKey,
+            @Value("${app.s3.secret-key}") String secretKey) {
+        return S3Client.builder()
+                .endpointOverride(URI.create(endpoint))
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(accessKey, secretKey)))
+                .forcePathStyle(true)
+                .build();
+    }
+
+    @Bean
+    public S3Presigner s3Presigner(
+            @Value("${app.s3.endpoint}") String endpoint,
+            @Value("${app.s3.region}") String region,
+            @Value("${app.s3.access-key}") String accessKey,
+            @Value("${app.s3.secret-key}") String secretKey) {
+        return S3Presigner.builder()
+                .endpointOverride(URI.create(endpoint))
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(accessKey, secretKey)))
+                .build();
+    }
+
+    @Bean
+    public FileStorage s3FileStorage(S3Client s3Client, S3Presigner s3Presigner) {
+        return new S3FileStorage(s3Client, s3Presigner);
+    }
+}
+```
+
+```yaml
+# application.yml
+app:
+  s3:
+    endpoint: http://localhost:9000   # MinIO
+    region: us-east-1
+    access-key: minioadmin
+    secret-key: minioadmin
+```
+
+> **S3-compatible services:** This implementation works with any S3-compatible storage — [MinIO](https://min.io/), [Cloudflare R2](https://developers.cloudflare.com/r2/), [Wasabi](https://wasabi.com/), etc. Just change the `endpoint` and credentials. For AWS S3, remove `endpointOverride()` and `forcePathStyle()`, and use the default credential provider chain instead of static credentials.
+
+#### Implementing other backends (GCS, Azure Blob, etc.)
+
+The same pattern applies to any storage backend — implement the five `FileStorage` methods and register as a Spring bean. The `example` module contains a working S3 implementation for reference.
 
 ### Multiple storage backends
 
@@ -299,21 +428,7 @@ Generate time-limited direct-access URLs for storage backends that support it (e
 String url = downloadService.generatePresignedUrl(fileKey, Duration.ofHours(1));
 ```
 
-The default `FileStorage` implementation throws `UnsupportedOperationException`. Override `generatePresignedUrl()` in your storage implementation:
-
-```java
-@Override
-public String generatePresignedUrl(FileMetadata metadata, Duration expiration) {
-    GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-            .signatureDuration(expiration)
-            .getObjectRequest(GetObjectRequest.builder()
-                    .bucket(metadata.location().bucket())
-                    .key(metadata.location().objectKey())
-                    .build())
-            .build();
-    return s3Presigner.presignGetObject(presignRequest).url().toString();
-}
-```
+The default `FileStorage.generatePresignedUrl()` throws `UnsupportedOperationException`. See the [S3 example above](#3-implement-filestorage) for a full implementation.
 
 ### Range request (206 Partial Content)
 
@@ -1052,7 +1167,13 @@ FileEncryptor encryptor = new NoOpFileEncryptor(); // or your custom implementat
 
 ## Running the Example
 
-The `example` module is a full Spring Boot app with JPA (PostgreSQL), S3 (MinIO), and a web UI.
+The `example` module is a full Spring Boot app demonstrating how to wire up all the SPI implementations:
+
+| SPI Interface | Example Implementation | Notes |
+|---------------|----------------------|-------|
+| `FileStorage` | `LocalFileStorage`, `S3FileStorage` | Both registered — dual storage |
+| `FileMetadataRepository` | `FileMetadataRepositoryAdapter` | JPA/PostgreSQL-backed |
+| `FileFormatExtractor` | `TikaFileFormatExtractor` | Apache Tika-based |
 
 ```bash
 # Start PostgreSQL + MinIO
