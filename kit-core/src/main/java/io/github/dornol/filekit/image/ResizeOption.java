@@ -2,6 +2,8 @@ package io.github.dornol.filekit.image;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
+
 /**
  * Options for image resizing.
  *
@@ -28,6 +30,7 @@ public record ResizeOption(
         if (targetHeight <= 0) {
             throw new IllegalArgumentException("targetHeight must be positive: " + targetHeight);
         }
+        Objects.requireNonNull(scaleMode, "scaleMode");
         if (quality < 0.0f || quality > 1.0f) {
             throw new IllegalArgumentException("quality must be between 0.0 and 1.0: " + quality);
         }

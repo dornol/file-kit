@@ -152,9 +152,10 @@ public class ImageController {
             default -> "application/octet-stream";
         };
 
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(mediaType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+        return io.github.dornol.filekit.spring.download.FileResponseBuilder.inline(filename)
+                .contentType(mediaType)
+                .contentLength(data.length)
+                .toResponseBuilder()
                 .header("X-Image-Width", String.valueOf(metadata.width()))
                 .header("X-Image-Height", String.valueOf(metadata.height()))
                 .header("X-Image-Format", metadata.format())

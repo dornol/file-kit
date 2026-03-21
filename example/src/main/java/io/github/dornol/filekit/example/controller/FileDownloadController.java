@@ -98,8 +98,24 @@ public class FileDownloadController {
             @PathVariable String fileKey,
             @RequestHeader(value = "Range", required = false) String rangeHeader) {
         DownloadResult result = fileDownloadService.download(fileKey);
+
+        if (rangeHeader != null) {
+            var byteRange = io.github.dornol.filekit.domain.ByteRange.parse(rangeHeader, result.metadata().size());
+            try {
+                java.io.InputStream content = result.content();
+                content.skipNBytes(byteRange.start());
+                java.io.InputStream bounded = new io.github.dornol.filekit.io.BoundedInputStream(content, byteRange.length());
+                return FileResponseBuilder.inline(result.metadata())
+                        .range(rangeHeader)
+                        .body(new InputStreamResource(bounded));
+            } catch (java.io.IOException e) {
+                throw new io.github.dornol.filekit.storage.FileStorageException(
+                        io.github.dornol.filekit.storage.FileStorageException.DOWNLOAD_FAILED,
+                        "Failed to seek to range start", e);
+            }
+        }
+
         return FileResponseBuilder.inline(result.metadata())
-                .range(rangeHeader)
                 .body(new InputStreamResource(result.content()));
     }
 

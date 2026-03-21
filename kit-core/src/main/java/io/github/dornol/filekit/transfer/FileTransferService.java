@@ -106,8 +106,8 @@ public class FileTransferService extends AbstractFileOperationService {
         FileMetadata copied = doCopy(source, targetStorageType, targetBucket);
 
         try {
-            resolveStorage(source).delete(source);
             metadataRepository.deleteByKey(fileKey);
+            resolveStorage(source).delete(source);
             log.info("File moved: sourceKey={}, newKey={}", fileKey, copied.key());
         } catch (Exception e) {
             log.warn("Source deletion failed after copy (newKey={}): {}", copied.key(), e.getMessage());

@@ -173,6 +173,12 @@ public class FileUploadService {
      * and the exception is wrapped in a {@link RuntimeException} (or re-thrown as-is
      * if it is already unchecked).</p>
      *
+     * <p><strong>Quota note:</strong> If the callback fails, the file is removed from
+     * storage but the quota usage is <em>not</em> automatically rolled back.
+     * If your {@link io.github.dornol.filekit.spi.QuotaUsageProvider} tracks usage
+     * independently (e.g. via a database counter), you are responsible for
+     * compensating the usage in your error-handling logic.</p>
+     *
      * @param fileSource  the file to upload
      * @param storageType storage backend to use
      * @param bucket      target bucket
