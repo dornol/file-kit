@@ -30,7 +30,7 @@ public class MultipartFileValidator extends AbstractMultipartFileValidator<Multi
 
     @Override
     public boolean isFileSizeExceeded(MultipartFile value) {
-        return helper.isFileSizeExceeded(new MultipartFileSource(value), getMaxSize());
+        return helper.isFileSizeExceeded(new MultipartFileSource(value), support.getMaxSize());
     }
 
     @Override
@@ -40,12 +40,12 @@ public class MultipartFileValidator extends AbstractMultipartFileValidator<Multi
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(MultipartFile value) {
-        return helper.validateMediaTypeAndExtension(new MultipartFileSource(value), getAllowedMediaTypes());
+        return helper.validateMediaTypeAndExtension(new MultipartFileSource(value), support.getAllowedMediaTypes());
     }
 
     @Override
     public @Nullable String validateImageDimensions(MultipartFile value) {
         return helper.validateImageDimensions(new MultipartFileSource(value),
-                getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+                support.getMinWidth(), support.getMaxWidth(), support.getMinHeight(), support.getMaxHeight());
     }
 }

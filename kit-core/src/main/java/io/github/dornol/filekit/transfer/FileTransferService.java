@@ -34,20 +34,22 @@ public class FileTransferService extends AbstractFileOperationService {
     private final FileEventPublisher eventPublisher;
 
     /**
+     * Creates a builder with the two required dependencies.
+     *
      * @param metadataRepository repository for file metadata lookup and persistence
      * @param storageResolver    resolver to find storage backends by type
+     * @return a new builder instance
      */
+    public static Builder builder(FileMetadataRepository metadataRepository,
+                                  FileStorageResolver storageResolver) {
+        return new Builder(metadataRepository, storageResolver);
+    }
+
     public FileTransferService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver) {
         this(metadataRepository, storageResolver, null, new FileEventPublisher(List.of()));
     }
 
-    /**
-     * @param metadataRepository repository for file metadata lookup and persistence
-     * @param storageResolver    resolver to find storage backends by type
-     * @param quotaChecker       optional quota checker for target bucket
-     * @param eventPublisher     publisher for file lifecycle events
-     */
     public FileTransferService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver,
                                @Nullable QuotaChecker quotaChecker,
@@ -55,6 +57,42 @@ public class FileTransferService extends AbstractFileOperationService {
         super(metadataRepository, storageResolver);
         this.quotaChecker = quotaChecker;
         this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
+    }
+
+    private FileTransferService(Builder b) {
+        super(b.metadataRepository, b.storageResolver);
+        this.quotaChecker = b.quotaChecker;
+        this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
+    }
+
+    public static final class Builder {
+
+        private final FileMetadataRepository metadataRepository;
+        private final FileStorageResolver storageResolver;
+        private @Nullable QuotaChecker quotaChecker;
+        private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
+
+        private Builder(FileMetadataRepository metadataRepository,
+                        FileStorageResolver storageResolver) {
+            this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
+            this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
+        }
+
+        /** @param quotaChecker optional quota checker for target bucket */
+        public Builder quotaChecker(@Nullable QuotaChecker quotaChecker) {
+            this.quotaChecker = quotaChecker;
+            return this;
+        }
+
+        /** @param eventPublisher publisher for file lifecycle events */
+        public Builder eventPublisher(FileEventPublisher eventPublisher) {
+            this.eventPublisher = eventPublisher;
+            return this;
+        }
+
+        public FileTransferService build() {
+            return new FileTransferService(this);
+        }
     }
 
     /**

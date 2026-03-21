@@ -29,7 +29,7 @@ public class FileSourceValidator extends AbstractFileValidator<FileSource> {
 
     @Override
     public boolean isFileSizeExceeded(FileSource value) {
-        return helper.isFileSizeExceeded(value, getMaxSize());
+        return helper.isFileSizeExceeded(value, support.getMaxSize());
     }
 
     @Override
@@ -39,11 +39,11 @@ public class FileSourceValidator extends AbstractFileValidator<FileSource> {
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(FileSource value) {
-        return helper.validateMediaTypeAndExtension(value, getAllowedMediaTypes());
+        return helper.validateMediaTypeAndExtension(value, support.getAllowedMediaTypes());
     }
 
     @Override
     public @Nullable String validateImageDimensions(FileSource value) {
-        return helper.validateImageDimensions(value, getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+        return helper.validateImageDimensions(value, support.getMinWidth(), support.getMaxWidth(), support.getMinHeight(), support.getMaxHeight());
     }
 }

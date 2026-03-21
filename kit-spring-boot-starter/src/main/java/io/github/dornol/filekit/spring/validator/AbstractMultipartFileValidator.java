@@ -2,12 +2,9 @@ package io.github.dornol.filekit.spring.validator;
 
 import io.github.dornol.filekit.validator.BaseFileValidationSupport;
 import io.github.dornol.filekit.validator.FileValidationCallbacks;
-import io.github.dornol.filekit.validator.SafeMediaType;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import org.jspecify.annotations.Nullable;
-
-import java.util.Set;
 
 /**
  * Base class for {@link ValidMultipartFile} constraint validators.
@@ -22,7 +19,8 @@ import java.util.Set;
  */
 public abstract class AbstractMultipartFileValidator<T> implements ConstraintValidator<ValidMultipartFile, T>, FileValidationCallbacks<T> {
 
-    private final BaseFileValidationSupport<T> support;
+    /** Shared validation support — subclasses use this to access annotation configuration. */
+    protected final BaseFileValidationSupport<T> support;
 
     protected AbstractMultipartFileValidator() {
         this.support = new BaseFileValidationSupport<>(this);
@@ -39,32 +37,6 @@ public abstract class AbstractMultipartFileValidator<T> implements ConstraintVal
     @Override
     public boolean isValid(@Nullable T value, ConstraintValidatorContext context) {
         return support.isValid(value, context);
-    }
-
-    /** Returns the set of allowed media types configured on the annotation. */
-    protected Set<SafeMediaType> getAllowedMediaTypes() {
-        return support.getAllowedMediaTypes();
-    }
-
-    /** Returns the maximum file size configured on the annotation (0 = no limit). */
-    protected long getMaxSize() {
-        return support.getMaxSize();
-    }
-
-    protected int getMinWidth() {
-        return support.getMinWidth();
-    }
-
-    protected int getMaxWidth() {
-        return support.getMaxWidth();
-    }
-
-    protected int getMinHeight() {
-        return support.getMinHeight();
-    }
-
-    protected int getMaxHeight() {
-        return support.getMaxHeight();
     }
 
 }

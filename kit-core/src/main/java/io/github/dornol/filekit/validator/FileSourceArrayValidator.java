@@ -31,7 +31,7 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
 
     @Override
     public boolean isFileSizeExceeded(FileSource[] value) {
-        return helper.isAnyFileSizeExceeded(Arrays.asList(value), getMaxSize());
+        return helper.isAnyFileSizeExceeded(Arrays.asList(value), support.getMaxSize());
     }
 
     @Override
@@ -41,11 +41,11 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(FileSource[] value) {
-        return helper.validateAllMediaTypeAndExtension(Arrays.asList(value), getAllowedMediaTypes());
+        return helper.validateAllMediaTypeAndExtension(Arrays.asList(value), support.getAllowedMediaTypes());
     }
 
     @Override
     public @Nullable String validateImageDimensions(FileSource[] value) {
-        return helper.validateAllImageDimensions(Arrays.asList(value), getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+        return helper.validateAllImageDimensions(Arrays.asList(value), support.getMinWidth(), support.getMaxWidth(), support.getMinHeight(), support.getMaxHeight());
     }
 }

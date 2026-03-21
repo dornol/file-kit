@@ -31,7 +31,7 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
 
     @Override
     public boolean isFileSizeExceeded(Collection<FileSource> value) {
-        return helper.isAnyFileSizeExceeded(value, getMaxSize());
+        return helper.isAnyFileSizeExceeded(value, support.getMaxSize());
     }
 
     @Override
@@ -41,11 +41,11 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(Collection<FileSource> value) {
-        return helper.validateAllMediaTypeAndExtension(value, getAllowedMediaTypes());
+        return helper.validateAllMediaTypeAndExtension(value, support.getAllowedMediaTypes());
     }
 
     @Override
     public @Nullable String validateImageDimensions(Collection<FileSource> value) {
-        return helper.validateAllImageDimensions(value, getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+        return helper.validateAllImageDimensions(value, support.getMinWidth(), support.getMaxWidth(), support.getMinHeight(), support.getMaxHeight());
     }
 }

@@ -34,7 +34,7 @@ public class MultipartFileCollectionValidator extends AbstractMultipartFileValid
 
     @Override
     public boolean isFileSizeExceeded(Collection<MultipartFile> value) {
-        return helper.isAnyFileSizeExceeded(toSources(value), getMaxSize());
+        return helper.isAnyFileSizeExceeded(toSources(value), support.getMaxSize());
     }
 
     @Override
@@ -44,13 +44,13 @@ public class MultipartFileCollectionValidator extends AbstractMultipartFileValid
 
     @Override
     public @Nullable String validateMediaTypeAndExtension(Collection<MultipartFile> value) {
-        return helper.validateAllMediaTypeAndExtension(toSources(value), getAllowedMediaTypes());
+        return helper.validateAllMediaTypeAndExtension(toSources(value), support.getAllowedMediaTypes());
     }
 
     @Override
     public @Nullable String validateImageDimensions(Collection<MultipartFile> value) {
         return helper.validateAllImageDimensions(toSources(value),
-                getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+                support.getMinWidth(), support.getMaxWidth(), support.getMinHeight(), support.getMaxHeight());
     }
 
     private static List<FileSource> toSources(Collection<MultipartFile> files) {

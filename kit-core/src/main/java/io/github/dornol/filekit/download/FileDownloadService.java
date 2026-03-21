@@ -35,6 +35,18 @@ public class FileDownloadService extends AbstractFileOperationService {
     private final FileEncryptor fileEncryptor;
     private final FileEventPublisher eventPublisher;
 
+    /**
+     * Creates a builder with the two required dependencies.
+     *
+     * @param metadataRepository repository for file metadata lookup
+     * @param storageResolver    resolver to find storage backends
+     * @return a new builder instance
+     */
+    public static Builder builder(FileMetadataRepository metadataRepository,
+                                  FileStorageResolver storageResolver) {
+        return new Builder(metadataRepository, storageResolver);
+    }
+
     public FileDownloadService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver) {
         this(metadataRepository, storageResolver, new NoOpFileEncryptor(), new FileEventPublisher(List.of()));
@@ -46,14 +58,6 @@ public class FileDownloadService extends AbstractFileOperationService {
         this(metadataRepository, storageResolver, fileEncryptor, new FileEventPublisher(List.of()));
     }
 
-    /**
-     * Creates a download service with the specified encryptor and event publisher.
-     *
-     * @param metadataRepository repository for file metadata lookup
-     * @param storageResolver    resolver to find storage backends
-     * @param fileEncryptor      encryptor for at-rest decryption
-     * @param eventPublisher     publisher for file lifecycle events
-     */
     public FileDownloadService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver,
                                FileEncryptor fileEncryptor,
@@ -61,6 +65,42 @@ public class FileDownloadService extends AbstractFileOperationService {
         super(metadataRepository, storageResolver);
         this.fileEncryptor = Objects.requireNonNull(fileEncryptor, "fileEncryptor");
         this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
+    }
+
+    private FileDownloadService(Builder b) {
+        super(b.metadataRepository, b.storageResolver);
+        this.fileEncryptor = Objects.requireNonNull(b.fileEncryptor, "fileEncryptor");
+        this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
+    }
+
+    public static final class Builder {
+
+        private final FileMetadataRepository metadataRepository;
+        private final FileStorageResolver storageResolver;
+        private FileEncryptor fileEncryptor = new NoOpFileEncryptor();
+        private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
+
+        private Builder(FileMetadataRepository metadataRepository,
+                        FileStorageResolver storageResolver) {
+            this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
+            this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
+        }
+
+        /** @param fileEncryptor encryptor for at-rest decryption */
+        public Builder fileEncryptor(FileEncryptor fileEncryptor) {
+            this.fileEncryptor = fileEncryptor;
+            return this;
+        }
+
+        /** @param eventPublisher publisher for file lifecycle events */
+        public Builder eventPublisher(FileEventPublisher eventPublisher) {
+            this.eventPublisher = eventPublisher;
+            return this;
+        }
+
+        public FileDownloadService build() {
+            return new FileDownloadService(this);
+        }
     }
 
     public DownloadResult download(String fileKey) {
