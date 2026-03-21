@@ -75,8 +75,8 @@ public class ImageIOResizer implements ImageResizer {
 
     private BufferedImage resizeCover(BufferedImage source, int srcW, int srcH, int targetW, int targetH) {
         double scale = Math.max((double) targetW / srcW, (double) targetH / srcH);
-        int scaledW = (int) Math.round(srcW * scale);
-        int scaledH = (int) Math.round(srcH * scale);
+        int scaledW = Math.max(targetW, (int) Math.round(srcW * scale));
+        int scaledH = Math.max(targetH, (int) Math.round(srcH * scale));
         BufferedImage scaled = drawScaled(source, scaledW, scaledH);
 
         // Center crop to target dimensions

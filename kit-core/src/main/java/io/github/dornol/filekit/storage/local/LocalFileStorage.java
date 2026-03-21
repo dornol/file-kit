@@ -100,7 +100,7 @@ public class LocalFileStorage implements FileStorage {
         } catch (IOException e) {
             log.error("Failed to write file: {}", target, e);
             throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
-                    "Failed to write file");
+                    "Failed to write file", e);
         }
         return new FileLocation(command.bucket(), objectKey, storageType);
     }
@@ -113,7 +113,7 @@ public class LocalFileStorage implements FileStorage {
         } catch (IOException e) {
             log.error("Failed to delete file: {}", filePath, e);
             throw new FileStorageException(FileStorageException.DELETE_FAILED,
-                    "Failed to delete file");
+                    "Failed to delete file", e);
         }
     }
 
@@ -126,7 +126,7 @@ public class LocalFileStorage implements FileStorage {
         } catch (IOException e) {
             log.error("Failed to read file: {}", filePath, e);
             throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
-                    "Failed to read file");
+                    "Failed to read file", e);
         }
     }
 
@@ -155,19 +155,25 @@ public class LocalFileStorage implements FileStorage {
 
     /**
      * Validates that an existing file's real path (resolving symlinks) is within baseDir.
+     *
+     * @throws FileStorageException if the file does not exist or the resolved path escapes baseDir
      */
     private void validateExistingPath(Path path) {
-        if (Files.exists(path)) {
-            try {
-                Path realPath = path.toRealPath();
-                if (!realPath.startsWith(baseDir.toRealPath())) {
-                    throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
-                            "Path traversal detected");
-                }
-            } catch (IOException e) {
+        if (!Files.exists(path)) {
+            throw new FileStorageException(FileStorageException.FILE_NOT_FOUND,
+                    "File not found: " + path.getFileName());
+        }
+        try {
+            Path realPath = path.toRealPath();
+            if (!realPath.startsWith(baseDir.toRealPath())) {
                 throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
-                        "Failed to resolve file path");
+                        "Path traversal detected");
             }
+        } catch (FileStorageException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
+                    "Failed to resolve file path", e);
         }
     }
 

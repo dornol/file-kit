@@ -115,6 +115,9 @@ public class FileUploadService {
 
         /** @param maxUploadSize maximum file size in bytes (0 = unlimited) */
         public Builder maxUploadSize(long maxUploadSize) {
+            if (maxUploadSize < 0) {
+                throw new IllegalArgumentException("maxUploadSize must not be negative: " + maxUploadSize);
+            }
             this.maxUploadSize = maxUploadSize;
             return this;
         }

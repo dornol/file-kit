@@ -68,7 +68,20 @@ public class SpringDownloadService {
                 ? getInputStream(springStorage.loadResource(metadata))
                 : storage.load(metadata);
 
-        return new InputStreamResource(decryptToStream(encrypted));
+        try {
+            return new InputStreamResource(decryptToStream(encrypted));
+        } catch (Exception e) {
+            closeQuietly(encrypted);
+            throw e;
+        }
+    }
+
+    private static void closeQuietly(InputStream stream) {
+        try {
+            stream.close();
+        } catch (IOException ignored) {
+            // best-effort cleanup
+        }
     }
 
     private static InputStream getInputStream(Resource resource) {
@@ -110,7 +123,12 @@ public class SpringDownloadService {
 
         DeleteOnCloseInputStream(Path tempFile) throws IOException {
             this.tempFile = tempFile;
-            this.delegate = Files.newInputStream(tempFile);
+            try {
+                this.delegate = Files.newInputStream(tempFile);
+            } catch (IOException e) {
+                Files.deleteIfExists(tempFile);
+                throw e;
+            }
         }
 
         @Override

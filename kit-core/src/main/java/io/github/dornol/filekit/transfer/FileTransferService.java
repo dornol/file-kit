@@ -86,6 +86,12 @@ public class FileTransferService extends AbstractFileOperationService {
      *
      * <p>Copies the file to the target, then deletes the source file and its metadata.</p>
      *
+     * <p><strong>Partial failure:</strong> If the copy succeeds but source deletion fails,
+     * a {@link FileStorageException} with code {@link FileStorageException#MOVE_FAILED}
+     * is thrown. In this case the copied file and its metadata already exist in the target.
+     * The exception message contains the source file key; the caller should inspect the
+     * target bucket to find and clean up the orphaned copy if needed.</p>
+     *
      * @param fileKey           key of the source file
      * @param targetStorageType target storage backend
      * @param targetBucket      target bucket name

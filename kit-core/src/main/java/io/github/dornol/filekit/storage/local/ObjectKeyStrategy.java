@@ -57,10 +57,16 @@ public interface ObjectKeyStrategy {
         }
         return (key, ext) -> {
             String normalized = key.replace("-", "");
+            if (normalized.length() < depth * 2) {
+                throw new IllegalArgumentException(
+                        "Key too short for hash-prefixed depth " + depth
+                                + ": need at least " + (depth * 2)
+                                + " hex characters, got " + normalized.length());
+            }
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < depth; i++) {
                 int start = i * 2;
-                sb.append(normalized, start, Math.min(start + 2, normalized.length())).append('/');
+                sb.append(normalized, start, start + 2).append('/');
             }
             sb.append(key).append('.').append(ext);
             return sb.toString();
