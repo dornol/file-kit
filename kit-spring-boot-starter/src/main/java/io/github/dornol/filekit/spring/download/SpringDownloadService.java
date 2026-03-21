@@ -1,6 +1,8 @@
 package io.github.dornol.filekit.spring.download;
 
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.io.DeleteOnCloseInputStream;
+import io.github.dornol.filekit.io.IoUtils;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
@@ -71,16 +73,8 @@ public class SpringDownloadService {
         try {
             return new InputStreamResource(decryptToStream(encrypted));
         } catch (Exception e) {
-            closeQuietly(encrypted);
+            IoUtils.closeQuietly(encrypted);
             throw e;
-        }
-    }
-
-    private static void closeQuietly(InputStream stream) {
-        try {
-            stream.close();
-        } catch (IOException ignored) {
-            // best-effort cleanup
         }
     }
 
@@ -113,41 +107,6 @@ public class SpringDownloadService {
             }
             throw new FileStorageException(FileStorageException.DECRYPTION_FAILED,
                     "Failed to decrypt file content", e);
-        }
-    }
-
-    private static class DeleteOnCloseInputStream extends InputStream {
-
-        private final InputStream delegate;
-        private final Path tempFile;
-
-        DeleteOnCloseInputStream(Path tempFile) throws IOException {
-            this.tempFile = tempFile;
-            try {
-                this.delegate = Files.newInputStream(tempFile);
-            } catch (IOException e) {
-                Files.deleteIfExists(tempFile);
-                throw e;
-            }
-        }
-
-        @Override
-        public int read() throws IOException {
-            return delegate.read();
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            return delegate.read(b, off, len);
-        }
-
-        @Override
-        public void close() throws IOException {
-            try {
-                delegate.close();
-            } finally {
-                Files.deleteIfExists(tempFile);
-            }
         }
     }
 

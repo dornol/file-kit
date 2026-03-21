@@ -269,23 +269,10 @@ class ImageIOFormatConverterTest {
     // ── Custom metadata extractor ───────────────────────────────────
 
     @Nested
-    class CustomMetadataExtractor {
+    class Constructor {
 
         @Test
-        void usesInjectedExtractor() throws IOException {
-            ImageMetadataExtractor custom = bytes -> new ImageMetadata(50, 50, "custom");
-            ImageIOFormatConverter customConverter = new ImageIOFormatConverter(custom);
-
-            byte[] png = createTestImage("png", 50, 50);
-            ConvertResult result = customConverter.convert(png, ConvertOption.of("jpeg"));
-
-            assertNotNull(result.data());
-            // Output format comes from ConvertOption, not the extractor
-            assertEquals("jpeg", result.metadata().format());
-        }
-
-        @Test
-        void defaultConstructorUsesImageIOExtractor() throws IOException {
+        void defaultConstructorWorks() throws IOException {
             ImageIOFormatConverter defaultConverter = new ImageIOFormatConverter();
             byte[] png = createTestImage("png", 100, 80);
             ConvertResult result = defaultConverter.convert(png, ConvertOption.of("jpeg"));

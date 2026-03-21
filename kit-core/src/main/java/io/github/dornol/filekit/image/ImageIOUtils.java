@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.image;
 
 import io.github.dornol.filekit.storage.FileStorageException;
+import org.jspecify.annotations.Nullable;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -9,6 +10,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
@@ -20,6 +22,46 @@ import java.util.Iterator;
 final class ImageIOUtils {
 
     private ImageIOUtils() {}
+
+    /**
+     * Reads image bytes into a {@link BufferedImage}, throwing a consistent exception on failure.
+     *
+     * @param imageBytes raw image bytes
+     * @return decoded image, never {@code null}
+     * @throws FileStorageException if the image cannot be read
+     */
+    static BufferedImage readImage(byte[] imageBytes) {
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (image == null) {
+                throw new FileStorageException(FileStorageException.IMAGE_PROCESSING_FAILED,
+                        "Unable to read image");
+            }
+            return image;
+        } catch (FileStorageException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new FileStorageException(FileStorageException.IMAGE_PROCESSING_FAILED,
+                    "Failed to read image", e);
+        }
+    }
+
+    /**
+     * Resolves the output format: uses the requested format if non-null,
+     * otherwise extracts the original format from the image bytes.
+     *
+     * @param requestedFormat explicit format, or {@code null} to detect from source
+     * @param extractor       metadata extractor for format detection
+     * @param imageBytes      source image bytes (used when requestedFormat is null)
+     * @return resolved format name (e.g. "png", "jpeg")
+     */
+    static String resolveOutputFormat(@Nullable String requestedFormat,
+                                      ImageMetadataExtractor extractor, byte[] imageBytes) {
+        if (requestedFormat != null) {
+            return requestedFormat;
+        }
+        return extractor.extract(imageBytes).format();
+    }
 
     /**
      * Writes a {@link BufferedImage} to a byte array in the specified format and quality.

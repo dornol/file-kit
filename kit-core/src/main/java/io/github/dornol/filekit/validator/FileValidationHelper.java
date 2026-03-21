@@ -91,7 +91,10 @@ public class FileValidationHelper {
      * @param value   the file to check
      * @param allowed set of allowed media types
      * @return {@code true} if the media type is allowed
+     * @deprecated Use {@link #validateMediaTypeAndExtension(FileSource, Set)} instead,
+     *             which validates both media type and extension in a single pass.
      */
+    @Deprecated(forRemoval = true)
     public boolean isValidMediaType(FileSource value, Set<SafeMediaType> allowed) {
         Objects.requireNonNull(value, "value");
         Objects.requireNonNull(allowed, "allowed");

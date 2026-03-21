@@ -2,10 +2,8 @@ package io.github.dornol.filekit.image;
 
 import io.github.dornol.filekit.storage.FileStorageException;
 
-import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 /**
@@ -32,14 +30,8 @@ public class ImageIOResizer implements ImageResizer {
     @Override
     public ResizeResult resize(byte[] imageBytes, ResizeOption option) {
         try {
-            BufferedImage source = ImageIO.read(new ByteArrayInputStream(imageBytes));
-            if (source == null) {
-                throw new FileStorageException(FileStorageException.IMAGE_PROCESSING_FAILED,
-                        "Unable to read image");
-            }
-
-            ImageMetadata sourceMeta = metadataExtractor.extract(imageBytes);
-            String outputFormat = option.outputFormat() != null ? option.outputFormat() : sourceMeta.format();
+            BufferedImage source = ImageIOUtils.readImage(imageBytes);
+            String outputFormat = ImageIOUtils.resolveOutputFormat(option.outputFormat(), metadataExtractor, imageBytes);
 
             BufferedImage resized = applyResize(source, option);
 

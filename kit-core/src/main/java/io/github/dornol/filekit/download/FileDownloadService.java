@@ -3,6 +3,8 @@ package io.github.dornol.filekit.download;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.io.DeleteOnCloseInputStream;
+import io.github.dornol.filekit.io.IoUtils;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
@@ -75,16 +77,8 @@ public class FileDownloadService extends AbstractFileOperationService {
             eventPublisher.fireDownloaded(metadata);
             return new DownloadResult(metadata, content);
         } catch (Exception e) {
-            closeQuietly(content);
+            IoUtils.closeQuietly(content);
             throw e;
-        }
-    }
-
-    private static void closeQuietly(InputStream stream) {
-        try {
-            stream.close();
-        } catch (IOException ignored) {
-            // best-effort cleanup
         }
     }
 
@@ -120,44 +114,6 @@ public class FileDownloadService extends AbstractFileOperationService {
             }
             throw new FileStorageException(FileStorageException.DECRYPTION_FAILED,
                     "Failed to decrypt file content", e);
-        }
-    }
-
-    /**
-     * InputStream that deletes the backing temp file when closed.
-     */
-    private static class DeleteOnCloseInputStream extends InputStream {
-
-        private final InputStream delegate;
-        private final Path tempFile;
-
-        DeleteOnCloseInputStream(Path tempFile) throws IOException {
-            this.tempFile = tempFile;
-            try {
-                this.delegate = Files.newInputStream(tempFile);
-            } catch (IOException e) {
-                Files.deleteIfExists(tempFile);
-                throw e;
-            }
-        }
-
-        @Override
-        public int read() throws IOException {
-            return delegate.read();
-        }
-
-        @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            return delegate.read(b, off, len);
-        }
-
-        @Override
-        public void close() throws IOException {
-            try {
-                delegate.close();
-            } finally {
-                Files.deleteIfExists(tempFile);
-            }
         }
     }
 

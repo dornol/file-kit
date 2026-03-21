@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Default {@link ImageWatermarker} implementation using Java Graphics2D and ImageIO.
@@ -35,14 +36,8 @@ public class ImageIOWatermarker implements ImageWatermarker {
     @Override
     public WatermarkResult apply(byte[] imageBytes, WatermarkOption option) {
         try {
-            BufferedImage source = ImageIO.read(new ByteArrayInputStream(imageBytes));
-            if (source == null) {
-                throw new FileStorageException(FileStorageException.IMAGE_PROCESSING_FAILED,
-                        "Unable to read image");
-            }
-
-            ImageMetadata sourceMeta = metadataExtractor.extract(imageBytes);
-            String outputFormat = option.outputFormat() != null ? option.outputFormat() : sourceMeta.format();
+            BufferedImage source = ImageIOUtils.readImage(imageBytes);
+            String outputFormat = ImageIOUtils.resolveOutputFormat(option.outputFormat(), metadataExtractor, imageBytes);
 
             // Create a copy to draw on
             BufferedImage result = new BufferedImage(source.getWidth(), source.getHeight(),

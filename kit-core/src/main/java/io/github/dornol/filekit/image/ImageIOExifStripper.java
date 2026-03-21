@@ -2,9 +2,7 @@ package io.github.dornol.filekit.image;
 
 import io.github.dornol.filekit.storage.FileStorageException;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 /**
@@ -42,11 +40,7 @@ public class ImageIOExifStripper implements ExifStripper {
     public byte[] strip(byte[] imageBytes, float quality) {
         try {
             ImageMetadata metadata = metadataExtractor.extract(imageBytes);
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
-            if (image == null) {
-                throw new FileStorageException(FileStorageException.IMAGE_PROCESSING_FAILED,
-                        "Unable to read image for EXIF stripping");
-            }
+            BufferedImage image = ImageIOUtils.readImage(imageBytes);
             return ImageIOUtils.writeImage(image, metadata.format(), quality);
         } catch (FileStorageException e) {
             throw e;
