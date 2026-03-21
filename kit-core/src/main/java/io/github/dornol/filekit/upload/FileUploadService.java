@@ -213,10 +213,6 @@ public class FileUploadService {
                 return existing;
             }
 
-            if (quotaChecker != null) {
-                quotaChecker.check(storageType, bucket, bytesWritten);
-            }
-
             FileFormat format;
             try (InputStream is = Files.newInputStream(tempFile)) {
                 format = formatExtractor.extract(is);
@@ -231,6 +227,11 @@ public class FileUploadService {
             encryptedFile = Files.createTempFile("file-kit-encrypted-", ".tmp");
             encryptFile(tempFile, encryptedFile);
             long encryptedSize = Files.size(encryptedFile);
+
+            // Quota check uses the encrypted size (actual storage consumption)
+            if (quotaChecker != null) {
+                quotaChecker.check(storageType, bucket, encryptedSize);
+            }
 
             FileStorage storage = storageResolver.resolve(storageType);
             FileLocation location;

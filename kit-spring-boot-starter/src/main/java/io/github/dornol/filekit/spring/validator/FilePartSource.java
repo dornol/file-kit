@@ -46,16 +46,22 @@ public class FilePartSource implements FileSource, Closeable {
      * Creates a {@code FilePartSource} by buffering the {@link FilePart} content
      * to a temporary file.
      *
+     * <p><strong>Threading:</strong> This method involves blocking I/O
+     * ({@code Files.createTempFile}, {@code Files.size}). The caller should
+     * ensure the subscription runs on a blocking-safe scheduler
+     * (e.g. {@code Schedulers.boundedElastic()}).</p>
+     *
      * @param filePart the WebFlux file part to wrap
      * @return a {@code Mono} that emits the buffered {@code FilePartSource}
      */
     public static Mono<FilePartSource> from(FilePart filePart) {
         return Mono.fromCallable(() -> Files.createTempFile("file-kit-", ".tmp"))
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
                 .flatMap(temp -> filePart.transferTo(temp)
                         .then(Mono.fromCallable(() -> {
                             long size = Files.size(temp);
                             return new FilePartSource(filePart.filename(), temp, size);
-                        }))
+                        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()))
                         .onErrorResume(e -> Mono.fromRunnable(() -> deleteSilently(temp))
                                 .then(Mono.error(e))));
     }

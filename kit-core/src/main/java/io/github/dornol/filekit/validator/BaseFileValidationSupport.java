@@ -28,7 +28,7 @@ public class BaseFileValidationSupport<T> {
     private static final Logger log = LoggerFactory.getLogger(BaseFileValidationSupport.class);
 
     private final FileValidationCallbacks<T> callbacks;
-    private Set<SafeMediaType> allowedMediaTypes;
+    private Set<SafeMediaType> allowedMediaTypes = Collections.emptySet();
     private long maxSize;
     private int minWidth;
     private int maxWidth;
@@ -135,11 +135,13 @@ public class BaseFileValidationSupport<T> {
             return false;
         }
 
-        String mediaTypeError = callbacks.validateMediaTypeAndExtension(value);
-        if (mediaTypeError != null) {
-            log.debug("Validation failed: {}", mediaTypeError);
-            applyConstraintViolation(context, mediaTypeError);
-            return false;
+        if (!allowedMediaTypes.isEmpty()) {
+            String mediaTypeError = callbacks.validateMediaTypeAndExtension(value);
+            if (mediaTypeError != null) {
+                log.debug("Validation failed: {}", mediaTypeError);
+                applyConstraintViolation(context, mediaTypeError);
+                return false;
+            }
         }
 
         if (hasDimensionConstraints()) {

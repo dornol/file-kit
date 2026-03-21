@@ -2,6 +2,8 @@ package io.github.dornol.filekit.scan;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
+
 /**
  * Result of a virus scan operation.
  *
@@ -9,6 +11,10 @@ import org.jspecify.annotations.Nullable;
  * @param message optional detail message (e.g. virus name for INFECTED, error detail for ERROR)
  */
 public record ScanResult(Status status, @Nullable String message) {
+
+    public ScanResult {
+        Objects.requireNonNull(status, "status");
+    }
 
     public enum Status {
         CLEAN,

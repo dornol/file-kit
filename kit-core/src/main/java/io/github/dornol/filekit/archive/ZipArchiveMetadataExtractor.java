@@ -73,7 +73,11 @@ public class ZipArchiveMetadataExtractor implements ArchiveMetadataExtractor {
                     uncompressedSize = count;
                 }
 
-                totalUncompressedSize += uncompressedSize;
+                try {
+                    totalUncompressedSize = Math.addExact(totalUncompressedSize, uncompressedSize);
+                } catch (ArithmeticException e) {
+                    totalUncompressedSize = Long.MAX_VALUE;
+                }
                 if (totalUncompressedSize > maxUncompressedSize) {
                     throw new FileStorageException(FileStorageException.ARCHIVE_PROCESSING_FAILED,
                             "ZIP archive exceeds maximum uncompressed size: " + maxUncompressedSize);

@@ -123,20 +123,24 @@ class BaseFileValidationSupportTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void isValid_returnsFalse_whenMediaTypeInvalid() {
         StubCallbacks callbacks = new StubCallbacks();
         callbacks.mediaTypeError = "file-kit.validation.unsupported-media-type";
         BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+        support.init(new Class[]{TestMediaType.class}, 0L);
 
         assertFalse(support.isValid("file", context));
         verify(context).buildConstraintViolationWithTemplate("{file-kit.validation.unsupported-media-type}");
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void isValid_returnsFalse_whenExtensionInvalid() {
         StubCallbacks callbacks = new StubCallbacks();
         callbacks.mediaTypeError = "file-kit.validation.invalid-extension";
         BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+        support.init(new Class[]{TestMediaType.class}, 0L);
 
         assertFalse(support.isValid("file", context));
         verify(context).buildConstraintViolationWithTemplate("{file-kit.validation.invalid-extension}");
@@ -146,6 +150,17 @@ class BaseFileValidationSupportTest {
     void isValid_returnsTrue_whenAllChecksPassed() {
         StubCallbacks callbacks = new StubCallbacks();
         BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+
+        assertTrue(support.isValid("file", context));
+        verify(context, never()).disableDefaultConstraintViolation();
+    }
+
+    @Test
+    void isValid_skipsMediaTypeCheck_whenAllowedMediaTypesEmpty() {
+        StubCallbacks callbacks = new StubCallbacks();
+        callbacks.mediaTypeError = "file-kit.validation.unsupported-media-type";
+        BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+        // no init() -> allowedMediaTypes is empty -> media type check should be skipped
 
         assertTrue(support.isValid("file", context));
         verify(context, never()).disableDefaultConstraintViolation();
@@ -176,11 +191,13 @@ class BaseFileValidationSupportTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void isValid_checksFilenameBeforeMediaType() {
         StubCallbacks callbacks = new StubCallbacks();
         callbacks.validFilename = false;
         callbacks.mediaTypeError = "file-kit.validation.unsupported-media-type";
         BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+        support.init(new Class[]{TestMediaType.class}, 0L);
 
         assertFalse(support.isValid("file", context));
         verify(context).buildConstraintViolationWithTemplate("{file-kit.validation.invalid-filename}");

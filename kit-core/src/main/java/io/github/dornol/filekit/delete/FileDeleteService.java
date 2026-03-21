@@ -51,8 +51,14 @@ public class FileDeleteService extends AbstractFileOperationService {
     }
 
     /**
-     * Deletes a file by its key: removes the physical file from storage,
-     * then deletes the metadata record.
+     * Deletes a file by its key: removes the metadata record first,
+     * then deletes the physical file from storage.
+     *
+     * <p>Metadata is deleted first so that a partial failure (metadata deleted
+     * but storage deletion fails) leaves an orphan file in storage rather than
+     * a metadata entry pointing to a missing file. Orphan storage files are
+     * harmless and inaccessible, whereas orphan metadata would cause download
+     * failures.</p>
      *
      * @param fileKey unique file key
      */
@@ -60,8 +66,8 @@ public class FileDeleteService extends AbstractFileOperationService {
         Objects.requireNonNull(fileKey, "fileKey");
 
         FileMetadata metadata = metadataRepository.getByKey(fileKey);
-        resolveStorage(metadata).delete(metadata);
         metadataRepository.deleteByKey(fileKey);
+        resolveStorage(metadata).delete(metadata);
 
         log.info("File deleted: key={}", fileKey);
         eventPublisher.fireDeleted(metadata);
