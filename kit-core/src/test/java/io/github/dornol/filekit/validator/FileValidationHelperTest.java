@@ -174,32 +174,6 @@ class FileValidationHelperTest {
         }
     }
 
-    // ── isValidMediaType ────────────────────────────────────────────
-
-    @Nested
-    class IsValidMediaType {
-
-        private final Set<SafeMediaType> allowed = Set.of(TestMediaType.JPEG, TestMediaType.PNG);
-
-        @Test
-        void returnsTrueForAllowedType() {
-            TestFileSource file = new TestFileSource("photo.jpg", new byte[1]);
-            assertTrue(helper.isValidMediaType(file, allowed));
-        }
-
-        @Test
-        void returnsFalseForDisallowedType() {
-            TestFileSource file = new TestFileSource("document.pdf", new byte[1]);
-            assertFalse(helper.isValidMediaType(file, allowed));
-        }
-
-        @Test
-        void returnsFalseForUnknownType() {
-            TestFileSource file = new TestFileSource("unknown.xyz", new byte[1]);
-            assertFalse(helper.isValidMediaType(file, allowed));
-        }
-    }
-
     // ── Batch validation methods ────────────────────────────────────
 
     @Nested
@@ -312,31 +286,11 @@ class FileValidationHelperTest {
         }
 
         @Test
-        void isValidMediaType_closesStream() {
-            AtomicBoolean closed = new AtomicBoolean(false);
-            FileSource source = trackableSource("photo.jpg", new byte[1], closed);
-
-            helper.isValidMediaType(source, Set.of(TestMediaType.JPEG));
-
-            assertTrue(closed.get(), "InputStream should be closed after media type detection");
-        }
-
-        @Test
         void validateMediaTypeAndExtension_closesStream_evenOnInvalidType() {
             AtomicBoolean closed = new AtomicBoolean(false);
             FileSource source = trackableSource("document.pdf", new byte[1], closed);
 
             helper.validateMediaTypeAndExtension(source, Set.of(TestMediaType.JPEG));
-
-            assertTrue(closed.get(), "InputStream should be closed even when validation fails");
-        }
-
-        @Test
-        void isValidMediaType_closesStream_evenOnInvalidType() {
-            AtomicBoolean closed = new AtomicBoolean(false);
-            FileSource source = trackableSource("document.pdf", new byte[1], closed);
-
-            helper.isValidMediaType(source, Set.of(TestMediaType.JPEG));
 
             assertTrue(closed.get(), "InputStream should be closed even when validation fails");
         }

@@ -1132,7 +1132,11 @@ file-kit.validation.file-empty=File is empty
 file-kit.validation.file-too-large=File size exceeded
 file-kit.validation.invalid-filename=Invalid filename
 file-kit.validation.invalid-extension=Invalid file extension
-file-kit.validation.invalid-image-dimensions=Image dimensions out of range
+file-kit.validation.image-not-readable=File is not a valid image
+file-kit.validation.image-width-too-small=Image width is too small
+file-kit.validation.image-width-too-large=Image width is too large
+file-kit.validation.image-height-too-small=Image height is too small
+file-kit.validation.image-height-too-large=Image height is too large
 ```
 
 ### Storage error messages

@@ -3,22 +3,16 @@ package io.github.dornol.filekit.download;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.event.FileEventPublisher;
-import io.github.dornol.filekit.io.DeleteOnCloseInputStream;
 import io.github.dornol.filekit.io.IoUtils;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
 import io.github.dornol.filekit.storage.AbstractFileOperationService;
-import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -47,17 +41,23 @@ public class FileDownloadService extends AbstractFileOperationService {
         return new Builder(metadataRepository, storageResolver);
     }
 
+    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
+    @Deprecated(forRemoval = true)
     public FileDownloadService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver) {
         this(metadataRepository, storageResolver, new NoOpFileEncryptor(), new FileEventPublisher(List.of()));
     }
 
+    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
+    @Deprecated(forRemoval = true)
     public FileDownloadService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver,
                                FileEncryptor fileEncryptor) {
         this(metadataRepository, storageResolver, fileEncryptor, new FileEventPublisher(List.of()));
     }
 
+    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
+    @Deprecated(forRemoval = true)
     public FileDownloadService(FileMetadataRepository metadataRepository,
                                FileStorageResolver storageResolver,
                                FileEncryptor fileEncryptor,
@@ -136,25 +136,7 @@ public class FileDownloadService extends AbstractFileOperationService {
     }
 
     private InputStream decryptToStream(InputStream encryptedContent) {
-        Path decryptedFile = null;
-        try {
-            decryptedFile = Files.createTempFile("file-kit-decrypted-", ".tmp");
-            try (InputStream in = encryptedContent;
-                 OutputStream out = Files.newOutputStream(decryptedFile)) {
-                fileEncryptor.decrypt(in, out);
-            }
-            return new DeleteOnCloseInputStream(decryptedFile);
-        } catch (IOException e) {
-            if (decryptedFile != null) {
-                try {
-                    Files.deleteIfExists(decryptedFile);
-                } catch (IOException deleteEx) {
-                    e.addSuppressed(deleteEx);
-                }
-            }
-            throw new FileStorageException(FileStorageException.DECRYPTION_FAILED,
-                    "Failed to decrypt file content", e);
-        }
+        return io.github.dornol.filekit.io.DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor);
     }
 
 }

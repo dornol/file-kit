@@ -62,17 +62,17 @@ public class FileValidationHelper {
         }
         if (!typeValid) {
             log.warn("Detected media type '{}' is not in the allowed list: {}", detected, allowed);
-            return "file-kit.validation.unsupported-media-type";
+            return ValidationMessageKeys.UNSUPPORTED_MEDIA_TYPE;
         }
 
         // Check extension
         if (originalFilename == null) {
-            return "file-kit.validation.invalid-extension";
+            return ValidationMessageKeys.INVALID_EXTENSION;
         }
         String extension = getExtension(originalFilename).toLowerCase(Locale.ENGLISH);
         if (extension.isEmpty()) {
             log.debug("File has no extension: '{}'", originalFilename);
-            return "file-kit.validation.invalid-extension";
+            return ValidationMessageKeys.INVALID_EXTENSION;
         }
 
         for (SafeMediaType safe : allowed) {
@@ -82,39 +82,7 @@ public class FileValidationHelper {
         }
 
         log.debug("Extension '{}' does not match detected media type '{}'", extension, detected);
-        return "file-kit.validation.invalid-extension";
-    }
-
-    /**
-     * Checks whether the detected media type of the file is in the allowed set.
-     *
-     * @param value   the file to check
-     * @param allowed set of allowed media types
-     * @return {@code true} if the media type is allowed
-     * @deprecated Use {@link #validateMediaTypeAndExtension(FileSource, Set)} instead,
-     *             which validates both media type and extension in a single pass.
-     */
-    @Deprecated(forRemoval = true)
-    public boolean isValidMediaType(FileSource value, Set<SafeMediaType> allowed) {
-        Objects.requireNonNull(value, "value");
-        Objects.requireNonNull(allowed, "allowed");
-        String detected;
-
-        try (InputStream is = value.getInputStream()) {
-            detected = detector.detect(value.getOriginalFilename(), is);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to detect media type", e);
-        }
-
-        for (SafeMediaType type : allowed) {
-            if (detected.equals(type.getMediaType())) {
-                return true;
-            }
-        }
-
-        log.warn("Detected media type '{}' is not in the allowed list: {}", detected, allowed);
-
-        return false;
+        return ValidationMessageKeys.INVALID_EXTENSION;
     }
 
     /**
@@ -183,12 +151,12 @@ public class FileValidationHelper {
              ImageInputStream iis = ImageIO.createImageInputStream(is)) {
             if (iis == null) {
                 log.debug("Unable to create image input stream for dimension validation");
-                return "file-kit.validation.image-not-readable";
+                return ValidationMessageKeys.IMAGE_NOT_READABLE;
             }
             Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
             if (!readers.hasNext()) {
                 log.debug("No suitable image reader found for dimension validation");
-                return "file-kit.validation.image-not-readable";
+                return ValidationMessageKeys.IMAGE_NOT_READABLE;
             }
             ImageReader reader = readers.next();
             try {
@@ -198,26 +166,26 @@ public class FileValidationHelper {
 
                 if (minWidth > 0 && width < minWidth) {
                     log.debug("Image width {} is below minimum {}", width, minWidth);
-                    return "file-kit.validation.image-width-too-small";
+                    return ValidationMessageKeys.IMAGE_WIDTH_TOO_SMALL;
                 }
                 if (maxWidth > 0 && width > maxWidth) {
                     log.debug("Image width {} exceeds maximum {}", width, maxWidth);
-                    return "file-kit.validation.image-width-too-large";
+                    return ValidationMessageKeys.IMAGE_WIDTH_TOO_LARGE;
                 }
                 if (minHeight > 0 && height < minHeight) {
                     log.debug("Image height {} is below minimum {}", height, minHeight);
-                    return "file-kit.validation.image-height-too-small";
+                    return ValidationMessageKeys.IMAGE_HEIGHT_TOO_SMALL;
                 }
                 if (maxHeight > 0 && height > maxHeight) {
                     log.debug("Image height {} exceeds maximum {}", height, maxHeight);
-                    return "file-kit.validation.image-height-too-large";
+                    return ValidationMessageKeys.IMAGE_HEIGHT_TOO_LARGE;
                 }
             } finally {
                 reader.dispose();
             }
         } catch (IOException e) {
             log.debug("Failed to read image dimensions", e);
-            return "file-kit.validation.image-not-readable";
+            return ValidationMessageKeys.IMAGE_NOT_READABLE;
         }
         return null;
     }

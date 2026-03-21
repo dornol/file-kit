@@ -30,6 +30,18 @@ public class FileDeleteService extends AbstractFileOperationService {
     private final FileEventPublisher eventPublisher;
 
     /**
+     * Creates a builder with the two required dependencies.
+     *
+     * @param metadataRepository repository for file metadata lookup and deletion
+     * @param storageResolver    resolver to find the storage backend for each file
+     * @return a new builder instance
+     */
+    public static Builder builder(FileMetadataRepository metadataRepository,
+                                  FileStorageResolver storageResolver) {
+        return new Builder(metadataRepository, storageResolver);
+    }
+
+    /**
      * @param metadataRepository repository for file metadata lookup and deletion
      * @param storageResolver    resolver to find the storage backend for each file
      */
@@ -48,6 +60,34 @@ public class FileDeleteService extends AbstractFileOperationService {
                              FileEventPublisher eventPublisher) {
         super(metadataRepository, storageResolver);
         this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
+    }
+
+    private FileDeleteService(Builder b) {
+        super(b.metadataRepository, b.storageResolver);
+        this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
+    }
+
+    public static final class Builder {
+
+        private final FileMetadataRepository metadataRepository;
+        private final FileStorageResolver storageResolver;
+        private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
+
+        private Builder(FileMetadataRepository metadataRepository,
+                        FileStorageResolver storageResolver) {
+            this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
+            this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
+        }
+
+        /** @param eventPublisher publisher for file lifecycle events */
+        public Builder eventPublisher(FileEventPublisher eventPublisher) {
+            this.eventPublisher = eventPublisher;
+            return this;
+        }
+
+        public FileDeleteService build() {
+            return new FileDeleteService(this);
+        }
     }
 
     /**

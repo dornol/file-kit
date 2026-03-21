@@ -119,19 +119,19 @@ public class BaseFileValidationSupport<T> {
 
         if (callbacks.isFileEmpty(value)) {
             log.debug("Validation failed: file is empty");
-            applyConstraintViolation(context, "file-kit.validation.file-empty");
+            applyConstraintViolation(context, ValidationMessageKeys.FILE_EMPTY);
             return false;
         }
 
         if (callbacks.isFileSizeExceeded(value)) {
             log.debug("Validation failed: file size exceeded (maxSize={})", maxSize);
-            applyConstraintViolation(context, "file-kit.validation.file-too-large");
+            applyConstraintViolation(context, ValidationMessageKeys.FILE_TOO_LARGE);
             return false;
         }
 
         if (!callbacks.isValidFilename(value)) {
             log.debug("Validation failed: invalid filename");
-            applyConstraintViolation(context, "file-kit.validation.invalid-filename");
+            applyConstraintViolation(context, ValidationMessageKeys.INVALID_FILENAME);
             return false;
         }
 

@@ -26,6 +26,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -325,6 +326,71 @@ class FileDownloadServiceTest {
             FileStorageException ex = assertThrows(FileStorageException.class,
                     () -> failingService.download("file-key"));
             assertEquals(FileStorageException.DECRYPTION_FAILED, ex.getMessageKey());
+        }
+    }
+
+    // ── Builder validation ────────────────────────────────────────────
+
+    @Nested
+    class BuilderValidation {
+
+        @Test
+        void builder_nullMetadataRepository_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> FileDownloadService.builder(null, storageResolver));
+        }
+
+        @Test
+        void builder_nullStorageResolver_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> FileDownloadService.builder(metadataRepository, null));
+        }
+
+        @Test
+        void builder_defaultsWork() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver).build();
+            assertNotNull(svc);
+        }
+
+        @Test
+        void builder_withFileEncryptor() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(new NoOpFileEncryptor())
+                    .build();
+            assertNotNull(svc);
+        }
+
+        @Test
+        void builder_withEventPublisher() {
+            FileEventListener listener = mock(FileEventListener.class);
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .eventPublisher(new FileEventPublisher(List.of(listener)))
+                    .build();
+
+            InputStream content = new ByteArrayInputStream("hello".getBytes());
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(metadata)).thenReturn(content);
+
+            svc.download("file-key");
+
+            verify(listener).onDownloaded(metadata);
+        }
+
+        @Test
+        void builder_withAllOptions() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(new NoOpFileEncryptor())
+                    .eventPublisher(new FileEventPublisher(List.of()))
+                    .build();
+            assertNotNull(svc);
+        }
+
+        @Test
+        void builder_chainingReturnsSameBuilder() {
+            FileDownloadService.Builder builder = FileDownloadService.builder(metadataRepository, storageResolver);
+            FileDownloadService.Builder same = builder.fileEncryptor(new NoOpFileEncryptor());
+            assertSame(builder, same);
         }
     }
 

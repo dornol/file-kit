@@ -191,7 +191,10 @@ public class FileKitAutoConfiguration {
                                                    FileEncryptor fileEncryptor,
                                                    FileEventPublisher eventPublisher) {
         log.info("Registering FileDownloadService");
-        return new FileDownloadService(metadataRepository, storageResolver, fileEncryptor, eventPublisher);
+        return FileDownloadService.builder(metadataRepository, storageResolver)
+                .fileEncryptor(fileEncryptor)
+                .eventPublisher(eventPublisher)
+                .build();
     }
 
     @Bean
@@ -201,7 +204,9 @@ public class FileKitAutoConfiguration {
                                                FileStorageResolver storageResolver,
                                                FileEventPublisher eventPublisher) {
         log.info("Registering FileDeleteService");
-        return new FileDeleteService(metadataRepository, storageResolver, eventPublisher);
+        return FileDeleteService.builder(metadataRepository, storageResolver)
+                .eventPublisher(eventPublisher)
+                .build();
     }
 
     @Bean

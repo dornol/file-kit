@@ -1,7 +1,6 @@
 package io.github.dornol.filekit.spring.download;
 
 import io.github.dornol.filekit.domain.FileMetadata;
-import io.github.dornol.filekit.io.DeleteOnCloseInputStream;
 import io.github.dornol.filekit.io.IoUtils;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -15,9 +14,6 @@ import org.springframework.core.io.Resource;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Objects;
 
 /**
@@ -88,26 +84,7 @@ public class SpringDownloadService {
     }
 
     private InputStream decryptToStream(InputStream encryptedContent) {
-        Path decryptedFile = null;
-        try {
-            decryptedFile = Files.createTempFile("file-kit-decrypted-", ".tmp");
-            try (InputStream in = encryptedContent;
-                 OutputStream out = Files.newOutputStream(decryptedFile)) {
-                fileEncryptor.decrypt(in, out);
-            }
-            // Return an InputStream that deletes temp file on close
-            return new DeleteOnCloseInputStream(decryptedFile);
-        } catch (IOException e) {
-            if (decryptedFile != null) {
-                try {
-                    Files.deleteIfExists(decryptedFile);
-                } catch (IOException deleteEx) {
-                    e.addSuppressed(deleteEx);
-                }
-            }
-            throw new FileStorageException(FileStorageException.DECRYPTION_FAILED,
-                    "Failed to decrypt file content", e);
-        }
+        return io.github.dornol.filekit.io.DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor);
     }
 
 }

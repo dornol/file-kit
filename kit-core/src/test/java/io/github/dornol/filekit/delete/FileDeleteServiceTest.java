@@ -18,6 +18,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -213,6 +214,53 @@ class FileDeleteServiceTest {
             FileDeleteService svc = new FileDeleteService(
                     metadataRepository, storageResolver, new FileEventPublisher(List.of()));
             assertNotNull(svc);
+        }
+    }
+
+    // ── Builder validation ────────────────────────────────────────
+
+    @Nested
+    class BuilderValidation {
+
+        @Test
+        void builder_nullMetadataRepository_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> FileDeleteService.builder(null, storageResolver));
+        }
+
+        @Test
+        void builder_nullStorageResolver_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> FileDeleteService.builder(metadataRepository, null));
+        }
+
+        @Test
+        void builder_defaultsWork() {
+            FileDeleteService svc = FileDeleteService.builder(metadataRepository, storageResolver).build();
+            assertNotNull(svc);
+        }
+
+        @Test
+        void builder_withEventPublisher() {
+            FileEventListener listener = mock(FileEventListener.class);
+            FileDeleteService svc = FileDeleteService.builder(metadataRepository, storageResolver)
+                    .eventPublisher(new FileEventPublisher(List.of(listener)))
+                    .build();
+            assertNotNull(svc);
+
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+
+            svc.delete("file-key");
+
+            verify(listener).onDeleted(metadata);
+        }
+
+        @Test
+        void builder_chainingReturnsSameBuilder() {
+            FileDeleteService.Builder builder = FileDeleteService.builder(metadataRepository, storageResolver);
+            FileDeleteService.Builder same = builder.eventPublisher(new FileEventPublisher(List.of()));
+            assertSame(builder, same);
         }
     }
 
