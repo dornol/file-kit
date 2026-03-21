@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * {@link FileStorage} implementation that stores files on the local filesystem.
@@ -79,7 +80,14 @@ public class LocalFileStorage implements FileStorage {
         Path target = validatePath(baseDir.resolve(command.bucket()).resolve(objectKey));
         try {
             Files.createDirectories(target.getParent());
-            Files.copy(command.content(), target);
+            Path tmp = Files.createTempFile(target.getParent(), ".upload-", ".tmp");
+            try {
+                Files.copy(command.content(), tmp, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException e) {
+                Files.deleteIfExists(tmp);
+                throw e;
+            }
         } catch (IOException e) {
             log.error("Failed to write file: {}", target, e);
             throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
