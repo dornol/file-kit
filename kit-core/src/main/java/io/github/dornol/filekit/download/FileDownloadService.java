@@ -66,13 +66,26 @@ public class FileDownloadService extends AbstractFileOperationService {
         FileMetadata metadata = metadataRepository.getByKey(fileKey);
         InputStream content = resolveStorage(metadata).load(metadata);
 
-        if (!(fileEncryptor instanceof NoOpFileEncryptor)) {
-            content = decryptToStream(content);
-        }
+        try {
+            if (fileEncryptor.isEnabled()) {
+                content = decryptToStream(content);
+            }
 
-        log.info("File downloaded: key={}", fileKey);
-        eventPublisher.fireDownloaded(metadata);
-        return new DownloadResult(metadata, content);
+            log.info("File downloaded: key={}", fileKey);
+            eventPublisher.fireDownloaded(metadata);
+            return new DownloadResult(metadata, content);
+        } catch (Exception e) {
+            closeQuietly(content);
+            throw e;
+        }
+    }
+
+    private static void closeQuietly(InputStream stream) {
+        try {
+            stream.close();
+        } catch (IOException ignored) {
+            // best-effort cleanup
+        }
     }
 
     public String resolveUri(String fileKey) {

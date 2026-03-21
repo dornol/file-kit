@@ -26,6 +26,11 @@ public interface FileSource {
     /**
      * Returns an {@link InputStream} to read the file content.
      *
+     * <p>Implementations must support multiple invocations, each returning a fresh
+     * stream positioned at the beginning of the file. This is required because
+     * validation may read the stream more than once (e.g. media type detection
+     * followed by image dimension validation).</p>
+     *
      * @return input stream of the file
      * @throws IOException if the stream cannot be opened
      */

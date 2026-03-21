@@ -78,6 +78,21 @@ public class BaseFileValidationSupport<T> {
 
         this.allowedMediaTypes = Collections.unmodifiableSet(safeMediaTypes);
         this.maxSize = maxSize;
+
+        if (minWidth < 0 || maxWidth < 0 || minHeight < 0 || maxHeight < 0) {
+            throw new IllegalArgumentException(
+                    "Image dimension constraints must not be negative: minWidth=" + minWidth
+                            + ", maxWidth=" + maxWidth + ", minHeight=" + minHeight + ", maxHeight=" + maxHeight);
+        }
+        if (minWidth > 0 && maxWidth > 0 && minWidth > maxWidth) {
+            throw new IllegalArgumentException(
+                    "minWidth (" + minWidth + ") must not exceed maxWidth (" + maxWidth + ")");
+        }
+        if (minHeight > 0 && maxHeight > 0 && minHeight > maxHeight) {
+            throw new IllegalArgumentException(
+                    "minHeight (" + minHeight + ") must not exceed maxHeight (" + maxHeight + ")");
+        }
+
         this.minWidth = minWidth;
         this.maxWidth = maxWidth;
         this.minHeight = minHeight;

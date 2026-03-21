@@ -56,7 +56,7 @@ public class SpringDownloadService {
         FileMetadata metadata = metadataRepository.getByKey(fileKey);
         FileStorage storage = storageResolver.resolve(metadata.location().storageType());
 
-        if (fileEncryptor instanceof NoOpFileEncryptor) {
+        if (!fileEncryptor.isEnabled()) {
             if (storage instanceof SpringFileStorage springStorage) {
                 return springStorage.loadResource(metadata);
             }

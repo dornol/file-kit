@@ -401,35 +401,35 @@ class FileValidationHelperTest {
         @Test
         void returnsErrorWhenWidthBelowMinimum() {
             TestFileSource file = imageSource(50, 100);
-            assertEquals("file-kit.validation.invalid-image-dimensions",
+            assertEquals("file-kit.validation.image-width-too-small",
                     helper.validateImageDimensions(file, 100, 0, 0, 0));
         }
 
         @Test
         void returnsErrorWhenWidthExceedsMaximum() {
             TestFileSource file = imageSource(500, 100);
-            assertEquals("file-kit.validation.invalid-image-dimensions",
+            assertEquals("file-kit.validation.image-width-too-large",
                     helper.validateImageDimensions(file, 0, 300, 0, 0));
         }
 
         @Test
         void returnsErrorWhenHeightBelowMinimum() {
             TestFileSource file = imageSource(100, 50);
-            assertEquals("file-kit.validation.invalid-image-dimensions",
+            assertEquals("file-kit.validation.image-height-too-small",
                     helper.validateImageDimensions(file, 0, 0, 100, 0));
         }
 
         @Test
         void returnsErrorWhenHeightExceedsMaximum() {
             TestFileSource file = imageSource(100, 500);
-            assertEquals("file-kit.validation.invalid-image-dimensions",
+            assertEquals("file-kit.validation.image-height-too-large",
                     helper.validateImageDimensions(file, 0, 0, 0, 300));
         }
 
         @Test
         void returnsErrorForNonImageFile() {
             TestFileSource file = new TestFileSource("file.txt", "not an image".getBytes());
-            assertEquals("file-kit.validation.invalid-image-dimensions",
+            assertEquals("file-kit.validation.image-not-readable",
                     helper.validateImageDimensions(file, 100, 0, 0, 0));
         }
 
@@ -454,7 +454,7 @@ class FileValidationHelperTest {
         @Test
         void batchValidation_returnsErrorForFirstInvalid() {
             List<TestFileSource> files = List.of(imageSource(200, 200), imageSource(50, 50));
-            assertEquals("file-kit.validation.invalid-image-dimensions",
+            assertEquals("file-kit.validation.image-width-too-small",
                     helper.validateAllImageDimensions(files, 100, 400, 100, 400));
         }
     }

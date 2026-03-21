@@ -150,6 +150,14 @@ public class FileUploadService {
 
     /**
      * Uploads a file: dedup check, format detection, storage, metadata save.
+     *
+     * <p><strong>Deduplication:</strong> If a file with the same checksum already exists,
+     * the existing metadata is returned immediately without storing a new copy.
+     * In this case, the {@code callback} (if provided) is <em>not</em> executed,
+     * no upload event is fired, and the {@code storageType}/{@code bucket} parameters
+     * are ignored (the original file's location is preserved).
+     * If you need per-upload side effects regardless of deduplication,
+     * check the returned metadata's key against your expected new key.</p>
      */
     public FileMetadata upload(FileSource fileSource, Enum<?> storageType, String bucket) throws IOException {
         return doUpload(fileSource, storageType, bucket, null);

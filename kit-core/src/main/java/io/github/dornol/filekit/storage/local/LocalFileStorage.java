@@ -83,9 +83,18 @@ public class LocalFileStorage implements FileStorage {
             Path tmp = Files.createTempFile(target.getParent(), ".upload-", ".tmp");
             try {
                 Files.copy(command.content(), tmp, StandardCopyOption.REPLACE_EXISTING);
-                Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
+                try {
+                    Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    log.debug("ATOMIC_MOVE not supported, falling back to REPLACE_EXISTING");
+                    Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+                }
             } catch (IOException e) {
-                Files.deleteIfExists(tmp);
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException deleteEx) {
+                    e.addSuppressed(deleteEx);
+                }
                 throw e;
             }
         } catch (IOException e) {

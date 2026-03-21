@@ -15,6 +15,19 @@ import java.io.OutputStream;
 public interface FileEncryptor {
 
     /**
+     * Returns whether this encryptor actually performs encryption.
+     *
+     * <p>Used by download and transfer services to decide whether decryption is needed.
+     * The default implementation returns {@code true}; {@link NoOpFileEncryptor}
+     * overrides this to return {@code false}.</p>
+     *
+     * @return {@code true} if this encryptor performs real encryption
+     */
+    default boolean isEnabled() {
+        return true;
+    }
+
+    /**
      * Encrypts content from the input stream and writes to the output stream.
      *
      * @param plainInput   plaintext input

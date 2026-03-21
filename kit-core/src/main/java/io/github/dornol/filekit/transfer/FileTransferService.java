@@ -14,7 +14,11 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -119,29 +123,48 @@ public class FileTransferService extends AbstractFileOperationService {
 
         String newKey = UUID.randomUUID().toString();
 
-        try (InputStream content = sourceStorage.load(source)) {
-            FileUploadCommand command = new FileUploadCommand(
-                    newKey,
-                    source.name(),
-                    content,
-                    source.size(),
-                    source.format().mimeType(),
-                    source.format().extension(),
-                    targetBucket
-            );
+        // Buffer to temp file to get the actual stored size (may differ from
+        // metadata.size() when encryption is active).
+        Path tempFile = null;
+        try {
+            tempFile = Files.createTempFile("file-kit-transfer-", ".tmp");
+            try (InputStream content = sourceStorage.load(source)) {
+                Files.copy(content, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+            long actualSize = Files.size(tempFile);
 
-            FileLocation newLocation = targetStorage.upload(command);
-            FileMetadata copied = new FileMetadata(
-                    newKey, source.name(), source.size(), source.checksum(),
-                    source.format(), newLocation
-            );
+            try (InputStream buffered = Files.newInputStream(tempFile)) {
+                FileUploadCommand command = new FileUploadCommand(
+                        newKey,
+                        source.name(),
+                        buffered,
+                        actualSize,
+                        source.format().mimeType(),
+                        source.format().extension(),
+                        targetBucket
+                );
 
-            return metadataRepository.save(copied);
+                FileLocation newLocation = targetStorage.upload(command);
+                FileMetadata copied = new FileMetadata(
+                        newKey, source.name(), source.size(), source.checksum(),
+                        source.format(), newLocation
+                );
+
+                return metadataRepository.save(copied);
+            }
         } catch (FileStorageException e) {
             throw e;
         } catch (Exception e) {
             throw new FileStorageException(FileStorageException.COPY_FAILED,
                     "Failed to copy file: " + source.key(), e);
+        } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ignored) {
+                    // best-effort cleanup
+                }
+            }
         }
     }
 }

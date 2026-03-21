@@ -10,6 +10,11 @@ import java.io.OutputStream;
  */
 public class NoOpFileEncryptor implements FileEncryptor {
 
+    @Override
+    public boolean isEnabled() {
+        return false;
+    }
+
     /**
      * Copies content from {@code plainInput} to {@code cipherOutput} without any transformation.
      *

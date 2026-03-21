@@ -38,7 +38,13 @@ public class QuotaChecker {
         long maxBytes = policy.getMaxBytes(storageType, bucket);
         long usedBytes = usageProvider.getUsedBytes(storageType, bucket);
 
-        if (usedBytes + additionalBytes > maxBytes) {
+        long totalBytes;
+        try {
+            totalBytes = Math.addExact(usedBytes, additionalBytes);
+        } catch (ArithmeticException e) {
+            totalBytes = Long.MAX_VALUE;
+        }
+        if (totalBytes > maxBytes) {
             throw new FileStorageException(FileStorageException.QUOTA_EXCEEDED,
                     "Quota exceeded: used=" + usedBytes + ", additional=" + additionalBytes
                             + ", max=" + maxBytes);

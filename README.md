@@ -701,6 +701,8 @@ implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
 Metrics are automatically exported to any configured Micrometer backend (Prometheus, Datadog, CloudWatch, etc.).
 
+> **Cardinality warning:** Metrics are tagged by `storageType` and `bucket`. If your application uses a large number of distinct bucket names (e.g. per-user buckets), this can lead to high cardinality in your metrics backend. Consider using a fixed set of bucket names to keep metric cardinality manageable.
+
 ## Image Processing
 
 file-kit provides image metadata extraction, resizing, thumbnail generation, watermarking, EXIF stripping, and format conversion as standalone utilities. These are **not** integrated into the upload flow — use them directly where needed.

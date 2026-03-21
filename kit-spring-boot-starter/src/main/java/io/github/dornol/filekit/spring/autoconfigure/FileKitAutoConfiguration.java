@@ -42,7 +42,6 @@ import io.github.dornol.filekit.validator.FileValidationHelper;
 import io.github.dornol.filekit.validator.MediaTypeDetector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -50,6 +49,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.util.ClassUtils;
 
 import java.util.List;
@@ -275,13 +275,18 @@ public class FileKitAutoConfiguration {
         return new FileTransferService(metadataRepository, storageResolver, quotaChecker, eventPublisher);
     }
 
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnClass(MeterRegistry.class)
-    @ConditionalOnBean(MeterRegistry.class)
-    public FileKitMetrics fileKitMetrics(MeterRegistry meterRegistry) {
-        log.info("Registering FileKitMetrics (Micrometer)");
-        return new FileKitMetrics(meterRegistry);
+    @Configuration
+    @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
+    static class MetricsConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        @ConditionalOnBean(type = "io.micrometer.core.instrument.MeterRegistry")
+        public FileKitMetrics fileKitMetrics(io.micrometer.core.instrument.MeterRegistry meterRegistry) {
+            log.info("Registering FileKitMetrics (Micrometer)");
+            return new FileKitMetrics(meterRegistry);
+        }
+
     }
 
 }

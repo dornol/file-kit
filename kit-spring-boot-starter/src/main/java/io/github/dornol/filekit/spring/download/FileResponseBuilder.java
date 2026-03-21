@@ -205,12 +205,14 @@ public final class FileResponseBuilder {
     private String buildContentDisposition() {
         // ASCII-only fallback: replace non-printable/non-ASCII chars with underscore
         String fallback = filename.replaceAll("[^\\x20-\\x7E]", "_");
+        // Escape backslashes and double quotes per RFC 6266 / RFC 2616 quoted-string
+        String escapedFallback = fallback.replace("\\", "\\\\").replace("\"", "\\\"");
         String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8)
                 .replace("+", "%20");
 
         return String.format(Locale.ROOT,
                 "%s; filename=\"%s\"; filename*=UTF-8''%s",
-                action.getDispositionType(), fallback, encoded);
+                action.getDispositionType(), escapedFallback, encoded);
     }
 
     /**

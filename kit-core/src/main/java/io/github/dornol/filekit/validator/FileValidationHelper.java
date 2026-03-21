@@ -180,12 +180,12 @@ public class FileValidationHelper {
              ImageInputStream iis = ImageIO.createImageInputStream(is)) {
             if (iis == null) {
                 log.debug("Unable to create image input stream for dimension validation");
-                return "file-kit.validation.invalid-image-dimensions";
+                return "file-kit.validation.image-not-readable";
             }
             Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
             if (!readers.hasNext()) {
                 log.debug("No suitable image reader found for dimension validation");
-                return "file-kit.validation.invalid-image-dimensions";
+                return "file-kit.validation.image-not-readable";
             }
             ImageReader reader = readers.next();
             try {
@@ -195,26 +195,26 @@ public class FileValidationHelper {
 
                 if (minWidth > 0 && width < minWidth) {
                     log.debug("Image width {} is below minimum {}", width, minWidth);
-                    return "file-kit.validation.invalid-image-dimensions";
+                    return "file-kit.validation.image-width-too-small";
                 }
                 if (maxWidth > 0 && width > maxWidth) {
                     log.debug("Image width {} exceeds maximum {}", width, maxWidth);
-                    return "file-kit.validation.invalid-image-dimensions";
+                    return "file-kit.validation.image-width-too-large";
                 }
                 if (minHeight > 0 && height < minHeight) {
                     log.debug("Image height {} is below minimum {}", height, minHeight);
-                    return "file-kit.validation.invalid-image-dimensions";
+                    return "file-kit.validation.image-height-too-small";
                 }
                 if (maxHeight > 0 && height > maxHeight) {
                     log.debug("Image height {} exceeds maximum {}", height, maxHeight);
-                    return "file-kit.validation.invalid-image-dimensions";
+                    return "file-kit.validation.image-height-too-large";
                 }
             } finally {
                 reader.dispose();
             }
         } catch (IOException e) {
             log.debug("Failed to read image dimensions", e);
-            return "file-kit.validation.invalid-image-dimensions";
+            return "file-kit.validation.image-not-readable";
         }
         return null;
     }
