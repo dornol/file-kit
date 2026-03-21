@@ -6,7 +6,11 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import java.io.InputStream;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NoOpFileEncryptorTest {
 
@@ -48,6 +52,23 @@ class NoOpFileEncryptorTest {
         encryptor.decrypt(new ByteArrayInputStream(new byte[0]), out);
 
         assertArrayEquals(new byte[0], out.toByteArray());
+    }
+
+    @Test
+    void isEnabled_returnsFalse() {
+        assertFalse(encryptor.isEnabled());
+    }
+
+    @Test
+    void defaultIsEnabled_returnsTrue() {
+        // A custom FileEncryptor (not NoOp) should return true by default
+        FileEncryptor custom = new FileEncryptor() {
+            @Override
+            public void encrypt(InputStream plainInput, java.io.OutputStream cipherOutput) {}
+            @Override
+            public void decrypt(InputStream cipherInput, java.io.OutputStream plainOutput) {}
+        };
+        assertTrue(custom.isEnabled());
     }
 
     @Test

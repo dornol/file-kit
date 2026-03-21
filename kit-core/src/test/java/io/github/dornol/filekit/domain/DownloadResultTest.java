@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DownloadResultTest {
@@ -84,6 +85,22 @@ class DownloadResultTest {
             String str = result.toString();
             assertNotNull(str);
             assertTrue(str.startsWith("DownloadResult["));
+        }
+    }
+
+    @Nested
+    class Validation {
+
+        @Test
+        void nullMetadata_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new DownloadResult(null, new ByteArrayInputStream(new byte[0])));
+        }
+
+        @Test
+        void nullContent_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new DownloadResult(sampleMetadata("key-1"), null));
         }
     }
 }

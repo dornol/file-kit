@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ImageMetadataTest {
 
@@ -81,6 +82,40 @@ class ImageMetadataTest {
             String str = metadata.toString();
             assertNotNull(str);
             assertEquals("ImageMetadata[width=640, height=480, format=png]", str);
+        }
+    }
+
+    @Nested
+    class Validation {
+
+        @Test
+        void zeroWidth_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ImageMetadata(0, 100, "png"));
+        }
+
+        @Test
+        void negativeWidth_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ImageMetadata(-1, 100, "png"));
+        }
+
+        @Test
+        void zeroHeight_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ImageMetadata(100, 0, "png"));
+        }
+
+        @Test
+        void negativeHeight_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new ImageMetadata(100, -1, "png"));
+        }
+
+        @Test
+        void nullFormat_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new ImageMetadata(100, 100, null));
         }
     }
 }

@@ -506,4 +506,55 @@ class FileResponseBuilderTest {
             assertThat(response.getHeaders().getContentLength()).isEqualTo(1024);
         }
     }
+
+    // ── Null validation ──────────────────────────────────────────────
+
+    @Nested
+    class NullValidation {
+
+        @Test
+        void download_nullMetadata_throws() {
+            assertThatThrownBy(() -> FileResponseBuilder.download((FileMetadata) null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+
+        @Test
+        void inline_nullMetadata_throws() {
+            assertThatThrownBy(() -> FileResponseBuilder.inline((FileMetadata) null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+    }
+
+    // ── Content-Disposition escaping ─────────────────────────────────
+
+    @Nested
+    class ContentDispositionEscaping {
+
+        @Test
+        void filenameWithDoubleQuote_isEscaped() {
+            ResponseEntity<String> response = FileResponseBuilder.download("file\"name.txt")
+                    .body("data");
+
+            String cd = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+            assertThat(cd).contains("filename=\"file\\\"name.txt\"");
+        }
+
+        @Test
+        void filenameWithBackslash_isEscaped() {
+            ResponseEntity<String> response = FileResponseBuilder.download("file\\name.txt")
+                    .body("data");
+
+            String cd = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+            assertThat(cd).contains("filename=\"file\\\\name.txt\"");
+        }
+
+        @Test
+        void filenameWithBothQuoteAndBackslash_isEscaped() {
+            ResponseEntity<String> response = FileResponseBuilder.download("a\"b\\c.txt")
+                    .body("data");
+
+            String cd = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+            assertThat(cd).contains("filename=\"a\\\"b\\\\c.txt\"");
+        }
+    }
 }

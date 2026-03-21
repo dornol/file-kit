@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ScanResultTest {
 
@@ -116,6 +117,12 @@ class ScanResultTest {
 
             assertEquals(ScanResult.Status.ERROR, result.status());
             assertEquals("", result.message());
+        }
+
+        @Test
+        void constructWithNullStatus_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new ScanResult(null, "message"));
         }
     }
 }

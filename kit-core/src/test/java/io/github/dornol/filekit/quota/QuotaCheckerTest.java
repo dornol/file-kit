@@ -79,6 +79,24 @@ class QuotaCheckerTest {
             when(usageProvider.getUsedBytes(StorageType.LOCAL, "bucket")).thenReturn(1000L);
             assertDoesNotThrow(() -> checker.check(StorageType.LOCAL, "bucket", 0));
         }
+
+        @Test
+        void longOverflow_stillThrowsQuotaExceeded() {
+            when(usageProvider.getUsedBytes(StorageType.LOCAL, "bucket")).thenReturn(Long.MAX_VALUE);
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> checker.check(StorageType.LOCAL, "bucket", Long.MAX_VALUE));
+            assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
+        }
+
+        @Test
+        void nearOverflow_stillThrowsQuotaExceeded() {
+            when(usageProvider.getUsedBytes(StorageType.LOCAL, "bucket")).thenReturn(Long.MAX_VALUE - 1);
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> checker.check(StorageType.LOCAL, "bucket", 2));
+            assertEquals(FileStorageException.QUOTA_EXCEEDED, ex.getMessageKey());
+        }
     }
 
     @Nested

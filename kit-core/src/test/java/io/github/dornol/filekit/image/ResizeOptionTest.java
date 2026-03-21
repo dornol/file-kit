@@ -152,6 +152,12 @@ class ResizeOptionTest {
             ResizeOption option = new ResizeOption(100, 100, ScaleMode.FIT, null, 1.0f);
             assertEquals(1.0f, option.quality(), 0.001f);
         }
+
+        @Test
+        void nullScaleMode_throws() {
+            assertThrows(NullPointerException.class,
+                    () -> new ResizeOption(100, 100, null, null, 0.85f));
+        }
     }
 
     @Nested

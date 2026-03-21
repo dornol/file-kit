@@ -203,6 +203,52 @@ class BaseFileValidationSupportTest {
         verify(context).buildConstraintViolationWithTemplate("{file-kit.validation.invalid-filename}");
     }
 
+    // ── Dimension constraint validation ────────────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void init_negativeDimension_throws() {
+        StubCallbacks callbacks = new StubCallbacks();
+        BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> support.init(new Class[]{TestMediaType.class}, 0L, -1, 0, 0, 0));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void init_minWidthExceedsMaxWidth_throws() {
+        StubCallbacks callbacks = new StubCallbacks();
+        BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> support.init(new Class[]{TestMediaType.class}, 0L, 500, 100, 0, 0));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void init_minHeightExceedsMaxHeight_throws() {
+        StubCallbacks callbacks = new StubCallbacks();
+        BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> support.init(new Class[]{TestMediaType.class}, 0L, 0, 0, 500, 100));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void init_validDimensionConstraints_succeeds() {
+        StubCallbacks callbacks = new StubCallbacks();
+        BaseFileValidationSupport<String> support = new BaseFileValidationSupport<>(callbacks);
+
+        support.init(new Class[]{TestMediaType.class}, 0L, 100, 500, 100, 500);
+
+        assertEquals(100, support.getMinWidth());
+        assertEquals(500, support.getMaxWidth());
+        assertEquals(100, support.getMinHeight());
+        assertEquals(500, support.getMaxHeight());
+    }
+
     @Test
     void isValid_disablesDefaultConstraintOnFailure() {
         StubCallbacks callbacks = new StubCallbacks();

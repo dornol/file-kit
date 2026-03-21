@@ -50,4 +50,21 @@ class ObjectKeyStrategyTest {
         assertThrows(IllegalArgumentException.class, () -> ObjectKeyStrategy.hashPrefixed(5));
     }
 
+    @Test
+    void hashPrefixed_shortKey_throws() {
+        ObjectKeyStrategy strategy = ObjectKeyStrategy.hashPrefixed(2);
+        // "ab" after removing hyphens is only 2 chars, need 4 for depth 2
+        assertThrows(IllegalArgumentException.class,
+                () -> strategy.resolve("ab", "txt"));
+    }
+
+    @Test
+    void hashPrefixed_exactMinimumKeyLength_works() {
+        ObjectKeyStrategy strategy = ObjectKeyStrategy.hashPrefixed(2);
+        // "abcd" is exactly 4 chars, enough for depth 2
+        String result = strategy.resolve("abcd", "txt");
+        assertTrue(result.startsWith("ab/cd/"));
+        assertTrue(result.endsWith("abcd.txt"));
+    }
+
 }

@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -208,6 +209,17 @@ class FileTransferServiceTest {
             assertEquals("test.txt", moved.name());
             verify(sourceStorage).delete(sourceMetadata);
             verify(metadataRepository).deleteByKey("source-key");
+        }
+
+        @Test
+        void deletesMetadataBeforeStorage() {
+            setupCopyMocks();
+
+            service.move("source-key", StorageType.S3, "target-bucket");
+
+            var order = inOrder(metadataRepository, sourceStorage);
+            order.verify(metadataRepository).deleteByKey("source-key");
+            order.verify(sourceStorage).delete(sourceMetadata);
         }
 
         @Test

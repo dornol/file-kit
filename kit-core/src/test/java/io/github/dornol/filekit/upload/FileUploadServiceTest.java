@@ -98,6 +98,20 @@ class FileUploadServiceTest {
                     () -> FileUploadService.builder(null, metadataRepository, formatExtractor, storageResolver)
                             .maxUploadSize(100).build());
         }
+
+        @Test
+        void negativeMaxUploadSize_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> FileUploadService.builder(checksumCalculator, metadataRepository,
+                            formatExtractor, storageResolver).maxUploadSize(-1));
+        }
+
+        @Test
+        void zeroMaxUploadSize_allowed() {
+            FileUploadService svc = FileUploadService.builder(checksumCalculator, metadataRepository,
+                    formatExtractor, storageResolver).maxUploadSize(0).build();
+            assertNotNull(svc);
+        }
     }
 
     // ── Parameter validation ─────────────────────────────────────────

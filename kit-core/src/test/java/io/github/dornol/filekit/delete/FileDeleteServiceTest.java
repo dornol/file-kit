@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,6 +57,30 @@ class FileDeleteServiceTest {
         service.delete("file-key");
 
         verify(fileStorage).delete(metadata);
+        verify(metadataRepository).deleteByKey("file-key");
+    }
+
+    @Test
+    void delete_deletesMetadataBeforeStorage() {
+        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+        when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+
+        service.delete("file-key");
+
+        var order = inOrder(metadataRepository, fileStorage);
+        order.verify(metadataRepository).deleteByKey("file-key");
+        order.verify(fileStorage).delete(metadata);
+    }
+
+    @Test
+    void delete_storageFailureAfterMetadataDelete_propagates() {
+        when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+        when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+        doThrow(new FileStorageException(FileStorageException.DELETE_FAILED, "disk error"))
+                .when(fileStorage).delete(metadata);
+
+        assertThrows(FileStorageException.class, () -> service.delete("file-key"));
+        // Metadata was already deleted (metadata-first order)
         verify(metadataRepository).deleteByKey("file-key");
     }
 
