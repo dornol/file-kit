@@ -5,7 +5,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -351,6 +355,107 @@ class FileValidationHelperTest {
                 @Override public long getSize() { return content.length; }
                 @Override public boolean isEmpty() { return content.length == 0; }
             };
+        }
+    }
+
+    // ── validateImageDimensions ──────────────────────────────────────
+
+    @Nested
+    class ValidateImageDimensions {
+
+        private TestFileSource imageSource(int width, int height) {
+            try {
+                BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(img, "png", baos);
+                return new TestFileSource("image.png", baos.toByteArray());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void returnsNullWhenNoDimensionConstraints() {
+            TestFileSource file = imageSource(100, 100);
+            assertNull(helper.validateImageDimensions(file, 0, 0, 0, 0));
+        }
+
+        @Test
+        void returnsNullWhenWithinAllConstraints() {
+            TestFileSource file = imageSource(200, 150);
+            assertNull(helper.validateImageDimensions(file, 100, 300, 100, 200));
+        }
+
+        @Test
+        void returnsNullWhenExactlyAtMinimum() {
+            TestFileSource file = imageSource(100, 100);
+            assertNull(helper.validateImageDimensions(file, 100, 0, 100, 0));
+        }
+
+        @Test
+        void returnsNullWhenExactlyAtMaximum() {
+            TestFileSource file = imageSource(300, 200);
+            assertNull(helper.validateImageDimensions(file, 0, 300, 0, 200));
+        }
+
+        @Test
+        void returnsErrorWhenWidthBelowMinimum() {
+            TestFileSource file = imageSource(50, 100);
+            assertEquals("file-kit.validation.invalid-image-dimensions",
+                    helper.validateImageDimensions(file, 100, 0, 0, 0));
+        }
+
+        @Test
+        void returnsErrorWhenWidthExceedsMaximum() {
+            TestFileSource file = imageSource(500, 100);
+            assertEquals("file-kit.validation.invalid-image-dimensions",
+                    helper.validateImageDimensions(file, 0, 300, 0, 0));
+        }
+
+        @Test
+        void returnsErrorWhenHeightBelowMinimum() {
+            TestFileSource file = imageSource(100, 50);
+            assertEquals("file-kit.validation.invalid-image-dimensions",
+                    helper.validateImageDimensions(file, 0, 0, 100, 0));
+        }
+
+        @Test
+        void returnsErrorWhenHeightExceedsMaximum() {
+            TestFileSource file = imageSource(100, 500);
+            assertEquals("file-kit.validation.invalid-image-dimensions",
+                    helper.validateImageDimensions(file, 0, 0, 0, 300));
+        }
+
+        @Test
+        void returnsErrorForNonImageFile() {
+            TestFileSource file = new TestFileSource("file.txt", "not an image".getBytes());
+            assertEquals("file-kit.validation.invalid-image-dimensions",
+                    helper.validateImageDimensions(file, 100, 0, 0, 0));
+        }
+
+        @Test
+        void onlyMinWidthConstraint() {
+            TestFileSource file = imageSource(200, 50);
+            assertNull(helper.validateImageDimensions(file, 100, 0, 0, 0));
+        }
+
+        @Test
+        void onlyMaxHeightConstraint() {
+            TestFileSource file = imageSource(1000, 200);
+            assertNull(helper.validateImageDimensions(file, 0, 0, 0, 300));
+        }
+
+        @Test
+        void batchValidation_returnsNullWhenAllValid() {
+            List<TestFileSource> files = List.of(imageSource(200, 200), imageSource(300, 300));
+            assertNull(helper.validateAllImageDimensions(files, 100, 400, 100, 400));
+        }
+
+        @Test
+        void batchValidation_returnsErrorForFirstInvalid() {
+            List<TestFileSource> files = List.of(imageSource(200, 200), imageSource(50, 50));
+            assertEquals("file-kit.validation.invalid-image-dimensions",
+                    helper.validateAllImageDimensions(files, 100, 400, 100, 400));
         }
     }
 

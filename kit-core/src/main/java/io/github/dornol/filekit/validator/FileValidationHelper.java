@@ -5,8 +5,13 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -154,6 +159,82 @@ public class FileValidationHelper {
         }
 
         return true;
+    }
+
+    /**
+     * Validates image dimensions against the given constraints.
+     * Uses ImageIO to read only the image header (width/height) without decoding the full image.
+     *
+     * @param value     the file to check
+     * @param minWidth  minimum width in pixels (0 = no limit)
+     * @param maxWidth  maximum width in pixels (0 = no limit)
+     * @param minHeight minimum height in pixels (0 = no limit)
+     * @param maxHeight maximum height in pixels (0 = no limit)
+     * @return {@code null} if valid, or the message key for the failed check
+     */
+    public @Nullable String validateImageDimensions(FileSource value,
+                                                     int minWidth, int maxWidth,
+                                                     int minHeight, int maxHeight) {
+        Objects.requireNonNull(value, "value");
+        try (InputStream is = value.getInputStream();
+             ImageInputStream iis = ImageIO.createImageInputStream(is)) {
+            if (iis == null) {
+                log.debug("Unable to create image input stream for dimension validation");
+                return "file-kit.validation.invalid-image-dimensions";
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
+            if (!readers.hasNext()) {
+                log.debug("No suitable image reader found for dimension validation");
+                return "file-kit.validation.invalid-image-dimensions";
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(iis);
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+
+                if (minWidth > 0 && width < minWidth) {
+                    log.debug("Image width {} is below minimum {}", width, minWidth);
+                    return "file-kit.validation.invalid-image-dimensions";
+                }
+                if (maxWidth > 0 && width > maxWidth) {
+                    log.debug("Image width {} exceeds maximum {}", width, maxWidth);
+                    return "file-kit.validation.invalid-image-dimensions";
+                }
+                if (minHeight > 0 && height < minHeight) {
+                    log.debug("Image height {} is below minimum {}", height, minHeight);
+                    return "file-kit.validation.invalid-image-dimensions";
+                }
+                if (maxHeight > 0 && height > maxHeight) {
+                    log.debug("Image height {} exceeds maximum {}", height, maxHeight);
+                    return "file-kit.validation.invalid-image-dimensions";
+                }
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException e) {
+            log.debug("Failed to read image dimensions", e);
+            return "file-kit.validation.invalid-image-dimensions";
+        }
+        return null;
+    }
+
+    /**
+     * Validates image dimensions for each file in the iterable.
+     *
+     * @return {@code null} if all valid, or the message key for the first failed check
+     */
+    public @Nullable String validateAllImageDimensions(Iterable<? extends FileSource> files,
+                                                        int minWidth, int maxWidth,
+                                                        int minHeight, int maxHeight) {
+        Objects.requireNonNull(files, "files");
+        for (FileSource file : files) {
+            String result = validateImageDimensions(file, minWidth, maxWidth, minHeight, maxHeight);
+            if (result != null) {
+                return result;
+            }
+        }
+        return null;
     }
 
     // --- Batch validation methods for array/collection validators ---

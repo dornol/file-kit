@@ -24,6 +24,7 @@ dependencies {
     compileOnly(libs.spring.webflux)
     compileOnly(libs.spring.boot.autoconfigure)
     compileOnly(libs.tika.core)
+    compileOnly(libs.micrometer.core)
 
     annotationProcessor(libs.spring.boot.configuration.processor)
 
@@ -41,6 +42,8 @@ dependencies {
     testImplementation(libs.assertj.core)
     testImplementation(libs.tika.core)
     testImplementation(libs.pdfbox)
+    testImplementation(libs.micrometer.core)
+    testImplementation(libs.micrometer.test)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 

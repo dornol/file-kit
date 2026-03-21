@@ -18,7 +18,7 @@ import java.util.Set;
  * Validation messages use Jakarta Validation's standard message interpolation
  * with keys like {@code {file-kit.validation.unsupported-media-type}}.</p>
  *
- * <p>Validation order: empty &rarr; size &rarr; filename &rarr; media type + extension.
+ * <p>Validation order: empty &rarr; size &rarr; filename &rarr; media type + extension &rarr; image dimensions.
  * Lightweight checks run first to avoid unnecessary I/O for invalid files.</p>
  *
  * @param <T> the type of value being validated
@@ -30,6 +30,10 @@ public class BaseFileValidationSupport<T> {
     private final FileValidationCallbacks<T> callbacks;
     private Set<SafeMediaType> allowedMediaTypes;
     private long maxSize;
+    private int minWidth;
+    private int maxWidth;
+    private int minHeight;
+    private int maxHeight;
 
     /** @param callbacks delegate that implements the actual validation checks */
     public BaseFileValidationSupport(FileValidationCallbacks<T> callbacks) {
@@ -43,6 +47,21 @@ public class BaseFileValidationSupport<T> {
      * @param maxSize          maximum file size in bytes (0 = no limit)
      */
     public void init(Class<? extends Enum<? extends SafeMediaType>>[] mediaTypeClasses, long maxSize) {
+        init(mediaTypeClasses, maxSize, 0, 0, 0, 0);
+    }
+
+    /**
+     * Initializes allowed media types, max size, and image dimension constraints.
+     *
+     * @param mediaTypeClasses enum classes implementing {@link SafeMediaType}
+     * @param maxSize          maximum file size in bytes (0 = no limit)
+     * @param minWidth         minimum image width in pixels (0 = no limit)
+     * @param maxWidth         maximum image width in pixels (0 = no limit)
+     * @param minHeight        minimum image height in pixels (0 = no limit)
+     * @param maxHeight        maximum image height in pixels (0 = no limit)
+     */
+    public void init(Class<? extends Enum<? extends SafeMediaType>>[] mediaTypeClasses, long maxSize,
+                     int minWidth, int maxWidth, int minHeight, int maxHeight) {
         Set<SafeMediaType> safeMediaTypes = new HashSet<>();
 
         for (Class<? extends Enum<? extends SafeMediaType>> enumClass : mediaTypeClasses) {
@@ -59,15 +78,20 @@ public class BaseFileValidationSupport<T> {
 
         this.allowedMediaTypes = Collections.unmodifiableSet(safeMediaTypes);
         this.maxSize = maxSize;
+        this.minWidth = minWidth;
+        this.maxWidth = maxWidth;
+        this.minHeight = minHeight;
+        this.maxHeight = maxHeight;
 
-        log.debug("Initialized file validation: allowedMediaTypes={}, maxSize={}", safeMediaTypes, maxSize);
+        log.debug("Initialized file validation: allowedMediaTypes={}, maxSize={}, dimensions=[{}x{} ~ {}x{}]",
+                safeMediaTypes, maxSize, minWidth, minHeight, maxWidth, maxHeight);
     }
 
     /**
      * Runs all validation checks against the given value.
      *
-     * <p>Validation order: empty &rarr; size &rarr; filename &rarr; media type + extension.
-     * Lightweight checks run first to avoid unnecessary MIME detection I/O.</p>
+     * <p>Validation order: empty &rarr; size &rarr; filename &rarr; media type + extension &rarr; image dimensions.
+     * Lightweight checks run first to avoid unnecessary I/O.</p>
      *
      * @param value   the value to validate
      * @param context the constraint validator context
@@ -103,6 +127,15 @@ public class BaseFileValidationSupport<T> {
             return false;
         }
 
+        if (hasDimensionConstraints()) {
+            String dimensionError = callbacks.validateImageDimensions(value);
+            if (dimensionError != null) {
+                log.debug("Validation failed: {}", dimensionError);
+                applyConstraintViolation(context, dimensionError);
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -112,6 +145,26 @@ public class BaseFileValidationSupport<T> {
 
     public long getMaxSize() {
         return maxSize;
+    }
+
+    public int getMinWidth() {
+        return minWidth;
+    }
+
+    public int getMaxWidth() {
+        return maxWidth;
+    }
+
+    public int getMinHeight() {
+        return minHeight;
+    }
+
+    public int getMaxHeight() {
+        return maxHeight;
+    }
+
+    private boolean hasDimensionConstraints() {
+        return minWidth > 0 || maxWidth > 0 || minHeight > 0 || maxHeight > 0;
     }
 
     private void applyConstraintViolation(ConstraintValidatorContext context, String messageKey) {

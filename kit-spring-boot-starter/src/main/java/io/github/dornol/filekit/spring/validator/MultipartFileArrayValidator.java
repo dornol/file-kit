@@ -47,6 +47,12 @@ public class MultipartFileArrayValidator extends AbstractMultipartFileValidator<
         return helper.validateAllMediaTypeAndExtension(toSources(value), getAllowedMediaTypes());
     }
 
+    @Override
+    public @Nullable String validateImageDimensions(MultipartFile[] value) {
+        return helper.validateAllImageDimensions(toSources(value),
+                getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+    }
+
     private static List<FileSource> toSources(MultipartFile[] files) {
         return Arrays.stream(files).<FileSource>map(MultipartFileSource::new).toList();
     }

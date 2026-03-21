@@ -42,4 +42,10 @@ public class MultipartFileValidator extends AbstractMultipartFileValidator<Multi
     public @Nullable String validateMediaTypeAndExtension(MultipartFile value) {
         return helper.validateMediaTypeAndExtension(new MultipartFileSource(value), getAllowedMediaTypes());
     }
+
+    @Override
+    public @Nullable String validateImageDimensions(MultipartFile value) {
+        return helper.validateImageDimensions(new MultipartFileSource(value),
+                getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+    }
 }

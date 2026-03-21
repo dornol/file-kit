@@ -77,6 +77,27 @@ public class FileUploadController {
 
 That's it. No configuration class needed.
 
+#### Image dimension validation
+
+For image uploads, you can enforce minimum/maximum width and height:
+
+```java
+@PostMapping("/upload-avatar")
+public ResponseEntity<?> uploadAvatar(
+        @RequestParam("file")
+        @ValidMultipartFile(
+                value = AllowedMediaType.class,
+                maxSize = 5 * 1024 * 1024,
+                minWidth = 200, minHeight = 200,
+                maxWidth = 4096, maxHeight = 4096)
+        MultipartFile file) {
+    // file is validated - guaranteed to be 200x200 ~ 4096x4096
+    return ResponseEntity.ok("Uploaded: " + file.getOriginalFilename());
+}
+```
+
+Dimension constraints use ImageIO to read only the image header — no full decoding, minimal overhead. Non-image files fail validation when any dimension constraint is set.
+
 ### WebFlux (FilePart) Support
 
 For Spring WebFlux applications, use `FilePartSource` to wrap a `FilePart` as a `FileSource`. This lets you use the same `FileUploadService` without any changes:
@@ -657,6 +678,28 @@ The following beans are registered automatically when their dependencies are pre
 | `FileEncryptor` | Always (`NoOpFileEncryptor` default, overridable) |
 | `QuotaChecker` | `QuotaPolicy` + `QuotaUsageProvider` (both required) |
 | `FileEventPublisher` | Always (collects all `FileEventListener` beans, empty list if none) |
+| `FileKitMetrics` | When Micrometer is on the classpath + `MeterRegistry` bean available |
+
+### Micrometer metrics
+
+When `spring-boot-starter-actuator` is on the classpath, file-kit automatically records metrics via `FileKitMetrics`:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `file.kit.uploads` | Counter | Upload count (tags: `storageType`, `bucket`) |
+| `file.kit.upload.size` | DistributionSummary | Uploaded file size in bytes |
+| `file.kit.downloads` | Counter | Download count |
+| `file.kit.deletes` | Counter | Delete count |
+| `file.kit.copies` | Counter | Copy count |
+| `file.kit.moves` | Counter | Move count |
+
+No configuration needed — just add the actuator dependency:
+
+```groovy
+implementation 'org.springframework.boot:spring-boot-starter-actuator'
+```
+
+Metrics are automatically exported to any configured Micrometer backend (Prometheus, Datadog, CloudWatch, etc.).
 
 ## Image Processing
 
@@ -1073,6 +1116,7 @@ If no custom `FileEncryptor` bean is registered, encryption is skipped entirely.
 | File size | Rejects files exceeding `maxSize` (in bytes) |
 | Filename | Rejects null, blank, too-long (>200 chars), and path traversal patterns (`..`, `/`, `\`) |
 | Extension | Verifies that file extension matches the detected content type |
+| Image dimensions | Validates width/height against `minWidth`/`maxWidth`/`minHeight`/`maxHeight` (only when set) |
 
 ## Error Messages
 
@@ -1086,6 +1130,7 @@ file-kit.validation.file-empty=File is empty
 file-kit.validation.file-too-large=File size exceeded
 file-kit.validation.invalid-filename=Invalid filename
 file-kit.validation.invalid-extension=Invalid file extension
+file-kit.validation.invalid-image-dimensions=Image dimensions out of range
 ```
 
 ### Storage error messages

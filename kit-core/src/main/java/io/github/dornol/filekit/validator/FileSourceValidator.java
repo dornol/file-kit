@@ -41,4 +41,9 @@ public class FileSourceValidator extends AbstractFileValidator<FileSource> {
     public @Nullable String validateMediaTypeAndExtension(FileSource value) {
         return helper.validateMediaTypeAndExtension(value, getAllowedMediaTypes());
     }
+
+    @Override
+    public @Nullable String validateImageDimensions(FileSource value) {
+        return helper.validateImageDimensions(value, getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+    }
 }

@@ -33,4 +33,15 @@ public interface FileValidationCallbacks<T> {
      */
     @Nullable String validateMediaTypeAndExtension(T value);
 
+    /**
+     * Validates image dimensions (width/height) against configured constraints.
+     * Only called when at least one dimension constraint is set.
+     *
+     * @param value the value to validate
+     * @return {@code null} if valid, or the message key for the failed check
+     */
+    default @Nullable String validateImageDimensions(T value) {
+        return null;
+    }
+
 }

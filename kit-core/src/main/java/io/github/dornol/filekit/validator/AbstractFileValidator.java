@@ -27,7 +27,9 @@ public abstract class AbstractFileValidator<T> implements ConstraintValidator<Va
     @Override
     public void initialize(ValidFile constraintAnnotation) {
         ConstraintValidator.super.initialize(constraintAnnotation);
-        support.init(constraintAnnotation.value(), constraintAnnotation.maxSize());
+        support.init(constraintAnnotation.value(), constraintAnnotation.maxSize(),
+                constraintAnnotation.minWidth(), constraintAnnotation.maxWidth(),
+                constraintAnnotation.minHeight(), constraintAnnotation.maxHeight());
     }
 
     @Override
@@ -43,6 +45,22 @@ public abstract class AbstractFileValidator<T> implements ConstraintValidator<Va
     /** Returns the maximum file size configured on the annotation (0 = no limit). */
     protected long getMaxSize() {
         return support.getMaxSize();
+    }
+
+    protected int getMinWidth() {
+        return support.getMinWidth();
+    }
+
+    protected int getMaxWidth() {
+        return support.getMaxWidth();
+    }
+
+    protected int getMinHeight() {
+        return support.getMinHeight();
+    }
+
+    protected int getMaxHeight() {
+        return support.getMaxHeight();
     }
 
 }

@@ -43,4 +43,9 @@ public class FileSourceArrayValidator extends AbstractFileValidator<FileSource[]
     public @Nullable String validateMediaTypeAndExtension(FileSource[] value) {
         return helper.validateAllMediaTypeAndExtension(Arrays.asList(value), getAllowedMediaTypes());
     }
+
+    @Override
+    public @Nullable String validateImageDimensions(FileSource[] value) {
+        return helper.validateAllImageDimensions(Arrays.asList(value), getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+    }
 }

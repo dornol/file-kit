@@ -43,4 +43,9 @@ public class FileSourceCollectionValidator extends AbstractFileValidator<Collect
     public @Nullable String validateMediaTypeAndExtension(Collection<FileSource> value) {
         return helper.validateAllMediaTypeAndExtension(value, getAllowedMediaTypes());
     }
+
+    @Override
+    public @Nullable String validateImageDimensions(Collection<FileSource> value) {
+        return helper.validateAllImageDimensions(value, getMinWidth(), getMaxWidth(), getMinHeight(), getMaxHeight());
+    }
 }

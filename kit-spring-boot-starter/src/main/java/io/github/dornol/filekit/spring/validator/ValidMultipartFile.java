@@ -46,6 +46,27 @@ public @interface ValidMultipartFile {
     long maxSize() default 0L;
 
     /**
+     * Minimum required image width in pixels. {@code 0} means no limit.
+     * Only applied to image files; non-image files fail validation if any dimension constraint is set.
+     */
+    int minWidth() default 0;
+
+    /**
+     * Maximum allowed image width in pixels. {@code 0} means no limit.
+     */
+    int maxWidth() default 0;
+
+    /**
+     * Minimum required image height in pixels. {@code 0} means no limit.
+     */
+    int minHeight() default 0;
+
+    /**
+     * Maximum allowed image height in pixels. {@code 0} means no limit.
+     */
+    int maxHeight() default 0;
+
+    /**
      * Enum classes implementing {@link SafeMediaType} that define the allowed media types.
      */
     Class<? extends Enum<? extends SafeMediaType>>[] value() default {};
