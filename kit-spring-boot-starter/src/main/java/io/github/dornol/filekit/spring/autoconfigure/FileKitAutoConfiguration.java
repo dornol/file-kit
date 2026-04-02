@@ -216,7 +216,9 @@ public class FileKitAutoConfiguration {
                                                        FileStorageResolver storageResolver,
                                                        FileEncryptor fileEncryptor) {
         log.info("Registering SpringDownloadService");
-        return new SpringDownloadService(metadataRepository, storageResolver, fileEncryptor);
+        return SpringDownloadService.builder(metadataRepository, storageResolver)
+                .fileEncryptor(fileEncryptor)
+                .build();
     }
 
     @Bean
@@ -277,7 +279,10 @@ public class FileKitAutoConfiguration {
                                                     FileEventPublisher eventPublisher) {
         QuotaChecker quotaChecker = quotaCheckerProvider.getIfAvailable();
         log.info("Registering FileTransferService (quota={})", quotaChecker != null ? "enabled" : "none");
-        return new FileTransferService(metadataRepository, storageResolver, quotaChecker, eventPublisher);
+        return FileTransferService.builder(metadataRepository, storageResolver)
+                .quotaChecker(quotaChecker)
+                .eventPublisher(eventPublisher)
+                .build();
     }
 
     @Configuration

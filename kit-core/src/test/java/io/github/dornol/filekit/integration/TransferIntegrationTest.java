@@ -50,8 +50,8 @@ class TransferIntegrationTest {
 
         uploadService = FileUploadService.builder(new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("text/plain", "txt", "text"), storageResolver).build();
-        downloadService = new FileDownloadService(metadataRepository, storageResolver);
-        transferService = new FileTransferService(metadataRepository, storageResolver);
+        downloadService = FileDownloadService.builder(metadataRepository, storageResolver).build();
+        transferService = FileTransferService.builder(metadataRepository, storageResolver).build();
     }
 
     @Nested

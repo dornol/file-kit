@@ -41,27 +41,6 @@ public class FileDeleteService extends AbstractFileOperationService {
         return new Builder(metadataRepository, storageResolver);
     }
 
-    /**
-     * @param metadataRepository repository for file metadata lookup and deletion
-     * @param storageResolver    resolver to find the storage backend for each file
-     */
-    public FileDeleteService(FileMetadataRepository metadataRepository,
-                             FileStorageResolver storageResolver) {
-        this(metadataRepository, storageResolver, new FileEventPublisher(List.of()));
-    }
-
-    /**
-     * @param metadataRepository repository for file metadata lookup and deletion
-     * @param storageResolver    resolver to find the storage backend for each file
-     * @param eventPublisher     publisher for file lifecycle events
-     */
-    public FileDeleteService(FileMetadataRepository metadataRepository,
-                             FileStorageResolver storageResolver,
-                             FileEventPublisher eventPublisher) {
-        super(metadataRepository, storageResolver);
-        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
-    }
-
     private FileDeleteService(Builder b) {
         super(b.metadataRepository, b.storageResolver);
         this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
@@ -124,7 +103,7 @@ public class FileDeleteService extends AbstractFileOperationService {
     public BatchDeleteResult deleteAll(Collection<String> fileKeys) {
         Objects.requireNonNull(fileKeys, "fileKeys");
 
-        java.util.List<String> succeeded = new ArrayList<>();
+        List<String> succeeded = new ArrayList<>();
         Map<String, String> failed = new LinkedHashMap<>();
 
         for (String fileKey : fileKeys) {

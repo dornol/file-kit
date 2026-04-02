@@ -57,8 +57,8 @@ class UploadDownloadIntegrationTest {
 
         uploadService = FileUploadService.builder(checksumCalculator, metadataRepository,
                 formatExtractor, storageResolver).build();
-        downloadService = new FileDownloadService(metadataRepository, storageResolver);
-        deleteService = new FileDeleteService(metadataRepository, storageResolver);
+        downloadService = FileDownloadService.builder(metadataRepository, storageResolver).build();
+        deleteService = FileDeleteService.builder(metadataRepository, storageResolver).build();
     }
 
     // ── Upload → Download full flow ──────────────────────────────────

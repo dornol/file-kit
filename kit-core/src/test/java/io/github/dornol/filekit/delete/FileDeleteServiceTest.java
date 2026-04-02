@@ -47,7 +47,7 @@ class FileDeleteServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FileDeleteService(metadataRepository, storageResolver);
+        service = FileDeleteService.builder(metadataRepository, storageResolver).build();
     }
 
     @Test
@@ -99,15 +99,15 @@ class FileDeleteServiceTest {
     }
 
     @Test
-    void constructor_nullMetadataRepository_throws() {
+    void builder_nullMetadataRepository_throws() {
         assertThrows(NullPointerException.class,
-                () -> new FileDeleteService(null, storageResolver));
+                () -> FileDeleteService.builder(null, storageResolver));
     }
 
     @Test
-    void constructor_nullStorageResolver_throws() {
+    void builder_nullStorageResolver_throws() {
         assertThrows(NullPointerException.class,
-                () -> new FileDeleteService(metadataRepository, null));
+                () -> FileDeleteService.builder(metadataRepository, null));
     }
 
     // ── Event integration ────────────────────────────────────────────
@@ -116,8 +116,8 @@ class FileDeleteServiceTest {
     class EventIntegration {
 
         FileEventListener listener = mock(FileEventListener.class);
-        FileDeleteService serviceWithEvents = new FileDeleteService(
-                metadataRepository, storageResolver, new FileEventPublisher(List.of(listener)));
+        FileDeleteService serviceWithEvents = FileDeleteService.builder(metadataRepository, storageResolver)
+                .eventPublisher(new FileEventPublisher(List.of(listener))).build();
 
         @Test
         void deleteFires_onDeleted() {
@@ -195,25 +195,6 @@ class FileDeleteServiceTest {
 
             assertTrue(result.allSucceeded());
             assertEquals(2, result.succeeded().size());
-        }
-    }
-
-    // ── Full constructor validation ──────────────────────────────────
-
-    @Nested
-    class FullConstructorValidation {
-
-        @Test
-        void nullEventPublisher_throws() {
-            assertThrows(NullPointerException.class,
-                    () -> new FileDeleteService(metadataRepository, storageResolver, null));
-        }
-
-        @Test
-        void threeArgConstructor_valid() {
-            FileDeleteService svc = new FileDeleteService(
-                    metadataRepository, storageResolver, new FileEventPublisher(List.of()));
-            assertNotNull(svc);
         }
     }
 

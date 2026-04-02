@@ -45,8 +45,8 @@ class BatchDeleteIntegrationTest {
 
         uploadService = FileUploadService.builder(new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("text/plain", "txt", "text"), storageResolver).build();
-        downloadService = new FileDownloadService(metadataRepository, storageResolver);
-        deleteService = new FileDeleteService(metadataRepository, storageResolver);
+        downloadService = FileDownloadService.builder(metadataRepository, storageResolver).build();
+        deleteService = FileDeleteService.builder(metadataRepository, storageResolver).build();
     }
 
     @Test

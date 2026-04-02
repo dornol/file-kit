@@ -53,8 +53,8 @@ class QuotaIntegrationTest {
                 is -> new FileFormat("text/plain", "txt", "text"),
                 storageResolver).quotaChecker(quotaChecker).eventPublisher(eventPublisher).build();
 
-        transferService = new FileTransferService(metadataRepository, storageResolver,
-                quotaChecker, eventPublisher);
+        transferService = FileTransferService.builder(metadataRepository, storageResolver)
+                .quotaChecker(quotaChecker).eventPublisher(eventPublisher).build();
     }
 
     @Nested

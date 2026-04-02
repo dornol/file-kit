@@ -45,20 +45,6 @@ public class FileTransferService extends AbstractFileOperationService {
         return new Builder(metadataRepository, storageResolver);
     }
 
-    public FileTransferService(FileMetadataRepository metadataRepository,
-                               FileStorageResolver storageResolver) {
-        this(metadataRepository, storageResolver, null, new FileEventPublisher(List.of()));
-    }
-
-    public FileTransferService(FileMetadataRepository metadataRepository,
-                               FileStorageResolver storageResolver,
-                               @Nullable QuotaChecker quotaChecker,
-                               FileEventPublisher eventPublisher) {
-        super(metadataRepository, storageResolver);
-        this.quotaChecker = quotaChecker;
-        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
-    }
-
     private FileTransferService(Builder b) {
         super(b.metadataRepository, b.storageResolver);
         this.quotaChecker = b.quotaChecker;

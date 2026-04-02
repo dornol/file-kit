@@ -56,10 +56,12 @@ class EventIntegrationTest {
                 new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("text/plain", "txt", "text"),
                 storageResolver).eventPublisher(eventPublisher).build();
-        downloadService = new FileDownloadService(metadataRepository, storageResolver,
-                new io.github.dornol.filekit.spi.NoOpFileEncryptor(), eventPublisher);
-        deleteService = new FileDeleteService(metadataRepository, storageResolver, eventPublisher);
-        transferService = new FileTransferService(metadataRepository, storageResolver, null, eventPublisher);
+        downloadService = FileDownloadService.builder(metadataRepository, storageResolver)
+                .eventPublisher(eventPublisher).build();
+        deleteService = FileDeleteService.builder(metadataRepository, storageResolver)
+                .eventPublisher(eventPublisher).build();
+        transferService = FileTransferService.builder(metadataRepository, storageResolver)
+                .eventPublisher(eventPublisher).build();
     }
 
     @Nested

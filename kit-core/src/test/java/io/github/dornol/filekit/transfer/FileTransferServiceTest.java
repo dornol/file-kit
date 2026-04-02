@@ -52,7 +52,7 @@ class FileTransferServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FileTransferService(metadataRepository, storageResolver);
+        service = FileTransferService.builder(metadataRepository, storageResolver).build();
     }
 
     private void setupCopyMocks() {
@@ -342,8 +342,8 @@ class FileTransferServiceTest {
     class QuotaIntegration {
 
         QuotaChecker quotaChecker = mock(QuotaChecker.class);
-        FileTransferService serviceWithQuota = new FileTransferService(
-                metadataRepository, storageResolver, quotaChecker, new FileEventPublisher(List.of()));
+        FileTransferService serviceWithQuota = FileTransferService.builder(metadataRepository, storageResolver)
+                .quotaChecker(quotaChecker).build();
 
         @Test
         void copy_quotaExceeded_throwsBeforeUpload() {
@@ -396,8 +396,8 @@ class FileTransferServiceTest {
     class EventIntegration {
 
         FileEventListener listener = mock(FileEventListener.class);
-        FileTransferService serviceWithEvents = new FileTransferService(
-                metadataRepository, storageResolver, null, new FileEventPublisher(List.of(listener)));
+        FileTransferService serviceWithEvents = FileTransferService.builder(metadataRepository, storageResolver)
+                .eventPublisher(new FileEventPublisher(List.of(listener))).build();
 
         @Test
         void copy_fires_onCopied() {
@@ -459,37 +459,39 @@ class FileTransferServiceTest {
     // ── Constructor validation ──────────────────────────────────────
 
     @Nested
-    class ConstructorValidation {
+    class BuilderValidation {
 
         @Test
         void nullMetadataRepository_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileTransferService(null, storageResolver));
+                    () -> FileTransferService.builder(null, storageResolver));
         }
 
         @Test
         void nullStorageResolver_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileTransferService(metadataRepository, null));
+                    () -> FileTransferService.builder(metadataRepository, null));
         }
 
         @Test
-        void validConstruction() {
-            FileTransferService svc = new FileTransferService(metadataRepository, storageResolver);
+        void defaultsWork() {
+            FileTransferService svc = FileTransferService.builder(metadataRepository, storageResolver).build();
             assertNotNull(svc);
         }
 
         @Test
-        void fullConstructor_nullQuotaChecker_allowed() {
-            FileTransferService svc = new FileTransferService(
-                    metadataRepository, storageResolver, null, new FileEventPublisher(List.of()));
+        void nullQuotaChecker_allowed() {
+            FileTransferService svc = FileTransferService.builder(metadataRepository, storageResolver)
+                    .quotaChecker(null).build();
             assertNotNull(svc);
         }
 
         @Test
-        void fullConstructor_nullEventPublisher_throws() {
-            assertThrows(NullPointerException.class,
-                    () -> new FileTransferService(metadataRepository, storageResolver, null, null));
+        void withEventPublisher() {
+            FileEventListener listener = mock(FileEventListener.class);
+            FileTransferService svc = FileTransferService.builder(metadataRepository, storageResolver)
+                    .eventPublisher(new FileEventPublisher(List.of(listener))).build();
+            assertNotNull(svc);
         }
     }
 }

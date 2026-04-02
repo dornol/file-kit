@@ -59,8 +59,8 @@ class LocalStorageIntegrationTest {
                 new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("application/octet-stream", "bin", "application"),
                 storageResolver).build();
-        downloadService = new FileDownloadService(metadataRepository, storageResolver);
-        deleteService = new FileDeleteService(metadataRepository, storageResolver);
+        downloadService = FileDownloadService.builder(metadataRepository, storageResolver).build();
+        deleteService = FileDeleteService.builder(metadataRepository, storageResolver).build();
     }
 
     @Nested
