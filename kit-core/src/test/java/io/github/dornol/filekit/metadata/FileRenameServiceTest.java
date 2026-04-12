@@ -15,8 +15,10 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,10 +32,10 @@ class FileRenameServiceTest {
     FileEventListener listener = mock(FileEventListener.class);
     FileRenameService service;
 
+    private final FileFormat format = new FileFormat("text/plain", "txt", "text");
+    private final FileLocation location = new FileLocation("bucket", "obj-key", StorageType.LOCAL);
     private final FileMetadata metadata = new FileMetadata(
-            "file-key", "old-name.txt", 100, "checksum",
-            new FileFormat("text/plain", "txt", "text"),
-            new FileLocation("bucket", "obj-key", StorageType.LOCAL)
+            "file-key", "old-name.txt", 100, "checksum", format, location
     );
 
     @BeforeEach
@@ -57,16 +59,36 @@ class FileRenameServiceTest {
             assertEquals("new-name.txt", result.name());
             assertEquals(metadata.size(), result.size());
             assertEquals(metadata.checksum(), result.checksum());
+            assertEquals(format, result.format());
+            assertEquals(location, result.location());
         }
 
         @Test
-        void firesRenamedEvent() {
+        void firesRenamedEvent_withBeforeAndAfter() {
             when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
             when(metadataRepository.update(any())).thenAnswer(inv -> inv.getArgument(0));
 
             FileMetadata result = service.rename("file-key", "new-name.txt");
 
             verify(listener).onRenamed(metadata, result);
+            assertEquals("old-name.txt", metadata.name());
+            assertEquals("new-name.txt", result.name());
+        }
+
+        @Test
+        void passesUpdatedMetadataToRepository() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(metadataRepository.update(any())).thenAnswer(inv -> {
+                FileMetadata updated = inv.getArgument(0);
+                assertEquals("file-key", updated.key());
+                assertEquals("new-name.txt", updated.name());
+                assertEquals(metadata.checksum(), updated.checksum());
+                return updated;
+            });
+
+            service.rename("file-key", "new-name.txt");
+
+            verify(metadataRepository).update(any());
         }
 
         @Test
@@ -77,6 +99,19 @@ class FileRenameServiceTest {
             FileStorageException ex = assertThrows(FileStorageException.class,
                     () -> service.rename("missing", "new.txt"));
             assertEquals(FileStorageException.FILE_NOT_FOUND, ex.getMessageKey());
+            verify(metadataRepository, never()).update(any());
+        }
+
+        @Test
+        void listenerException_doesNotBreakRename() {
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(metadataRepository.update(any())).thenAnswer(inv -> inv.getArgument(0));
+            doThrow(new RuntimeException("boom")).when(listener).onRenamed(any(), any());
+
+            FileMetadata result = service.rename("file-key", "new-name.txt");
+
+            assertNotNull(result);
+            assertEquals("new-name.txt", result.name());
         }
     }
 
@@ -99,15 +134,25 @@ class FileRenameServiceTest {
         void tooLongFilename_throws() {
             String longName = "a".repeat(201) + ".txt";
 
-            assertThrows(FileStorageException.class,
+            FileStorageException ex = assertThrows(FileStorageException.class,
                     () -> service.rename("file-key", longName));
+            assertEquals(FileStorageException.INVALID_FILENAME, ex.getMessageKey());
             verify(metadataRepository, never()).update(any());
         }
 
         @Test
         void pathTraversal_throws() {
-            assertThrows(FileStorageException.class,
+            FileStorageException ex = assertThrows(FileStorageException.class,
                     () -> service.rename("file-key", "../etc/passwd"));
+            assertEquals(FileStorageException.INVALID_FILENAME, ex.getMessageKey());
+            verify(metadataRepository, never()).update(any());
+        }
+
+        @Test
+        void backslashInFilename_throws() {
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> service.rename("file-key", "path\\file.txt"));
+            assertEquals(FileStorageException.INVALID_FILENAME, ex.getMessageKey());
             verify(metadataRepository, never()).update(any());
         }
     }
@@ -125,6 +170,13 @@ class FileRenameServiceTest {
         void defaultsWork() {
             FileRenameService svc = FileRenameService.builder(metadataRepository).build();
             assertNotNull(svc);
+        }
+
+        @Test
+        void chainingReturnsSameBuilder() {
+            FileRenameService.Builder builder = FileRenameService.builder(metadataRepository);
+            FileRenameService.Builder same = builder.eventPublisher(new FileEventPublisher(List.of()));
+            assertSame(builder, same);
         }
     }
 }

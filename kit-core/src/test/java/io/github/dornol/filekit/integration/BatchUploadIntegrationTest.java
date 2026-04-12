@@ -2,6 +2,7 @@ package io.github.dornol.filekit.integration;
 
 import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.memory.InMemoryFileStorage;
@@ -13,10 +14,15 @@ import io.github.dornol.filekit.upload.FileUploadService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BatchUploadIntegrationTest {
@@ -26,6 +32,7 @@ class BatchUploadIntegrationTest {
     private InMemoryFileStorage memoryStorage;
     private InMemoryMetadataRepository metadataRepository;
     private FileUploadService uploadService;
+    private FileDownloadService downloadService;
 
     @BeforeEach
     void setUp() {
@@ -35,6 +42,7 @@ class BatchUploadIntegrationTest {
 
         uploadService = FileUploadService.builder(new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("text/plain", "txt", "text"), resolver).build();
+        downloadService = FileDownloadService.builder(metadataRepository, resolver).build();
     }
 
     @Test
@@ -52,10 +60,55 @@ class BatchUploadIntegrationTest {
         assertEquals(0, result.failed().size());
         assertEquals(3, result.totalRequested());
         assertEquals(3, memoryStorage.size());
+        assertEquals(3, metadataRepository.count());
     }
 
     @Test
-    void uploadAll_partialFailure() {
+    void uploadAll_eachFileDownloadable() throws IOException {
+        byte[] contentA = "content A".getBytes();
+        byte[] contentB = "content B".getBytes();
+
+        BatchUploadResult result = uploadService.uploadAll(
+                List.of(
+                        new TestFileSource("a.txt", contentA),
+                        new TestFileSource("b.txt", contentB)
+                ),
+                StorageType.MEMORY, "bucket");
+
+        assertTrue(result.allSucceeded());
+
+        FileMetadata metaA = result.succeeded().stream()
+                .filter(m -> "a.txt".equals(m.name())).findFirst().orElseThrow();
+        FileMetadata metaB = result.succeeded().stream()
+                .filter(m -> "b.txt".equals(m.name())).findFirst().orElseThrow();
+
+        assertNotEquals(metaA.key(), metaB.key());
+
+        try (InputStream is = downloadService.download(metaA.key()).content()) {
+            assertArrayEquals(contentA, is.readAllBytes());
+        }
+        try (InputStream is = downloadService.download(metaB.key()).content()) {
+            assertArrayEquals(contentB, is.readAllBytes());
+        }
+    }
+
+    @Test
+    void uploadAll_metadataPreserved() {
+        BatchUploadResult result = uploadService.uploadAll(
+                List.of(new TestFileSource("test.txt", "data".getBytes())),
+                StorageType.MEMORY, "bucket");
+
+        FileMetadata meta = result.succeeded().get(0);
+        assertNotNull(meta.key());
+        assertEquals("test.txt", meta.name());
+        assertEquals(4, meta.size());
+        assertNotNull(meta.checksum());
+        assertEquals("text/plain", meta.format().mimeType());
+        assertNotNull(meta.location());
+    }
+
+    @Test
+    void uploadAll_partialFailure_validFilesStillUploaded() {
         FileUploadService limited = FileUploadService.builder(
                 new Sha256ChecksumCalculator(), metadataRepository,
                 is -> new FileFormat("text/plain", "txt", "text"),
@@ -71,8 +124,26 @@ class BatchUploadIntegrationTest {
 
         assertFalse(result.allSucceeded());
         assertEquals(1, result.succeeded().size());
+        assertEquals("small.txt", result.succeeded().get(0).name());
         assertEquals(1, result.failed().size());
         assertTrue(result.failed().containsKey("big.txt"));
+        assertEquals(2, result.totalRequested());
+        assertEquals(1, memoryStorage.size());
+    }
+
+    @Test
+    void uploadAll_invalidFilename_failedEntry() {
+        BatchUploadResult result = uploadService.uploadAll(
+                List.of(
+                        new TestFileSource("good.txt", "ok".getBytes()),
+                        new TestFileSource("../evil.txt", "bad".getBytes())
+                ),
+                StorageType.MEMORY, "bucket");
+
+        assertFalse(result.allSucceeded());
+        assertEquals(1, result.succeeded().size());
+        assertEquals(1, result.failed().size());
+        assertTrue(result.failed().containsKey("../evil.txt"));
     }
 
     @Test
@@ -82,6 +153,7 @@ class BatchUploadIntegrationTest {
 
         assertTrue(result.allSucceeded());
         assertEquals(0, result.totalRequested());
+        assertEquals(0, memoryStorage.size());
     }
 
     @Test
@@ -97,8 +169,8 @@ class BatchUploadIntegrationTest {
 
         assertTrue(result.allSucceeded());
         assertEquals(2, result.succeeded().size());
-        // Dedup means same key returned for both
         assertEquals(result.succeeded().get(0).key(), result.succeeded().get(1).key());
+        assertEquals(result.succeeded().get(0).checksum(), result.succeeded().get(1).checksum());
         assertEquals(1, memoryStorage.size());
     }
 }

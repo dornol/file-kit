@@ -7,8 +7,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InMemoryMetadataRepositoryTest {
 
@@ -94,6 +96,24 @@ class InMemoryMetadataRepositoryTest {
 
         assertEquals(1, repository.count());
         assertEquals("new-checksum", repository.findByKey("key1").checksum());
+    }
+
+    @Test
+    void existsByKey_returnsTrue_whenPresent() {
+        repository.save(metadata("key1", "c1"));
+        assertTrue(repository.existsByKey("key1"));
+    }
+
+    @Test
+    void existsByKey_returnsFalse_whenAbsent() {
+        assertFalse(repository.existsByKey("missing"));
+    }
+
+    @Test
+    void existsByKey_returnsFalse_afterDelete() {
+        repository.save(metadata("key1", "c1"));
+        repository.deleteByKey("key1");
+        assertFalse(repository.existsByKey("key1"));
     }
 
     @Test

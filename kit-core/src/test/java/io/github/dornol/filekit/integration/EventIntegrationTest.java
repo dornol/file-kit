@@ -5,6 +5,7 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.metadata.FileRenameService;
 import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.storage.FileStorageResolver;
@@ -42,6 +43,7 @@ class EventIntegrationTest {
     private FileDownloadService downloadService;
     private FileDeleteService deleteService;
     private FileTransferService transferService;
+    private FileRenameService renameService;
 
     @BeforeEach
     void setUp() {
@@ -61,6 +63,8 @@ class EventIntegrationTest {
         deleteService = FileDeleteService.builder(metadataRepository, storageResolver)
                 .eventPublisher(eventPublisher).build();
         transferService = FileTransferService.builder(metadataRepository, storageResolver)
+                .eventPublisher(eventPublisher).build();
+        renameService = FileRenameService.builder(metadataRepository)
                 .eventPublisher(eventPublisher).build();
     }
 
@@ -225,6 +229,22 @@ class EventIntegrationTest {
             deleteService.delete(meta.key());
 
             verify(listener).onDeleted(meta);
+        }
+    }
+
+    @Nested
+    class RenameEvent {
+
+        @Test
+        void rename_firesRenamedEvent() throws IOException {
+            FileMetadata meta = uploadService.upload(
+                    new TestFileSource("file.txt", "data".getBytes()), StorageType.A, "bucket");
+
+            org.mockito.Mockito.reset(listener);
+
+            FileMetadata renamed = renameService.rename(meta.key(), "new-name.txt");
+
+            verify(listener).onRenamed(meta, renamed);
         }
     }
 

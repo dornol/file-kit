@@ -52,6 +52,11 @@ class ExistsIntegrationTest {
     }
 
     @Test
+    void existsByKey_emptyString_returnsFalse() {
+        assertFalse(metadataRepository.existsByKey(""));
+    }
+
+    @Test
     void existsByKey_afterDelete_returnsFalse() throws IOException {
         FileMetadata meta = uploadService.upload(
                 new TestFileSource("file.txt", "data".getBytes()), StorageType.MEMORY, "bucket");
@@ -61,5 +66,29 @@ class ExistsIntegrationTest {
         deleteService.delete(meta.key());
 
         assertFalse(metadataRepository.existsByKey(meta.key()));
+    }
+
+    @Test
+    void existsByKey_multipleFiles_eachExists() throws IOException {
+        FileMetadata m1 = uploadService.upload(
+                new TestFileSource("a.txt", "aaa".getBytes()), StorageType.MEMORY, "bucket");
+        FileMetadata m2 = uploadService.upload(
+                new TestFileSource("b.txt", "bbb".getBytes()), StorageType.MEMORY, "bucket");
+
+        assertTrue(metadataRepository.existsByKey(m1.key()));
+        assertTrue(metadataRepository.existsByKey(m2.key()));
+    }
+
+    @Test
+    void existsByKey_deleteOne_otherStillExists() throws IOException {
+        FileMetadata m1 = uploadService.upload(
+                new TestFileSource("a.txt", "aaa".getBytes()), StorageType.MEMORY, "bucket");
+        FileMetadata m2 = uploadService.upload(
+                new TestFileSource("b.txt", "bbb".getBytes()), StorageType.MEMORY, "bucket");
+
+        deleteService.delete(m1.key());
+
+        assertFalse(metadataRepository.existsByKey(m1.key()));
+        assertTrue(metadataRepository.existsByKey(m2.key()));
     }
 }

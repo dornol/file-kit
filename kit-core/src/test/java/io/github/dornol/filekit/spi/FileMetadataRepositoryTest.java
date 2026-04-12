@@ -7,6 +7,7 @@ import io.github.dornol.filekit.storage.FileStorageException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,6 +49,29 @@ class FileMetadataRepositoryTest {
                 () -> repo.getByKey("my-file-key"));
 
         assertTrue(ex.getMessage().contains("my-file-key"));
+    }
+
+    @Test
+    void existsByKey_returnsTrue_whenFound() {
+        FileMetadataRepository repo = stubRepository(sample);
+
+        assertTrue(repo.existsByKey("key-1"));
+    }
+
+    @Test
+    void existsByKey_returnsFalse_whenNotFound() {
+        FileMetadataRepository repo = stubRepository(null);
+
+        assertFalse(repo.existsByKey("missing"));
+    }
+
+    @Test
+    void update_defaultDelegatesToSave() {
+        FileMetadataRepository repo = stubRepository(null);
+
+        FileMetadata result = repo.update(sample);
+
+        assertSame(sample, result);
     }
 
     private static FileMetadataRepository stubRepository(FileMetadata returnValue) {

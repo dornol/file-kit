@@ -5,6 +5,7 @@ import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.metadata.FileRenameService;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
+import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.memory.InMemoryFileStorage;
 import io.github.dornol.filekit.test.InMemoryMetadataRepository;
@@ -21,6 +22,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RenameIntegrationTest {
 
@@ -56,6 +58,7 @@ class RenameIntegrationTest {
         assertNotEquals(uploaded.name(), renamed.name());
         assertEquals(uploaded.checksum(), renamed.checksum());
         assertEquals(uploaded.size(), renamed.size());
+        assertEquals(uploaded.format(), renamed.format());
         assertEquals(uploaded.location(), renamed.location());
 
         try (InputStream is = downloadService.download(renamed.key()).content()) {
@@ -72,5 +75,39 @@ class RenameIntegrationTest {
 
         FileMetadata found = metadataRepository.findByKey(uploaded.key());
         assertEquals("after.txt", found.name());
+    }
+
+    @Test
+    void rename_nonExistentKey_throws() {
+        FileStorageException ex = assertThrows(FileStorageException.class,
+                () -> renameService.rename("non-existent-key", "new.txt"));
+        assertEquals(FileStorageException.FILE_NOT_FOUND, ex.getMessageKey());
+    }
+
+    @Test
+    void rename_multipleTimes() throws IOException {
+        FileMetadata uploaded = uploadService.upload(
+                new TestFileSource("v1.txt", "data".getBytes()), StorageType.MEMORY, "bucket");
+
+        FileMetadata v2 = renameService.rename(uploaded.key(), "v2.txt");
+        assertEquals("v2.txt", v2.name());
+
+        FileMetadata v3 = renameService.rename(uploaded.key(), "v3.txt");
+        assertEquals("v3.txt", v3.name());
+
+        FileMetadata found = metadataRepository.findByKey(uploaded.key());
+        assertEquals("v3.txt", found.name());
+    }
+
+    @Test
+    void rename_doesNotAffectOtherFiles() throws IOException {
+        FileMetadata file1 = uploadService.upload(
+                new TestFileSource("file1.txt", "aaa".getBytes()), StorageType.MEMORY, "bucket");
+        FileMetadata file2 = uploadService.upload(
+                new TestFileSource("file2.txt", "bbb".getBytes()), StorageType.MEMORY, "bucket");
+
+        renameService.rename(file1.key(), "renamed.txt");
+
+        assertEquals("file2.txt", metadataRepository.findByKey(file2.key()).name());
     }
 }

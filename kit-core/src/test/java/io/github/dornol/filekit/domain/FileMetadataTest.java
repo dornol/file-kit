@@ -114,6 +114,45 @@ class FileMetadataTest {
     }
 
     @Nested
+    class WithName {
+
+        @Test
+        void returnsNewInstanceWithUpdatedName() {
+            FileMetadata original = new FileMetadata("key", "old.txt", 100, "chk", format, location);
+            FileMetadata renamed = original.withName("new.txt");
+
+            assertEquals("new.txt", renamed.name());
+            assertEquals("key", renamed.key());
+            assertEquals(100, renamed.size());
+            assertEquals("chk", renamed.checksum());
+            assertEquals(format, renamed.format());
+            assertEquals(location, renamed.location());
+        }
+
+        @Test
+        void originalUnchanged() {
+            FileMetadata original = new FileMetadata("key", "old.txt", 100, "chk", format, location);
+            original.withName("new.txt");
+
+            assertEquals("old.txt", original.name());
+        }
+
+        @Test
+        void nullNewName_throws() {
+            FileMetadata meta = new FileMetadata("key", "file.txt", 100, "chk", format, location);
+            assertThrows(NullPointerException.class, () -> meta.withName(null));
+        }
+
+        @Test
+        void sameNameProducesDifferentInstance() {
+            FileMetadata original = new FileMetadata("key", "same.txt", 100, "chk", format, location);
+            FileMetadata copy = original.withName("same.txt");
+
+            assertEquals(original, copy);
+        }
+    }
+
+    @Nested
     class RecordBehavior {
 
         @Test

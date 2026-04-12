@@ -44,6 +44,7 @@ class FileEventPublisherTest {
         assertDoesNotThrow(() -> publisher.fireDeleted(metadata));
         assertDoesNotThrow(() -> publisher.fireCopied(metadata, metadata2));
         assertDoesNotThrow(() -> publisher.fireMoved(metadata, metadata2));
+        assertDoesNotThrow(() -> publisher.fireRenamed(metadata, metadata2));
     }
 
     @Nested
@@ -80,6 +81,12 @@ class FileEventPublisherTest {
         void fireMoved_callsListener() {
             publisher.fireMoved(metadata, metadata2);
             verify(listener).onMoved(metadata, metadata2);
+        }
+
+        @Test
+        void fireRenamed_callsListener() {
+            publisher.fireRenamed(metadata, metadata2);
+            verify(listener).onRenamed(metadata, metadata2);
         }
     }
 
