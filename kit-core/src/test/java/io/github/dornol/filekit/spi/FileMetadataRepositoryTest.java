@@ -66,12 +66,21 @@ class FileMetadataRepositoryTest {
     }
 
     @Test
-    void update_defaultDelegatesToSave() {
-        FileMetadataRepository repo = stubRepository(null);
+    void update_defaultDelegatesToSave_whenKeyExists() {
+        FileMetadataRepository repo = stubRepository(sample);
 
         FileMetadata result = repo.update(sample);
 
         assertSame(sample, result);
+    }
+
+    @Test
+    void update_throwsWhenKeyNotFound() {
+        FileMetadataRepository repo = stubRepository(null);
+
+        FileStorageException ex = assertThrows(FileStorageException.class,
+                () -> repo.update(sample));
+        assertEquals(FileStorageException.FILE_NOT_FOUND, ex.getMessageKey());
     }
 
     private static FileMetadataRepository stubRepository(FileMetadata returnValue) {

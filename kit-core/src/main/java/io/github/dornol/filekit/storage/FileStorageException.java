@@ -92,4 +92,7 @@ public class FileStorageException extends RuntimeException {
     /** Upload would exceed the configured quota for the target bucket. */
     public static final String QUOTA_EXCEEDED = "file-kit.storage.quota-exceeded";
 
+    /** Downloaded file's checksum does not match the stored checksum. */
+    public static final String CHECKSUM_MISMATCH = "file-kit.storage.checksum-mismatch";
+
 }

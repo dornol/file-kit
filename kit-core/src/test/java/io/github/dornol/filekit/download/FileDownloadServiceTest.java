@@ -5,10 +5,12 @@ import io.github.dornol.filekit.domain.FileFormat;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.spi.ChecksumCalculator;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
+import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
@@ -453,6 +455,140 @@ class FileDownloadServiceTest {
             String url = service.generatePresignedUrl("file-key", longDuration);
 
             assertEquals("https://example.com/long", url);
+        }
+    }
+
+    // ── Checksum verification ───────────────────────────────────────
+
+    @Nested
+    class ChecksumVerification {
+
+        @Test
+        void checksumMatch_returnsContent() throws IOException {
+            byte[] content = "hello".getBytes();
+            Sha256ChecksumCalculator calc = new Sha256ChecksumCalculator();
+            String checksum = calc.checksum(content);
+
+            FileMetadata meta = new FileMetadata(
+                    "file-key", "test.txt", content.length, checksum,
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "obj-key", StorageType.LOCAL));
+
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .checksumCalculator(calc).build();
+
+            when(metadataRepository.getByKey("file-key")).thenReturn(meta);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(meta)).thenReturn(new ByteArrayInputStream(content));
+
+            DownloadResult result = svc.download("file-key");
+
+            assertArrayEquals(content, result.content().readAllBytes());
+        }
+
+        @Test
+        void checksumMismatch_throws() {
+            FileMetadata meta = new FileMetadata(
+                    "file-key", "test.txt", 5, "wrong-checksum",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "obj-key", StorageType.LOCAL));
+
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .checksumCalculator(new Sha256ChecksumCalculator()).build();
+
+            when(metadataRepository.getByKey("file-key")).thenReturn(meta);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(meta)).thenReturn(new ByteArrayInputStream("hello".getBytes()));
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> svc.download("file-key"));
+            assertEquals(FileStorageException.CHECKSUM_MISMATCH, ex.getMessageKey());
+        }
+
+        @Test
+        void noChecksumCalculator_skipsVerification() {
+            // default service has no checksumCalculator
+            InputStream content = new ByteArrayInputStream("hello".getBytes());
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.load(metadata)).thenReturn(content);
+
+            DownloadResult result = service.download("file-key");
+
+            assertNotNull(result);
+        }
+    }
+
+    // ── Pre-signed URL max expiration ───────────────────────────────
+
+    @Nested
+    class PresignedMaxExpiration {
+
+        @Test
+        void withinLimit_succeeds() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .maxPresignedExpiration(Duration.ofHours(2)).build();
+
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.generatePresignedUrl(metadata, Duration.ofHours(1)))
+                    .thenReturn("https://example.com/ok");
+
+            String url = svc.generatePresignedUrl("file-key", Duration.ofHours(1));
+
+            assertEquals("https://example.com/ok", url);
+        }
+
+        @Test
+        void exceedsLimit_throws() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .maxPresignedExpiration(Duration.ofHours(1)).build();
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> svc.generatePresignedUrl("file-key", Duration.ofHours(2)));
+            assertEquals(FileStorageException.PRESIGNED_URL_FAILED, ex.getMessageKey());
+        }
+
+        @Test
+        void exactLimit_succeeds() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .maxPresignedExpiration(Duration.ofHours(1)).build();
+
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.generatePresignedUrl(metadata, Duration.ofHours(1)))
+                    .thenReturn("https://example.com/exact");
+
+            String url = svc.generatePresignedUrl("file-key", Duration.ofHours(1));
+
+            assertEquals("https://example.com/exact", url);
+        }
+
+        @Test
+        void noLimit_allowsAnyDuration() {
+            // default service has no max
+            when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
+            when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
+            when(fileStorage.generatePresignedUrl(metadata, Duration.ofDays(365)))
+                    .thenReturn("https://example.com/year");
+
+            String url = service.generatePresignedUrl("file-key", Duration.ofDays(365));
+
+            assertEquals("https://example.com/year", url);
+        }
+
+        @Test
+        void negativeMaxExpiration_throwsOnBuild() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> FileDownloadService.builder(metadataRepository, storageResolver)
+                            .maxPresignedExpiration(Duration.ofSeconds(-1)));
+        }
+
+        @Test
+        void zeroMaxExpiration_throwsOnBuild() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> FileDownloadService.builder(metadataRepository, storageResolver)
+                            .maxPresignedExpiration(Duration.ZERO));
         }
     }
 }

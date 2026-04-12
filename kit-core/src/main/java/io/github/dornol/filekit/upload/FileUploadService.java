@@ -46,8 +46,11 @@ import java.util.UUID;
  * <p><strong>Thread safety / TOCTOU note:</strong> The checksum-based deduplication
  * ({@code findByChecksum → save}) is not atomic. Under concurrent uploads of the
  * same file, both threads may pass the dedup check and store the file twice.
- * If strict uniqueness is required, enforce a unique constraint on the checksum
- * column in your {@link FileMetadataRepository} implementation.</p>
+ * To prevent this, add a <strong>unique constraint on the checksum column</strong>
+ * in your {@link FileMetadataRepository} implementation and handle the
+ * constraint violation (e.g. catch the exception and return the existing entry).
+ * Without this, duplicate storage consumption and metadata bloat may occur
+ * under high concurrency.</p>
  *
  * @see FileStorage
  * @see FileMetadataRepository
@@ -180,8 +183,10 @@ public class FileUploadService {
      * <p><strong>Quota note:</strong> If the callback fails, the file is removed from
      * storage but the quota usage is <em>not</em> automatically rolled back.
      * If your {@link io.github.dornol.filekit.spi.QuotaUsageProvider} tracks usage
-     * independently (e.g. via a database counter), you are responsible for
-     * compensating the usage in your error-handling logic.</p>
+     * independently (e.g. via a database counter), you must compensate the usage
+     * in your error-handling logic. For example, wrap the upload in a try-catch
+     * and decrement the quota counter on {@link FileStorageException} with
+     * {@link FileStorageException#CALLBACK_FAILED}.</p>
      *
      * @param fileSource  the file to upload
      * @param storageType storage backend to use

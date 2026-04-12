@@ -48,6 +48,11 @@ public interface FileMetadataRepository {
     /**
      * Checks whether metadata exists for the given file key.
      *
+     * <p>The default implementation delegates to {@link #findByKey(String)},
+     * which loads the full metadata object. For large-scale deployments,
+     * override this with a more efficient query
+     * (e.g. {@code SELECT 1 WHERE key = ?}).</p>
+     *
      * @param key unique file key
      * @return {@code true} if metadata exists
      */
@@ -58,13 +63,16 @@ public interface FileMetadataRepository {
     /**
      * Replaces the metadata for the given key with the provided instance.
      *
-     * <p>The default implementation delegates to {@link #save(FileMetadata)}.
-     * Override if your data store distinguishes insert from update.</p>
+     * <p>The default implementation verifies the key exists (via {@link #getByKey(String)}),
+     * then delegates to {@link #save(FileMetadata)}.
+     * Override if your data store can do this atomically (e.g. SQL UPDATE).</p>
      *
      * @param metadata the updated metadata (same key, possibly different fields)
      * @return the persisted metadata
+     * @throws FileStorageException if no metadata exists for the given key
      */
     default FileMetadata update(FileMetadata metadata) {
+        getByKey(metadata.key());
         return save(metadata);
     }
 

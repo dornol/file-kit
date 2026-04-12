@@ -190,12 +190,22 @@ public class FileKitAutoConfiguration {
     public FileDownloadService fileDownloadService(FileMetadataRepository metadataRepository,
                                                    FileStorageResolver storageResolver,
                                                    FileEncryptor fileEncryptor,
-                                                   FileEventPublisher eventPublisher) {
-        log.info("Registering FileDownloadService");
-        return FileDownloadService.builder(metadataRepository, storageResolver)
+                                                   FileEventPublisher eventPublisher,
+                                                   ChecksumCalculator checksumCalculator,
+                                                   FileKitProperties properties) {
+        log.info("Registering FileDownloadService (checksumVerify={}, maxPresignedExpiration={})",
+                properties.isVerifyChecksumOnDownload(),
+                properties.getMaxPresignedExpiration());
+        FileDownloadService.Builder builder = FileDownloadService.builder(metadataRepository, storageResolver)
                 .fileEncryptor(fileEncryptor)
-                .eventPublisher(eventPublisher)
-                .build();
+                .eventPublisher(eventPublisher);
+        if (properties.isVerifyChecksumOnDownload()) {
+            builder.checksumCalculator(checksumCalculator);
+        }
+        if (properties.getMaxPresignedExpiration() != null) {
+            builder.maxPresignedExpiration(properties.getMaxPresignedExpiration());
+        }
+        return builder.build();
     }
 
     @Bean
