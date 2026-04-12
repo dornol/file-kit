@@ -15,7 +15,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.1.6'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.1.8'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -29,7 +29,7 @@ implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.1.6</version>
+    <version>0.1.8</version>
 </dependency>
 ```
 
@@ -675,6 +675,7 @@ The following beans are registered automatically when their dependencies are pre
 | `ExifStripper` | Always (`ImageIOExifStripper` default, overridable) |
 | `ImageFormatConverter` | Always (`ImageIOFormatConverter` default, overridable) |
 | `FileTransferService` | `FileMetadataRepository` + `FileStorageResolver` |
+| `FileRenameService` | `FileMetadataRepository` |
 | `FileEncryptor` | Always (`NoOpFileEncryptor` default, overridable) |
 | `QuotaChecker` | `QuotaPolicy` + `QuotaUsageProvider` (both required) |
 | `FileEventPublisher` | Always (collects all `FileEventListener` beans, empty list if none) |
@@ -970,6 +971,44 @@ Copy preserves the original filename, checksum, and format while assigning a new
 
 When a `QuotaChecker` is configured, both `copy()` and `move()` check the target bucket's quota before proceeding. Copy fires an `onCopied` event; move fires an `onMoved` event (never `onCopied`).
 
+### Batch copy/move
+
+Copy or move multiple files at once with best-effort strategy:
+
+```java
+@Autowired FileTransferService transferService;
+
+// Copy multiple files to another backend
+BatchTransferResult copyResult = transferService.copyAll(
+        List.of("key1", "key2"), StorageType.S3, "archive-bucket");
+
+// Move multiple files
+BatchTransferResult moveResult = transferService.moveAll(
+        List.of("key1", "key2"), StorageType.S3, "archive-bucket");
+
+copyResult.succeeded();      // List<FileMetadata> of new copies
+copyResult.failed();         // Map<String, String> of source keys to error messages
+copyResult.allSucceeded();   // true if no failures
+copyResult.totalRequested(); // total count requested
+```
+
+## Batch Upload
+
+Upload multiple files at once with best-effort strategy:
+
+```java
+@Autowired FileUploadService uploadService;
+
+BatchUploadResult result = uploadService.uploadAll(fileSources, StorageType.LOCAL, "uploads");
+
+result.succeeded();      // List<FileMetadata> of uploaded files
+result.failed();         // Map<String, String> of filenames to error messages
+result.allSucceeded();   // true if no failures
+result.totalRequested(); // total count requested
+```
+
+Deduplication applies per file — if two files have the same content, the existing metadata is returned for both.
+
 ## Batch Delete
 
 Delete multiple files at once with best-effort strategy:
@@ -1037,6 +1076,32 @@ usage.maxBytes();       // configured limit
 usage.remainingBytes(); // available space
 ```
 
+## File Existence Check
+
+Check whether a file exists without downloading it:
+
+```java
+@Autowired FileMetadataRepository metadataRepository;
+
+boolean exists = metadataRepository.existsByKey(fileKey);
+```
+
+This is a default method on the `FileMetadataRepository` SPI — no additional implementation required. Useful for pre-upload dedup checks or conditional logic.
+
+## File Rename
+
+Rename a file by updating its metadata without touching storage:
+
+```java
+@Autowired FileRenameService renameService;
+
+FileMetadata renamed = renameService.rename(fileKey, "new-name.txt");
+// Only metadata changes — storage is not affected
+// Fires onRenamed event
+```
+
+The same filename validation rules apply (path traversal, length limit). The rename fires an `onRenamed` event to all registered `FileEventListener`s.
+
 ## File Lifecycle Events
 
 file-kit publishes events for file operations via the `FileEventListener` SPI. Use this for audit logging, cache invalidation, statistics, or notifications.
@@ -1070,6 +1135,7 @@ public class AuditFileEventListener implements FileEventListener {
 | `onDeleted` | After storage + metadata deletion | deleted metadata |
 | `onCopied` | After copy completes | source + copy metadata |
 | `onMoved` | After move completes (copy + source deletion) | source + moved metadata |
+| `onRenamed` | After metadata name update | before + after metadata |
 
 ### Behavior
 
