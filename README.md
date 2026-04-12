@@ -137,7 +137,9 @@ Configure file-kit via `application.yml`:
 
 ```yaml
 file-kit:
-  max-upload-size: 10485760  # 10MB, 0 = unlimited (default)
+  max-upload-size: 10485760              # 10MB, 0 = unlimited (default)
+  verify-checksum-on-download: false     # verify integrity on download (default: false)
+  max-presigned-expiration: 24h          # maximum pre-signed URL lifetime (default: no limit)
 ```
 
 ## File Storage
@@ -450,6 +452,8 @@ String url = downloadService.generatePresignedUrl(fileKey, Duration.ofHours(1));
 ```
 
 The default `FileStorage.generatePresignedUrl()` throws `UnsupportedOperationException`. See the [S3 example above](#3-implement-filestorage) for a full implementation.
+
+To enforce a maximum URL lifetime, configure `file-kit.max-presigned-expiration` (e.g. `24h`). Requests exceeding the limit throw `FileStorageException` with `PRESIGNED_URL_FAILED`.
 
 ### Range request (206 Partial Content)
 
@@ -1230,6 +1234,7 @@ file-kit.storage.move-failed=File move failed
 file-kit.storage.encryption-failed=File encryption failed
 file-kit.storage.decryption-failed=File decryption failed
 file-kit.storage.quota-exceeded=Storage quota exceeded
+file-kit.storage.checksum-mismatch=Downloaded content checksum does not match stored checksum
 ```
 
 Use `exception.getMessageKey()` to look up the localized message in your application.

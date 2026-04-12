@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -58,5 +60,63 @@ class FileKitPropertiesTest {
             FileKitProperties props = context.getBean(FileKitProperties.class);
             assertThat(props.getMaxUploadSize()).isEqualTo(0L);
         });
+    }
+
+    // ── verifyChecksumOnDownload ─────────────────────────────────────
+
+    @Test
+    void defaultVerifyChecksumOnDownload_isFalse() {
+        FileKitProperties props = new FileKitProperties();
+        assertThat(props.isVerifyChecksumOnDownload()).isFalse();
+    }
+
+    @Test
+    void setAndGetVerifyChecksumOnDownload() {
+        FileKitProperties props = new FileKitProperties();
+        props.setVerifyChecksumOnDownload(true);
+        assertThat(props.isVerifyChecksumOnDownload()).isTrue();
+    }
+
+    @Test
+    void verifyChecksumOnDownload_boundFromConfig() {
+        contextRunner
+                .withPropertyValues("file-kit.verify-checksum-on-download=true")
+                .run(context -> {
+                    FileKitProperties props = context.getBean(FileKitProperties.class);
+                    assertThat(props.isVerifyChecksumOnDownload()).isTrue();
+                });
+    }
+
+    // ── maxPresignedExpiration ───────────────────────────────────────
+
+    @Test
+    void defaultMaxPresignedExpiration_isNull() {
+        FileKitProperties props = new FileKitProperties();
+        assertThat(props.getMaxPresignedExpiration()).isNull();
+    }
+
+    @Test
+    void setAndGetMaxPresignedExpiration() {
+        FileKitProperties props = new FileKitProperties();
+        props.setMaxPresignedExpiration(Duration.ofHours(24));
+        assertThat(props.getMaxPresignedExpiration()).isEqualTo(Duration.ofHours(24));
+    }
+
+    @Test
+    void maxPresignedExpiration_null_isAllowed() {
+        FileKitProperties props = new FileKitProperties();
+        props.setMaxPresignedExpiration(Duration.ofHours(1));
+        props.setMaxPresignedExpiration(null);
+        assertThat(props.getMaxPresignedExpiration()).isNull();
+    }
+
+    @Test
+    void maxPresignedExpiration_boundFromConfig() {
+        contextRunner
+                .withPropertyValues("file-kit.max-presigned-expiration=1h")
+                .run(context -> {
+                    FileKitProperties props = context.getBean(FileKitProperties.class);
+                    assertThat(props.getMaxPresignedExpiration()).isEqualTo(Duration.ofHours(1));
+                });
     }
 }
