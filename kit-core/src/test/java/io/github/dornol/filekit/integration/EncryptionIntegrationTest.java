@@ -58,7 +58,8 @@ class EncryptionIntegrationTest {
 
         uploadService = FileUploadService.builder(checksumCalculator, metadataRepository,
                 formatExtractor, storageResolver).fileEncryptor(encryptor).build();
-        downloadService = new FileDownloadService(metadataRepository, storageResolver, encryptor);
+        downloadService = FileDownloadService.builder(metadataRepository, storageResolver)
+                .fileEncryptor(encryptor).build();
     }
 
     @Nested

@@ -45,7 +45,7 @@ class SpringDownloadServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SpringDownloadService(metadataRepository, storageResolver);
+        service = SpringDownloadService.builder(metadataRepository, storageResolver).build();
     }
 
     // ── No encryption (NoOp) ────────────────────────────────────────
@@ -120,7 +120,8 @@ class SpringDownloadServiceTest {
 
         @BeforeEach
         void setUp() {
-            encryptedService = new SpringDownloadService(metadataRepository, storageResolver, xorEncryptor);
+            encryptedService = SpringDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(xorEncryptor).build();
         }
 
         @Test
@@ -204,8 +205,8 @@ class SpringDownloadServiceTest {
                 }
             };
 
-            SpringDownloadService failingService = new SpringDownloadService(
-                    metadataRepository, storageResolver, failingEncryptor);
+            SpringDownloadService failingService = SpringDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(failingEncryptor).build();
 
             FileStorage plainStorage = mock(FileStorage.class);
             when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
@@ -244,31 +245,31 @@ class SpringDownloadServiceTest {
     // ── Constructor validation ──────────────────────────────────────
 
     @Nested
-    class ConstructorValidation {
+    class BuilderValidation {
 
         @Test
-        void twoArgConstructor_usesNoOpEncryptor() {
-            // Should not throw
-            SpringDownloadService svc = new SpringDownloadService(metadataRepository, storageResolver);
+        void builder_defaultsWork() {
+            SpringDownloadService svc = SpringDownloadService.builder(metadataRepository, storageResolver).build();
             assertThat(svc).isNotNull();
         }
 
         @Test
         void nullMetadataRepository_throws() {
-            assertThatThrownBy(() -> new SpringDownloadService(null, storageResolver))
+            assertThatThrownBy(() -> SpringDownloadService.builder(null, storageResolver))
                     .isInstanceOf(NullPointerException.class);
         }
 
         @Test
         void nullStorageResolver_throws() {
-            assertThatThrownBy(() -> new SpringDownloadService(metadataRepository, null))
+            assertThatThrownBy(() -> SpringDownloadService.builder(metadataRepository, null))
                     .isInstanceOf(NullPointerException.class);
         }
 
         @Test
-        void nullFileEncryptor_throws() {
-            assertThatThrownBy(() -> new SpringDownloadService(metadataRepository, storageResolver, null))
-                    .isInstanceOf(NullPointerException.class);
+        void withEncryptor_valid() {
+            SpringDownloadService svc = SpringDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(new NoOpFileEncryptor()).build();
+            assertThat(svc).isNotNull();
         }
     }
 }

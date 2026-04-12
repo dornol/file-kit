@@ -41,32 +41,6 @@ public class FileDownloadService extends AbstractFileOperationService {
         return new Builder(metadataRepository, storageResolver);
     }
 
-    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
-    @Deprecated(forRemoval = true)
-    public FileDownloadService(FileMetadataRepository metadataRepository,
-                               FileStorageResolver storageResolver) {
-        this(metadataRepository, storageResolver, new NoOpFileEncryptor(), new FileEventPublisher(List.of()));
-    }
-
-    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
-    @Deprecated(forRemoval = true)
-    public FileDownloadService(FileMetadataRepository metadataRepository,
-                               FileStorageResolver storageResolver,
-                               FileEncryptor fileEncryptor) {
-        this(metadataRepository, storageResolver, fileEncryptor, new FileEventPublisher(List.of()));
-    }
-
-    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
-    @Deprecated(forRemoval = true)
-    public FileDownloadService(FileMetadataRepository metadataRepository,
-                               FileStorageResolver storageResolver,
-                               FileEncryptor fileEncryptor,
-                               FileEventPublisher eventPublisher) {
-        super(metadataRepository, storageResolver);
-        this.fileEncryptor = Objects.requireNonNull(fileEncryptor, "fileEncryptor");
-        this.eventPublisher = Objects.requireNonNull(eventPublisher, "eventPublisher");
-    }
-
     private FileDownloadService(Builder b) {
         super(b.metadataRepository, b.storageResolver);
         this.fileEncryptor = Objects.requireNonNull(b.fileEncryptor, "fileEncryptor");

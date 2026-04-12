@@ -47,23 +47,6 @@ public class SpringDownloadService {
         this.fileEncryptor = Objects.requireNonNull(b.fileEncryptor, "fileEncryptor");
     }
 
-    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
-    @Deprecated(forRemoval = true)
-    public SpringDownloadService(FileMetadataRepository metadataRepository,
-                                 FileStorageResolver storageResolver) {
-        this(metadataRepository, storageResolver, new NoOpFileEncryptor());
-    }
-
-    /** @deprecated Use {@link #builder(FileMetadataRepository, FileStorageResolver)} instead. */
-    @Deprecated(forRemoval = true)
-    public SpringDownloadService(FileMetadataRepository metadataRepository,
-                                 FileStorageResolver storageResolver,
-                                 FileEncryptor fileEncryptor) {
-        this.metadataRepository = Objects.requireNonNull(metadataRepository, "metadataRepository");
-        this.storageResolver = Objects.requireNonNull(storageResolver, "storageResolver");
-        this.fileEncryptor = Objects.requireNonNull(fileEncryptor, "fileEncryptor");
-    }
-
     public static final class Builder {
 
         private final FileMetadataRepository metadataRepository;

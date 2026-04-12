@@ -53,7 +53,7 @@ class FileDownloadServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new FileDownloadService(metadataRepository, storageResolver);
+        service = FileDownloadService.builder(metadataRepository, storageResolver).build();
     }
 
     // ── Download ─────────────────────────────────────────────────────
@@ -123,30 +123,24 @@ class FileDownloadServiceTest {
     // ── Constructor validation ───────────────────────────────────────
 
     @Nested
-    class ConstructorValidation {
+    class BuilderBasicValidation {
 
         @Test
         void nullMetadataRepository_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileDownloadService(null, storageResolver));
+                    () -> FileDownloadService.builder(null, storageResolver));
         }
 
         @Test
         void nullStorageResolver_throws() {
             assertThrows(NullPointerException.class,
-                    () -> new FileDownloadService(metadataRepository, null));
+                    () -> FileDownloadService.builder(metadataRepository, null));
         }
 
         @Test
-        void nullFileEncryptor_throws() {
-            assertThrows(NullPointerException.class,
-                    () -> new FileDownloadService(metadataRepository, storageResolver, null));
-        }
-
-        @Test
-        void threeArgConstructor_valid() {
-            FileDownloadService svc = new FileDownloadService(
-                    metadataRepository, storageResolver, new NoOpFileEncryptor());
+        void withEncryptor_valid() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(new NoOpFileEncryptor()).build();
             assertNotNull(svc);
         }
     }
@@ -157,9 +151,8 @@ class FileDownloadServiceTest {
     class EventIntegration {
 
         FileEventListener listener = mock(FileEventListener.class);
-        FileDownloadService serviceWithEvents = new FileDownloadService(
-                metadataRepository, storageResolver, new NoOpFileEncryptor(),
-                new FileEventPublisher(List.of(listener)));
+        FileDownloadService serviceWithEvents = FileDownloadService.builder(metadataRepository, storageResolver)
+                .eventPublisher(new FileEventPublisher(List.of(listener))).build();
 
         @Test
         void downloadFires_onDownloaded() {
@@ -202,21 +195,13 @@ class FileDownloadServiceTest {
     // ── Full constructor validation ──────────────────────────────────
 
     @Nested
-    class FullConstructorValidation {
+    class BuilderEventPublisherValidation {
 
         @Test
-        void fourArgConstructor_valid() {
-            FileDownloadService svc = new FileDownloadService(
-                    metadataRepository, storageResolver, new NoOpFileEncryptor(),
-                    new FileEventPublisher(List.of()));
+        void withEventPublisher_valid() {
+            FileDownloadService svc = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .eventPublisher(new FileEventPublisher(List.of())).build();
             assertNotNull(svc);
-        }
-
-        @Test
-        void nullEventPublisher_throws() {
-            assertThrows(NullPointerException.class,
-                    () -> new FileDownloadService(metadataRepository, storageResolver,
-                            new NoOpFileEncryptor(), null));
         }
     }
 
@@ -258,8 +243,8 @@ class FileDownloadServiceTest {
                 }
             };
 
-            FileDownloadService encryptedService = new FileDownloadService(
-                    metadataRepository, storageResolver, xorEncryptor);
+            FileDownloadService encryptedService = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(xorEncryptor).build();
 
             // Simulate encrypted storage content (XOR'd)
             byte[] plain = "hello".getBytes();
@@ -290,8 +275,8 @@ class FileDownloadServiceTest {
                 }
             };
 
-            FileDownloadService passThroughService = new FileDownloadService(
-                    metadataRepository, storageResolver, passThrough);
+            FileDownloadService passThroughService = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(passThrough).build();
 
             when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
@@ -316,8 +301,8 @@ class FileDownloadServiceTest {
                 }
             };
 
-            FileDownloadService failingService = new FileDownloadService(
-                    metadataRepository, storageResolver, failingEncryptor);
+            FileDownloadService failingService = FileDownloadService.builder(metadataRepository, storageResolver)
+                    .fileEncryptor(failingEncryptor).build();
 
             when(metadataRepository.getByKey("file-key")).thenReturn(metadata);
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);

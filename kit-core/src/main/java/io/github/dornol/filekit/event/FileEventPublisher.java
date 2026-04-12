@@ -25,7 +25,7 @@ public class FileEventPublisher {
      * @param listeners list of listeners to notify; empty list = no-op
      */
     public FileEventPublisher(List<FileEventListener> listeners) {
-        this.listeners = Objects.requireNonNull(listeners, "listeners");
+        this.listeners = List.copyOf(listeners);
     }
 
     public void fireUploaded(FileMetadata metadata) {
