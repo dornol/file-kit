@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.pdf;
 
+import io.github.dornol.filekit.storage.FileStorageException;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -28,8 +30,8 @@ public interface PdfMetadataExtractor {
         try {
             return extract(pdfStream.readAllBytes());
         } catch (IOException e) {
-            throw new io.github.dornol.filekit.storage.FileStorageException(
-                    io.github.dornol.filekit.storage.FileStorageException.PDF_PROCESSING_FAILED,
+            throw new FileStorageException(
+                    FileStorageException.PDF_PROCESSING_FAILED,
                     "Failed to read PDF stream", e);
         }
     }

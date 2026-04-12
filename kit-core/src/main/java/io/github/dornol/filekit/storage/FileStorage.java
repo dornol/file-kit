@@ -2,7 +2,9 @@ package io.github.dornol.filekit.storage;
 
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.io.BoundedInputStream;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 
@@ -73,16 +75,16 @@ public interface FileStorage {
         InputStream is = load(metadata);
         try {
             is.skipNBytes(start);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             try {
                 is.close();
-            } catch (java.io.IOException closeEx) {
+            } catch (IOException closeEx) {
                 e.addSuppressed(closeEx);
             }
             throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
                     "Failed to skip to byte offset " + start, e);
         }
-        return new io.github.dornol.filekit.io.BoundedInputStream(is, end - start + 1);
+        return new BoundedInputStream(is, end - start + 1);
     }
 
 }

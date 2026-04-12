@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -85,7 +86,7 @@ public class LocalFileStorage implements FileStorage {
                 Files.copy(command.content(), tmp, StandardCopyOption.REPLACE_EXISTING);
                 try {
                     Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE);
-                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                } catch (AtomicMoveNotSupportedException e) {
                     log.debug("ATOMIC_MOVE not supported, falling back to REPLACE_EXISTING");
                     Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
                 }

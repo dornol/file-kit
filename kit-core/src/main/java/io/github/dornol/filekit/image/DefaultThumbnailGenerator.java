@@ -1,5 +1,7 @@
 package io.github.dornol.filekit.image;
 
+import java.util.Objects;
+
 /**
  * Default {@link ThumbnailGenerator} implementation that delegates to {@link ImageResizer}.
  */
@@ -9,7 +11,7 @@ public class DefaultThumbnailGenerator implements ThumbnailGenerator {
 
     /** @param resizer the resizer to delegate thumbnail generation to */
     public DefaultThumbnailGenerator(ImageResizer resizer) {
-        this.resizer = java.util.Objects.requireNonNull(resizer, "resizer");
+        this.resizer = Objects.requireNonNull(resizer, "resizer");
     }
 
     @Override

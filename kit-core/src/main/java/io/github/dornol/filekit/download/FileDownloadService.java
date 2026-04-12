@@ -4,6 +4,7 @@ import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.event.FileEventPublisher;
 import io.github.dornol.filekit.io.IoUtils;
+import io.github.dornol.filekit.io.DecryptionHelper;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.NoOpFileEncryptor;
@@ -110,7 +111,7 @@ public class FileDownloadService extends AbstractFileOperationService {
     }
 
     private InputStream decryptToStream(InputStream encryptedContent) {
-        return io.github.dornol.filekit.io.DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor);
+        return DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor);
     }
 
 }

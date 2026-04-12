@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 
 /**
  * Adapter that wraps a Spring {@link MultipartFile} as a {@link FileSource}.
@@ -19,7 +20,7 @@ public class MultipartFileSource implements FileSource {
 
     /** @param multipartFile the Spring multipart file to wrap */
     public MultipartFileSource(MultipartFile multipartFile) {
-        this.multipartFile = java.util.Objects.requireNonNull(multipartFile, "multipartFile");
+        this.multipartFile = Objects.requireNonNull(multipartFile, "multipartFile");
     }
 
     @Override

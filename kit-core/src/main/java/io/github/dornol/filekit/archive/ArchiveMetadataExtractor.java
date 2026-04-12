@@ -1,6 +1,8 @@
 package io.github.dornol.filekit.archive;
 
-import java.io.ByteArrayInputStream;
+import io.github.dornol.filekit.storage.FileStorageException;
+
+import java.io.IOException;
 import java.io.InputStream;
 
 /**
@@ -25,9 +27,9 @@ public interface ArchiveMetadataExtractor {
     default ArchiveMetadata extract(InputStream archiveStream) {
         try {
             return extract(archiveStream.readAllBytes());
-        } catch (java.io.IOException e) {
-            throw new io.github.dornol.filekit.storage.FileStorageException(
-                    io.github.dornol.filekit.storage.FileStorageException.ARCHIVE_PROCESSING_FAILED,
+        } catch (IOException e) {
+            throw new FileStorageException(
+                    FileStorageException.ARCHIVE_PROCESSING_FAILED,
                     "Failed to read archive stream", e);
         }
     }

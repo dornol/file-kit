@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.spring.download;
 
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.io.DecryptionHelper;
 import io.github.dornol.filekit.io.IoUtils;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -104,7 +105,7 @@ public class SpringDownloadService {
     }
 
     private InputStream decryptToStream(InputStream encryptedContent) {
-        return io.github.dornol.filekit.io.DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor);
+        return DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor);
     }
 
 }
