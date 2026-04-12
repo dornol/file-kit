@@ -27,7 +27,17 @@
 - [ ] example 컴파일 확인: `./gradlew :example:compileJava`
 - [ ] auto-configuration에 새 서비스 빈 등록 완료
 
-## 4. Version & Release
+## 4. Documentation
+
+- [ ] README.md 버전 번호 최신화 (Quick Start 의존성 버전)
+- [ ] 새 기능 README.md에 사용법 추가 (코드 예제 포함)
+- [ ] 변경/삭제된 API가 있으면 README.md에서 제거 또는 수정
+- [ ] CLAUDE.md 프로젝트 철학·범위 변경 시 반영
+- [ ] 새 SPI 인터페이스 추가 시 README.md "Using without Spring Boot" 섹션 업데이트
+- [ ] 새 auto-configured bean 추가 시 README.md "Auto-configured beans" 테이블 업데이트
+- [ ] 새 에러 메시지 키 추가 시 README.md "Error Messages" 섹션 업데이트
+
+## 5. Version & Release
 
 - [ ] `build.gradle.kts`에서 `version` 업데이트
 - [ ] 버전 커밋: `Bump version to x.y.z`
@@ -37,7 +47,7 @@
 - [ ] Maven Central 배포 확인: `Maven Publish` 워크플로우 완료
 - [ ] GitHub Release 자동 생성 확인: `GitHub Release` 워크플로우 완료
 
-## 5. Post-Release
+## 6. Post-Release
 
 - [ ] Maven Central에서 artifact 조회 가능 확인
 - [ ] GitHub Release 페이지에서 릴리즈 노트 확인
