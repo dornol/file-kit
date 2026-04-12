@@ -2,12 +2,17 @@ package io.github.dornol.filekit.example.controller;
 
 import io.github.dornol.filekit.delete.BatchDeleteResult;
 import io.github.dornol.filekit.delete.FileDeleteService;
+import io.github.dornol.filekit.domain.ByteRange;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.download.FileDownloadService;
 import io.github.dornol.filekit.example.infra.FileMetadataRepositoryAdapter;
 import io.github.dornol.filekit.example.config.StorageType;
+import io.github.dornol.filekit.io.BoundedInputStream;
+import io.github.dornol.filekit.metadata.FileRenameService;
 import io.github.dornol.filekit.spring.download.FileResponseBuilder;
+import io.github.dornol.filekit.storage.FileStorageException;
+import io.github.dornol.filekit.transfer.BatchTransferResult;
 import io.github.dornol.filekit.transfer.FileTransferService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
@@ -16,11 +21,14 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,15 +40,18 @@ public class FileDownloadController {
     private final FileDownloadService fileDownloadService;
     private final FileDeleteService fileDeleteService;
     private final FileTransferService fileTransferService;
+    private final FileRenameService fileRenameService;
     private final FileMetadataRepositoryAdapter metadataRepository;
 
     public FileDownloadController(FileDownloadService fileDownloadService,
                                   FileDeleteService fileDeleteService,
                                   FileTransferService fileTransferService,
+                                  FileRenameService fileRenameService,
                                   FileMetadataRepositoryAdapter metadataRepository) {
         this.fileDownloadService = fileDownloadService;
         this.fileDeleteService = fileDeleteService;
         this.fileTransferService = fileTransferService;
+        this.fileRenameService = fileRenameService;
         this.metadataRepository = metadataRepository;
     }
 
@@ -100,24 +111,41 @@ public class FileDownloadController {
         DownloadResult result = fileDownloadService.download(fileKey);
 
         if (rangeHeader != null) {
-            var byteRange = io.github.dornol.filekit.domain.ByteRange.parse(rangeHeader, result.metadata().size());
-            java.io.InputStream content = result.content();
+            ByteRange byteRange = ByteRange.parse(rangeHeader, result.metadata().size());
+            InputStream content = result.content();
             try {
                 content.skipNBytes(byteRange.start());
-                java.io.InputStream bounded = new io.github.dornol.filekit.io.BoundedInputStream(content, byteRange.length());
+                InputStream bounded = new BoundedInputStream(content, byteRange.length());
                 return FileResponseBuilder.inline(result.metadata())
                         .range(rangeHeader)
                         .body(new InputStreamResource(bounded));
-            } catch (java.io.IOException e) {
-                try { content.close(); } catch (java.io.IOException ignored) {}
-                throw new io.github.dornol.filekit.storage.FileStorageException(
-                        io.github.dornol.filekit.storage.FileStorageException.DOWNLOAD_FAILED,
+            } catch (IOException e) {
+                try { content.close(); } catch (IOException ignored) {}
+                throw new FileStorageException(
+                        FileStorageException.DOWNLOAD_FAILED,
                         "Failed to seek to range start", e);
             }
         }
 
         return FileResponseBuilder.inline(result.metadata())
                 .body(new InputStreamResource(result.content()));
+    }
+
+    @GetMapping("/files/{fileKey}/exists")
+    public ResponseEntity<Map<String, Object>> exists(@PathVariable String fileKey) {
+        boolean exists = metadataRepository.existsByKey(fileKey);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("fileKey", fileKey);
+        result.put("exists", exists);
+        return ResponseEntity.ok(result);
+    }
+
+    @PutMapping("/files/{fileKey}/rename")
+    public ResponseEntity<Map<String, Object>> rename(
+            @PathVariable String fileKey,
+            @RequestParam("newName") String newName) {
+        FileMetadata renamed = fileRenameService.rename(fileKey, newName);
+        return ResponseEntity.ok(toMetadataMap(renamed));
     }
 
     @DeleteMapping("/files/batch")
@@ -148,6 +176,36 @@ public class FileDownloadController {
             @RequestParam(value = "targetBucket", defaultValue = "uploads") String targetBucket) {
         FileMetadata moved = fileTransferService.move(fileKey, targetStorageType, targetBucket);
         return ResponseEntity.ok(toMetadataMap(moved));
+    }
+
+    @PostMapping("/files/batch-copy")
+    public ResponseEntity<Map<String, Object>> batchCopy(
+            @RequestBody List<String> fileKeys,
+            @RequestParam(value = "targetStorageType", defaultValue = "LOCAL") StorageType targetStorageType,
+            @RequestParam(value = "targetBucket", defaultValue = "uploads") String targetBucket) {
+        BatchTransferResult result = fileTransferService.copyAll(fileKeys, targetStorageType, targetBucket);
+        return ResponseEntity.ok(toBatchTransferMap(result));
+    }
+
+    @PostMapping("/files/batch-move")
+    public ResponseEntity<Map<String, Object>> batchMove(
+            @RequestBody List<String> fileKeys,
+            @RequestParam(value = "targetStorageType", defaultValue = "LOCAL") StorageType targetStorageType,
+            @RequestParam(value = "targetBucket", defaultValue = "uploads") String targetBucket) {
+        BatchTransferResult result = fileTransferService.moveAll(fileKeys, targetStorageType, targetBucket);
+        return ResponseEntity.ok(toBatchTransferMap(result));
+    }
+
+    private static Map<String, Object> toBatchTransferMap(BatchTransferResult result) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("totalRequested", result.totalRequested());
+        response.put("succeededCount", result.succeeded().size());
+        response.put("failedCount", result.failed().size());
+        response.put("succeeded", result.succeeded().stream().map(FileDownloadController::toMetadataMap).toList());
+        if (!result.failed().isEmpty()) {
+            response.put("failed", result.failed());
+        }
+        return response;
     }
 
     private static Map<String, Object> toMetadataMap(FileMetadata m) {

@@ -1315,23 +1315,28 @@ MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/upload` | POST | Upload a file (multipart) |
+| `/upload-multiple` | POST | Batch upload multiple files |
 | `/files` | GET | List all uploaded files |
 | `/files/{fileKey}/download` | GET | Download a file |
 | `/files/{fileKey}/stream` | GET | Stream a file with Range header support |
 | `/files/{fileKey}/presigned-url` | GET | Generate a pre-signed URL |
 | `/files/{fileKey}/uri` | GET | Resolve file URI |
+| `/files/{fileKey}/exists` | GET | Check if a file exists |
+| `/files/{fileKey}/rename` | PUT | Rename a file |
 | `/files/{fileKey}` | DELETE | Delete a file |
+| `/files/{fileKey}/copy` | POST | Copy a file to a new location |
+| `/files/{fileKey}/move` | POST | Move a file to a new location |
+| `/files/batch` | DELETE | Batch delete multiple files |
+| `/files/batch-copy` | POST | Batch copy multiple files |
+| `/files/batch-move` | POST | Batch move multiple files |
 | `/image/metadata` | POST | Extract image metadata |
 | `/image/resize` | POST | Resize an image |
 | `/image/thumbnail` | POST | Generate a thumbnail |
 | `/image/watermark` | POST | Apply a text watermark |
-| `/pdf/metadata` | POST | Extract PDF metadata |
 | `/image/strip-exif` | POST | Strip EXIF metadata from an image |
 | `/image/convert` | POST | Convert image format |
+| `/pdf/metadata` | POST | Extract PDF metadata |
 | `/archive/metadata` | POST | Extract ZIP archive metadata |
-| `/files/{fileKey}/copy` | POST | Copy a file to a new location |
-| `/files/{fileKey}/move` | POST | Move a file to a new location |
-| `/files/batch` | DELETE | Batch delete multiple files |
 
 ## Security Considerations
 

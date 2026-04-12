@@ -29,10 +29,13 @@ import java.io.OutputStream;
 import java.security.GeneralSecurityException;
 import java.util.List;
 
+import io.github.dornol.filekit.storage.FileStorageException;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration tests for encryption-at-rest round-trip using a real AES encryptor.
@@ -144,6 +147,88 @@ class EncryptionIntegrationTest {
 
             assertEquals(first.key(), second.key());
             assertEquals(first.checksum(), second.checksum());
+        }
+    }
+
+    @Nested
+    class ChecksumVerificationWithEncryption {
+
+        @Test
+        void checksumVerification_passesWithEncryption() throws IOException, GeneralSecurityException {
+            AesFileEncryptor encryptor = new AesFileEncryptor();
+            Sha256ChecksumCalculator calc = new Sha256ChecksumCalculator();
+            FileStorageResolver resolver = new FileStorageResolver(List.of(memoryStorage));
+
+            FileUploadService upload = FileUploadService.builder(calc, metadataRepository,
+                    is -> new FileFormat("text/plain", "txt", "text"), resolver)
+                    .fileEncryptor(encryptor).build();
+
+            FileDownloadService download = FileDownloadService.builder(metadataRepository, resolver)
+                    .fileEncryptor(encryptor)
+                    .checksumCalculator(calc)
+                    .build();
+
+            byte[] content = "checksum + encryption test".getBytes();
+            FileMetadata uploaded = upload.upload(
+                    new TestFileSource("verified.txt", content), StorageType.MEMORY, "vault");
+
+            // checksum in metadata is based on plaintext
+            assertEquals(calc.checksum(content), uploaded.checksum());
+
+            // download decrypts first, then verifies checksum against plaintext
+            DownloadResult result = download.download(uploaded.key());
+            try (InputStream is = result.content()) {
+                assertArrayEquals(content, is.readAllBytes());
+            }
+        }
+
+        @Test
+        void checksumVerification_detectsCorruption() throws IOException, GeneralSecurityException {
+            AesFileEncryptor encryptor = new AesFileEncryptor();
+            Sha256ChecksumCalculator calc = new Sha256ChecksumCalculator();
+            InMemoryFileStorage corruptibleStorage = new InMemoryFileStorage(StorageType.MEMORY);
+            InMemoryMetadataRepository repo = new InMemoryMetadataRepository();
+            FileStorageResolver resolver = new FileStorageResolver(List.of(corruptibleStorage));
+
+            FileUploadService upload = FileUploadService.builder(calc, repo,
+                    is -> new FileFormat("text/plain", "txt", "text"), resolver)
+                    .fileEncryptor(encryptor).build();
+
+            // Upload normally
+            byte[] content = "will be corrupted".getBytes();
+            FileMetadata uploaded = upload.upload(
+                    new TestFileSource("file.txt", content), StorageType.MEMORY, "vault");
+
+            // Corrupt the stored data: delete and re-save with different encrypted content
+            repo.deleteByKey(uploaded.key());
+            corruptibleStorage.delete(uploaded);
+
+            // Re-upload different content but manually save with original checksum
+            AesFileEncryptor encryptor2 = new AesFileEncryptor();
+            FileUploadService upload2 = FileUploadService.builder(calc, repo,
+                    is -> new FileFormat("text/plain", "txt", "text"), resolver)
+                    .fileEncryptor(encryptor2).build();
+            FileMetadata tampered = upload2.upload(
+                    new TestFileSource("file.txt", "different content".getBytes()),
+                    StorageType.MEMORY, "vault");
+
+            // Overwrite metadata with original checksum but pointing to tampered storage
+            FileMetadata faked = new FileMetadata(
+                    tampered.key(), tampered.name(), tampered.size(),
+                    uploaded.checksum(), // original checksum — mismatch!
+                    tampered.format(), tampered.location());
+            repo.deleteByKey(tampered.key());
+            repo.save(faked);
+
+            // Download with checksum verification — should detect mismatch
+            FileDownloadService download = FileDownloadService.builder(repo, resolver)
+                    .fileEncryptor(encryptor2)
+                    .checksumCalculator(calc)
+                    .build();
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> download.download(faked.key()));
+            assertEquals(FileStorageException.CHECKSUM_MISMATCH, ex.getMessageKey());
         }
     }
 

@@ -5,6 +5,7 @@ import io.github.dornol.filekit.example.config.AllowedMediaType;
 import io.github.dornol.filekit.example.config.StorageType;
 import io.github.dornol.filekit.spring.validator.MultipartFileSource;
 import io.github.dornol.filekit.spring.validator.ValidMultipartFile;
+import io.github.dornol.filekit.upload.BatchUploadResult;
 import io.github.dornol.filekit.upload.FileUploadService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -58,11 +59,16 @@ public class FileUploadController {
             @ValidMultipartFile(value = AllowedMediaType.class, maxSize = MAX_FILE_SIZE)
             MultipartFile[] files,
             @RequestParam(value = "storageType", defaultValue = "LOCAL") StorageType storageType
-    ) throws IOException {
-        List<Map<String, Object>> uploaded = new ArrayList<>();
+    ) {
+        List<MultipartFileSource> sources = new ArrayList<>();
         for (MultipartFile file : files) {
-            FileMetadata metadata = fileUploadService.upload(
-                    new MultipartFileSource(file), storageType, "uploads");
+            sources.add(new MultipartFileSource(file));
+        }
+
+        BatchUploadResult batchResult = fileUploadService.uploadAll(sources, storageType, "uploads");
+
+        List<Map<String, Object>> uploaded = new ArrayList<>();
+        for (FileMetadata metadata : batchResult.succeeded()) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("fileKey", metadata.key());
             item.put("filename", metadata.name());
@@ -73,9 +79,13 @@ public class FileUploadController {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", "success");
-        result.put("count", files.length);
+        result.put("totalRequested", batchResult.totalRequested());
+        result.put("succeededCount", batchResult.succeeded().size());
+        result.put("failedCount", batchResult.failed().size());
         result.put("files", uploaded);
+        if (!batchResult.failed().isEmpty()) {
+            result.put("failed", batchResult.failed());
+        }
         return ResponseEntity.ok(result);
     }
 }
