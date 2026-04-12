@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.spring.autoconfigure;
 
 import io.github.dornol.filekit.pdf.PdfBoxMetadataExtractor;
+import io.github.dornol.filekit.pdf.PdfMetadata;
 import io.github.dornol.filekit.pdf.PdfMetadataExtractor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -39,7 +40,7 @@ class PdfKitAutoConfigurationTest {
     static class CustomPdfConfig {
         @Bean
         PdfMetadataExtractor customPdfExtractor() {
-            return pdfBytes -> new io.github.dornol.filekit.pdf.PdfMetadata(0, null, null, null, null);
+            return pdfBytes -> new PdfMetadata(0, null, null, null, null);
         }
     }
 }
