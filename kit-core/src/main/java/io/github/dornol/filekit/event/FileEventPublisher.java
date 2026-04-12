@@ -48,6 +48,10 @@ public class FileEventPublisher {
         dispatch("onMoved", listener -> listener.onMoved(source, moved));
     }
 
+    public void fireRenamed(FileMetadata before, FileMetadata after) {
+        dispatch("onRenamed", listener -> listener.onRenamed(before, after));
+    }
+
     private void dispatch(String eventName, Consumer<FileEventListener> action) {
         for (FileEventListener listener : listeners) {
             try {

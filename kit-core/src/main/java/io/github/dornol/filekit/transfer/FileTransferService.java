@@ -19,7 +19,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -141,6 +145,74 @@ public class FileTransferService extends AbstractFileOperationService {
 
         eventPublisher.fireMoved(source, copied);
         return copied;
+    }
+
+    /**
+     * Copies multiple files to a target storage backend and bucket using a best-effort strategy.
+     *
+     * <p>Attempts to copy every file and collects results. Does not stop on first failure.</p>
+     *
+     * @param fileKeys          collection of source file keys
+     * @param targetStorageType target storage backend
+     * @param targetBucket      target bucket name
+     * @return result indicating which copies succeeded and which failed
+     */
+    public BatchTransferResult copyAll(Collection<String> fileKeys,
+                                       Enum<?> targetStorageType, String targetBucket) {
+        Objects.requireNonNull(fileKeys, "fileKeys");
+        Objects.requireNonNull(targetStorageType, "targetStorageType");
+        Objects.requireNonNull(targetBucket, "targetBucket");
+
+        List<FileMetadata> succeeded = new ArrayList<>();
+        Map<String, String> failed = new LinkedHashMap<>();
+
+        for (String fileKey : fileKeys) {
+            try {
+                FileMetadata copied = copy(fileKey, targetStorageType, targetBucket);
+                succeeded.add(copied);
+            } catch (Exception e) {
+                log.warn("Failed to copy file: key={}", fileKey, e);
+                failed.put(fileKey, e.getMessage());
+            }
+        }
+
+        log.info("Batch copy completed: {} succeeded, {} failed out of {} requested",
+                succeeded.size(), failed.size(), fileKeys.size());
+        return new BatchTransferResult(succeeded, failed);
+    }
+
+    /**
+     * Moves multiple files to a target storage backend and bucket using a best-effort strategy.
+     *
+     * <p>Attempts to move every file and collects results. Does not stop on first failure.</p>
+     *
+     * @param fileKeys          collection of source file keys
+     * @param targetStorageType target storage backend
+     * @param targetBucket      target bucket name
+     * @return result indicating which moves succeeded and which failed
+     */
+    public BatchTransferResult moveAll(Collection<String> fileKeys,
+                                       Enum<?> targetStorageType, String targetBucket) {
+        Objects.requireNonNull(fileKeys, "fileKeys");
+        Objects.requireNonNull(targetStorageType, "targetStorageType");
+        Objects.requireNonNull(targetBucket, "targetBucket");
+
+        List<FileMetadata> succeeded = new ArrayList<>();
+        Map<String, String> failed = new LinkedHashMap<>();
+
+        for (String fileKey : fileKeys) {
+            try {
+                FileMetadata moved = move(fileKey, targetStorageType, targetBucket);
+                succeeded.add(moved);
+            } catch (Exception e) {
+                log.warn("Failed to move file: key={}", fileKey, e);
+                failed.put(fileKey, e.getMessage());
+            }
+        }
+
+        log.info("Batch move completed: {} succeeded, {} failed out of {} requested",
+                succeeded.size(), failed.size(), fileKeys.size());
+        return new BatchTransferResult(succeeded, failed);
     }
 
     private FileMetadata doCopy(FileMetadata source, Enum<?> targetStorageType, String targetBucket) {

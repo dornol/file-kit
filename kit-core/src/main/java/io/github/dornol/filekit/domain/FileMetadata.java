@@ -30,4 +30,15 @@ public record FileMetadata(
         Objects.requireNonNull(format, "format");
         Objects.requireNonNull(location, "location");
     }
+
+    /**
+     * Returns a copy of this metadata with a different filename.
+     *
+     * @param newName the new filename
+     * @return new metadata instance with the updated name
+     */
+    public FileMetadata withName(String newName) {
+        Objects.requireNonNull(newName, "newName");
+        return new FileMetadata(key, newName, size, checksum, format, location);
+    }
 }

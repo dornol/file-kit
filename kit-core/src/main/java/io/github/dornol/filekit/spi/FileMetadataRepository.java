@@ -46,6 +46,29 @@ public interface FileMetadataRepository {
     void deleteByKey(String key);
 
     /**
+     * Checks whether metadata exists for the given file key.
+     *
+     * @param key unique file key
+     * @return {@code true} if metadata exists
+     */
+    default boolean existsByKey(String key) {
+        return findByKey(key) != null;
+    }
+
+    /**
+     * Replaces the metadata for the given key with the provided instance.
+     *
+     * <p>The default implementation delegates to {@link #save(FileMetadata)}.
+     * Override if your data store distinguishes insert from update.</p>
+     *
+     * @param metadata the updated metadata (same key, possibly different fields)
+     * @return the persisted metadata
+     */
+    default FileMetadata update(FileMetadata metadata) {
+        return save(metadata);
+    }
+
+    /**
      * Finds metadata by key, throwing {@link FileStorageException} if not found.
      *
      * @param key unique file key

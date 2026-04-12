@@ -4,6 +4,7 @@ import io.github.dornol.filekit.archive.ArchiveMetadataExtractor;
 import io.github.dornol.filekit.archive.ZipArchiveMetadataExtractor;
 import io.github.dornol.filekit.delete.FileDeleteService;
 import io.github.dornol.filekit.download.FileDownloadService;
+import io.github.dornol.filekit.metadata.FileRenameService;
 import io.github.dornol.filekit.event.FileEventPublisher;
 import io.github.dornol.filekit.image.DefaultThumbnailGenerator;
 import io.github.dornol.filekit.image.ExifStripper;
@@ -205,6 +206,17 @@ public class FileKitAutoConfiguration {
                                                FileEventPublisher eventPublisher) {
         log.info("Registering FileDeleteService");
         return FileDeleteService.builder(metadataRepository, storageResolver)
+                .eventPublisher(eventPublisher)
+                .build();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(FileMetadataRepository.class)
+    public FileRenameService fileRenameService(FileMetadataRepository metadataRepository,
+                                               FileEventPublisher eventPublisher) {
+        log.info("Registering FileRenameService");
+        return FileRenameService.builder(metadataRepository)
                 .eventPublisher(eventPublisher)
                 .build();
     }

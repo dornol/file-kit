@@ -19,4 +19,6 @@ public interface FileEventListener {
     default void onCopied(FileMetadata source, FileMetadata copy) {}
 
     default void onMoved(FileMetadata source, FileMetadata moved) {}
+
+    default void onRenamed(FileMetadata before, FileMetadata after) {}
 }

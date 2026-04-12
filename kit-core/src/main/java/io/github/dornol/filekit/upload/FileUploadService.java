@@ -28,7 +28,11 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -187,6 +191,42 @@ public class FileUploadService {
     public FileMetadata upload(FileSource fileSource, Enum<?> storageType, String bucket,
                                UploadCallback callback) throws IOException {
         return doUpload(fileSource, storageType, bucket, callback);
+    }
+
+    /**
+     * Uploads multiple files using a best-effort strategy.
+     *
+     * <p>Attempts to upload every file and collects results. Does not stop on first failure.</p>
+     *
+     * @param fileSources collection of files to upload
+     * @param storageType storage backend to use
+     * @param bucket      target bucket
+     * @return result indicating which uploads succeeded and which failed
+     */
+    public BatchUploadResult uploadAll(Collection<? extends FileSource> fileSources,
+                                       Enum<?> storageType, String bucket) {
+        Objects.requireNonNull(fileSources, "fileSources");
+        Objects.requireNonNull(storageType, "storageType");
+        Objects.requireNonNull(bucket, "bucket");
+
+        List<FileMetadata> succeeded = new ArrayList<>();
+        Map<String, String> failed = new LinkedHashMap<>();
+
+        for (FileSource fileSource : fileSources) {
+            String name = fileSource.getOriginalFilename() != null
+                    ? fileSource.getOriginalFilename() : "(unnamed)";
+            try {
+                FileMetadata meta = upload(fileSource, storageType, bucket);
+                succeeded.add(meta);
+            } catch (Exception e) {
+                log.warn("Failed to upload file: name={}", name, e);
+                failed.put(name, e.getMessage());
+            }
+        }
+
+        log.info("Batch upload completed: {} succeeded, {} failed out of {} requested",
+                succeeded.size(), failed.size(), fileSources.size());
+        return new BatchUploadResult(succeeded, failed);
     }
 
     private FileMetadata doUpload(FileSource fileSource, Enum<?> storageType, String bucket,
