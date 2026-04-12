@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.10] - 2025-07-12
+
+### Added
+- Encryption + checksum verification integration tests (pass + corruption detection)
+- `CHANGELOG.md`: version history from 0.0.1 to 0.1.9
+- Example endpoints: exists, rename, batch upload (uploadAll), batch copy/move
+
+### Changed
+- Example `upload-multiple` now uses `uploadAll` instead of manual loop
+- Example stream endpoint: replaced FQN with imports
+- `PdfKitAutoConfigurationTest`: replaced FQN with import
+
 ## [0.1.9] - 2025-07-12
 
 ### Added
