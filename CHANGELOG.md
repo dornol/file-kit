@@ -27,6 +27,13 @@ All notable changes to this project are documented in this file.
   caller, making subsequent `close()` a no-op. Enables try-with-resources for
   patterns where the temp file must outlive the block (e.g. wrapping into a
   `DeleteOnCloseInputStream`). Used internally by `DecryptionHelper`.
+- New package `io.github.dornol.filekit.async` with `AsyncFileUploadService`
+  and `AsyncFileDownloadService` — `CompletableFuture`-returning wrappers
+  around the sync services. Executor is injectable via the builder (default
+  `ForkJoinPool.commonPool()`); JDK 21+ users should prefer
+  `Executors.newVirtualThreadPerTaskExecutor()` for blocking file I/O. No new
+  runtime dependencies. Checked `IOException`s surface as the cause of
+  `CompletionException`.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
