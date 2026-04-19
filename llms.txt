@@ -1,0 +1,26 @@
+# file-kit
+
+> Lightweight Java library for file validation, upload, download, and deletion. Pluggable storage (local / S3 / custom SPI), streaming checksum deduplication, image / PDF / ZIP metadata, HMAC-signed URLs, async adapters, at-rest encryption. Spring Boot 3+ starter or pure-Java standalone use.
+
+file-kit treats file storage as an infrastructure layer: lifecycle management (store, load, delete, validate, extract metadata) with SPI-based extensibility. `kit-core` is pure Java — `kit-spring-boot-starter` adds auto-configuration. Image / PDF processing scopes to what typically accompanies file management (resize, thumbnail, watermark, EXIF strip, format convert, metadata). Out of scope: OCR, document conversion, content analysis, download authorization (application's responsibility).
+
+## Docs
+
+- [README](README.md): Overview, modules, Quick Start (Spring Boot), feature inventory, security considerations, requirements.
+- [CHANGELOG](CHANGELOG.md): Release history, version diffs.
+
+## Guides
+
+- [Guide index](docs/guide/README.md): Topic map.
+- [File upload annotation](docs/guide/file-upload.md): `@ValidMultipartFile`, image dimension checks, WebFlux `FilePart`.
+- [Upload/download/delete services](docs/guide/download.md): Service flow, virus scan, transactional callback, range requests, pre-signed URLs, `FileResponseBuilder`, MVC + WebFlux examples.
+- [Storage SPI](docs/guide/storage-spi.md): `FileStorage` contract, `LocalFileStorage`, `InMemoryFileStorage`, multi-backend routing.
+- [S3 storage](docs/guide/s3-storage.md): Full S3 / MinIO / R2 reference implementation.
+- [Batch operations](docs/guide/batch-operations.md): Batch upload / delete, copy / move, ZIP listing, existence, rename.
+- [Storage quota](docs/guide/quota.md): `QuotaPolicy` + `QuotaUsageProvider` SPI.
+- [Encryption at rest](docs/guide/encryption.md): `FileEncryptor` SPI, dedup preservation.
+- [Lifecycle events](docs/guide/lifecycle-events.md): `FileEventListener` (upload / download / delete / copy / move / rename / `onUploadFailed`).
+- [Validation and errors](docs/guide/validation-and-errors.md): Check matrix, i18n message keys.
+- [Image processing](docs/guide/image-processing.md): Metadata, resize, thumbnail, watermark, rotate, crop, EXIF strip, format convert.
+- [PDF metadata](docs/guide/pdf-metadata.md): Apache PDFBox-based extraction.
+- [Using without Spring Boot](docs/guide/standalone.md): Standalone `kit-core`, async adapters, `SignedUrlSigner`, `TempFileBuffer`, example app.
