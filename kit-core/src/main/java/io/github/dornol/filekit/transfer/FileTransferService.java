@@ -3,6 +3,7 @@ package io.github.dornol.filekit.transfer;
 import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.io.TempFileBuffer;
 import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.storage.AbstractFileOperationService;
@@ -14,10 +15,8 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +32,8 @@ import java.util.UUID;
 public class FileTransferService extends AbstractFileOperationService {
 
     private static final Logger log = LoggerFactory.getLogger(FileTransferService.class);
+
+    private static final String TEMP_TRANSFER_PREFIX = "file-kit-transfer-";
 
     private final @Nullable QuotaChecker quotaChecker;
     private final FileEventPublisher eventPublisher;
@@ -228,15 +229,13 @@ public class FileTransferService extends AbstractFileOperationService {
 
         // Buffer to temp file to get the actual stored size (may differ from
         // metadata.size() when encryption is active).
-        Path tempFile = null;
-        try {
-            tempFile = Files.createTempFile("file-kit-transfer-", ".tmp");
+        try (TempFileBuffer tempFile = TempFileBuffer.create(TEMP_TRANSFER_PREFIX)) {
             try (InputStream content = sourceStorage.load(source)) {
-                Files.copy(content, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(content, tempFile.path(), StandardCopyOption.REPLACE_EXISTING);
             }
-            long actualSize = Files.size(tempFile);
+            long actualSize = Files.size(tempFile.path());
 
-            try (InputStream buffered = Files.newInputStream(tempFile)) {
+            try (InputStream buffered = Files.newInputStream(tempFile.path())) {
                 FileUploadCommand command = new FileUploadCommand(
                         newKey,
                         source.name(),
@@ -260,14 +259,6 @@ public class FileTransferService extends AbstractFileOperationService {
         } catch (Exception e) {
             throw new FileStorageException(FileStorageException.COPY_FAILED,
                     "Failed to copy file: " + source.key(), e);
-        } finally {
-            if (tempFile != null) {
-                try {
-                    Files.deleteIfExists(tempFile);
-                } catch (IOException ignored) {
-                    // best-effort cleanup
-                }
-            }
         }
     }
 }

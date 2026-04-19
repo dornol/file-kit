@@ -6,6 +6,7 @@ import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.domain.FileSource;
 import io.github.dornol.filekit.event.FileEventPublisher;
 import io.github.dornol.filekit.io.MagicByteBuffer;
+import io.github.dornol.filekit.io.TempFileBuffer;
 import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
@@ -269,17 +270,15 @@ public class FileUploadService {
         validateFileSize(fileSource);
         validateFilename(fileSource.getOriginalFilename());
 
-        Path tempFile = Files.createTempFile(TEMP_UPLOAD_PREFIX, ".tmp");
-        Path encryptedFile = null;
-        try {
+        try (TempFileBuffer tempFile = TempFileBuffer.create(TEMP_UPLOAD_PREFIX)) {
             MagicByteBuffer header = new MagicByteBuffer(formatHeaderBufferSize);
             ChecksumComputation computation = checksumCalculator.newComputation();
-            long bytesWritten = teeIngest(fileSource, tempFile, computation, header);
+            long bytesWritten = teeIngest(fileSource, tempFile.path(), computation, header);
             String checksum = computation.finish();
 
             // Virus scan runs on every upload (including would-be duplicates) to
             // defend against signature-DB updates since a prior ingest.
-            scanForVirus(tempFile);
+            scanForVirus(tempFile.path());
 
             FileMetadata existing = metadataRepository.findByChecksum(checksum);
             if (existing != null) {
@@ -295,36 +294,32 @@ public class FileUploadService {
                     ? fileSource.getOriginalFilename()
                     : key + "." + format.extension();
 
-            // Encrypt content to a separate temp file
-            encryptedFile = Files.createTempFile(TEMP_ENCRYPTED_PREFIX, ".tmp");
-            encryptFile(tempFile, encryptedFile);
-            long encryptedSize = Files.size(encryptedFile);
+            try (TempFileBuffer encryptedFile = TempFileBuffer.create(TEMP_ENCRYPTED_PREFIX)) {
+                encryptFile(tempFile.path(), encryptedFile.path());
+                long encryptedSize = Files.size(encryptedFile.path());
 
-            // Quota check uses the encrypted size (actual storage consumption)
-            if (quotaChecker != null) {
-                quotaChecker.check(storageType, bucket, encryptedSize);
-            }
+                // Quota check uses the encrypted size (actual storage consumption)
+                if (quotaChecker != null) {
+                    quotaChecker.check(storageType, bucket, encryptedSize);
+                }
 
-            FileStorage storage = storageResolver.resolve(storageType);
-            FileLocation location;
-            try (InputStream is = Files.newInputStream(encryptedFile)) {
-                location = storage.upload(new FileUploadCommand(
-                        key, fileSource.getOriginalFilename(), is, encryptedSize,
-                        format.mimeType(), format.extension(), bucket));
-            }
+                FileStorage storage = storageResolver.resolve(storageType);
+                FileLocation location;
+                try (InputStream is = Files.newInputStream(encryptedFile.path())) {
+                    location = storage.upload(new FileUploadCommand(
+                            key, fileSource.getOriginalFilename(), is, encryptedSize,
+                            format.mimeType(), format.extension(), bucket));
+                }
 
-            FileMetadata metadata = new FileMetadata(key, name, bytesWritten, checksum, format, location);
+                FileMetadata metadata = new FileMetadata(key, name, bytesWritten, checksum, format, location);
 
-            executeCallback(callback, metadata, storage);
+                executeCallback(callback, metadata, storage);
 
-            FileMetadata saved = metadataRepository.save(metadata);
-            log.info("File uploaded: key={}, size={}, bucket={}, storageType={}", saved.key(), saved.size(), bucket, storageType);
-            eventPublisher.fireUploaded(saved);
-            return saved;
-        } finally {
-            Files.deleteIfExists(tempFile);
-            if (encryptedFile != null) {
-                Files.deleteIfExists(encryptedFile);
+                FileMetadata saved = metadataRepository.save(metadata);
+                log.info("File uploaded: key={}, size={}, bucket={}, storageType={}",
+                        saved.key(), saved.size(), bucket, storageType);
+                eventPublisher.fireUploaded(saved);
+                return saved;
             }
         }
     }

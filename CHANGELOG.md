@@ -12,6 +12,10 @@ All notable changes to this project are documented in this file.
 - `MagicByteBuffer`: captures the first N bytes of an upload stream for format detection
 - `FileUploadService.Builder.formatHeaderBufferSize(int)`: configurable header buffer
   (default 16 KiB, minimum 1 KiB)
+- `TempFileBuffer` (Closeable): scratchpad temp-file lifecycle helper. Pair with
+  try-with-resources for automatic best-effort cleanup. Used internally by
+  `FileUploadService` and `FileTransferService`; available in `io/` for any
+  caller that needs the same pattern.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
@@ -29,6 +33,12 @@ All notable changes to this project are documented in this file.
   status (consequence of the tee pattern). Previous behavior skipped checksum on
   infected files; the savings from eliminating tempFile re-reads on clean files
   (the common path) outweigh the marginal cost on infected files.
+- `FileUploadService.doUpload` / `FileTransferService.doCopy`: temp-file cleanup
+  moved from manual `finally` blocks to `try-with-resources` via
+  `TempFileBuffer`. Upload's encrypted-temp remains lazy (not created on
+  dedup-hit) via a nested try-with-resources block. `IOException` raised by
+  `Files.deleteIfExists` is now logged at WARN and swallowed uniformly across
+  both services (previously the Upload path could propagate it).
 
 ### Changed
 - `FileDownloadService.download()`: when a `ChecksumCalculator` is configured, the returned
