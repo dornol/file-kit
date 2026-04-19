@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,7 @@ public class FileDownloadService extends AbstractFileOperationService {
     private final FileEventPublisher eventPublisher;
     private final @Nullable ChecksumCalculator checksumCalculator;
     private final @Nullable Duration maxPresignedExpiration;
+    private final @Nullable Path tempDirectory;
 
     /**
      * Creates a builder with the two required dependencies.
@@ -54,6 +56,7 @@ public class FileDownloadService extends AbstractFileOperationService {
         this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
         this.checksumCalculator = b.checksumCalculator;
         this.maxPresignedExpiration = b.maxPresignedExpiration;
+        this.tempDirectory = b.tempDirectory;
     }
 
     public static final class Builder {
@@ -64,6 +67,7 @@ public class FileDownloadService extends AbstractFileOperationService {
         private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
         private @Nullable ChecksumCalculator checksumCalculator;
         private @Nullable Duration maxPresignedExpiration;
+        private @Nullable Path tempDirectory;
 
         private Builder(FileMetadataRepository metadataRepository,
                         FileStorageResolver storageResolver) {
@@ -111,6 +115,18 @@ public class FileDownloadService extends AbstractFileOperationService {
                 throw new IllegalArgumentException("maxPresignedExpiration must be positive");
             }
             this.maxPresignedExpiration = maxPresignedExpiration;
+            return this;
+        }
+
+        /**
+         * Directory to create decryption temp files in (used only when a
+         * custom {@link FileEncryptor} is configured). {@code null} (default)
+         * uses the system temp directory.
+         *
+         * @since 0.1.25
+         */
+        public Builder tempDirectory(@Nullable Path tempDirectory) {
+            this.tempDirectory = tempDirectory;
             return this;
         }
 
@@ -196,7 +212,7 @@ public class FileDownloadService extends AbstractFileOperationService {
     }
 
     private InputStream decryptToStream(InputStream encryptedContent) {
-        return DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor);
+        return DecryptionHelper.decryptToStream(encryptedContent, fileEncryptor, tempDirectory);
     }
 
 }

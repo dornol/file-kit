@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,6 +38,7 @@ public class FileTransferService extends AbstractFileOperationService {
 
     private final @Nullable QuotaChecker quotaChecker;
     private final FileEventPublisher eventPublisher;
+    private final @Nullable Path tempDirectory;
 
     /**
      * Creates a builder with the two required dependencies.
@@ -54,6 +56,7 @@ public class FileTransferService extends AbstractFileOperationService {
         super(b.metadataRepository, b.storageResolver);
         this.quotaChecker = b.quotaChecker;
         this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
+        this.tempDirectory = b.tempDirectory;
     }
 
     public static final class Builder {
@@ -62,6 +65,7 @@ public class FileTransferService extends AbstractFileOperationService {
         private final FileStorageResolver storageResolver;
         private @Nullable QuotaChecker quotaChecker;
         private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
+        private @Nullable Path tempDirectory;
 
         private Builder(FileMetadataRepository metadataRepository,
                         FileStorageResolver storageResolver) {
@@ -78,6 +82,17 @@ public class FileTransferService extends AbstractFileOperationService {
         /** @param eventPublisher publisher for file lifecycle events */
         public Builder eventPublisher(FileEventPublisher eventPublisher) {
             this.eventPublisher = eventPublisher;
+            return this;
+        }
+
+        /**
+         * Directory to create transfer temp files in. {@code null} (default)
+         * uses the system temp directory.
+         *
+         * @since 0.1.25
+         */
+        public Builder tempDirectory(@Nullable Path tempDirectory) {
+            this.tempDirectory = tempDirectory;
             return this;
         }
 
@@ -229,7 +244,7 @@ public class FileTransferService extends AbstractFileOperationService {
 
         // Buffer to temp file to get the actual stored size (may differ from
         // metadata.size() when encryption is active).
-        try (TempFileBuffer tempFile = TempFileBuffer.create(TEMP_TRANSFER_PREFIX)) {
+        try (TempFileBuffer tempFile = TempFileBuffer.create(tempDirectory, TEMP_TRANSFER_PREFIX)) {
             try (InputStream content = sourceStorage.load(source)) {
                 Files.copy(content, tempFile.path(), StandardCopyOption.REPLACE_EXISTING);
             }

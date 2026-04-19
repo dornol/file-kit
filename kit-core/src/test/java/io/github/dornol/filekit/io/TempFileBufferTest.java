@@ -188,4 +188,41 @@ class TempFileBufferTest {
         buf.close();
         assertThrows(IllegalStateException.class, buf::release);
     }
+
+    // ── create(Path, String) ─────────────────────────────────────────
+
+    // TD1
+    @Test
+    void createInDirectory_usesGivenDirectory(@org.junit.jupiter.api.io.TempDir Path dir) throws IOException {
+        try (TempFileBuffer buf = TempFileBuffer.create(dir, "td-custom-")) {
+            assertTrue(buf.path().startsWith(dir));
+            assertTrue(buf.path().getFileName().toString().startsWith("td-custom-"));
+            assertTrue(Files.exists(buf.path()));
+        }
+    }
+
+    // TD2
+    @Test
+    void createNullDirectory_fallsBackToSystemTmp() throws IOException {
+        Path sysTmp = Path.of(System.getProperty("java.io.tmpdir"));
+        try (TempFileBuffer buf = TempFileBuffer.create(null, "td-sys-")) {
+            assertTrue(buf.path().getParent().toAbsolutePath()
+                    .equals(sysTmp.toAbsolutePath()));
+        }
+    }
+
+    // TD3
+    @Test
+    void createWithDirectory_nullPrefix_throws() {
+        assertThrows(NullPointerException.class,
+                () -> TempFileBuffer.create(Path.of("."), null));
+    }
+
+    // TD4
+    @Test
+    void createInNonExistentDirectory_propagatesIOException() {
+        Path missing = Path.of("./target-does-not-exist-" + System.nanoTime());
+        assertThrows(IOException.class,
+                () -> TempFileBuffer.create(missing, "td-missing-"));
+    }
 }

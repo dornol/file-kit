@@ -74,6 +74,7 @@ public class FileUploadService {
     private final @Nullable QuotaChecker quotaChecker;
     private final FileEventPublisher eventPublisher;
     private final int formatHeaderBufferSize;
+    private final @Nullable Path tempDirectory;
 
     /**
      * Creates a builder with the four required dependencies.
@@ -102,6 +103,7 @@ public class FileUploadService {
         this.quotaChecker = b.quotaChecker;
         this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
         this.formatHeaderBufferSize = b.formatHeaderBufferSize;
+        this.tempDirectory = b.tempDirectory;
     }
 
     public static final class Builder {
@@ -117,6 +119,7 @@ public class FileUploadService {
         private @Nullable QuotaChecker quotaChecker;
         private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
         private int formatHeaderBufferSize = MagicByteBuffer.DEFAULT_SIZE;
+        private @Nullable Path tempDirectory;
 
         private Builder(ChecksumCalculator checksumCalculator,
                         FileMetadataRepository metadataRepository,
@@ -177,6 +180,19 @@ public class FileUploadService {
                                 + MagicByteBuffer.MIN_SIZE + ", got " + bytes);
             }
             this.formatHeaderBufferSize = bytes;
+            return this;
+        }
+
+        /**
+         * Directory to create ingest/encrypted temp files in. {@code null}
+         * (default) uses the system temp directory. The directory must exist;
+         * a missing directory raises {@link java.nio.file.NoSuchFileException}
+         * at upload time.
+         *
+         * @since 0.1.25
+         */
+        public Builder tempDirectory(@Nullable Path tempDirectory) {
+            this.tempDirectory = tempDirectory;
             return this;
         }
 
@@ -280,7 +296,7 @@ public class FileUploadService {
         validateFileSize(fileSource);
         validateFilename(fileSource.getOriginalFilename());
 
-        try (TempFileBuffer tempFile = TempFileBuffer.create(TEMP_UPLOAD_PREFIX)) {
+        try (TempFileBuffer tempFile = TempFileBuffer.create(tempDirectory, TEMP_UPLOAD_PREFIX)) {
             MagicByteBuffer header = new MagicByteBuffer(formatHeaderBufferSize);
             ChecksumComputation computation = checksumCalculator.newComputation();
             long bytesWritten = teeIngest(fileSource, tempFile.path(), computation, header);
@@ -304,7 +320,7 @@ public class FileUploadService {
                     ? fileSource.getOriginalFilename()
                     : key + "." + format.extension();
 
-            try (TempFileBuffer encryptedFile = TempFileBuffer.create(TEMP_ENCRYPTED_PREFIX)) {
+            try (TempFileBuffer encryptedFile = TempFileBuffer.create(tempDirectory, TEMP_ENCRYPTED_PREFIX)) {
                 encryptFile(tempFile.path(), encryptedFile.path());
                 long encryptedSize = Files.size(encryptedFile.path());
 

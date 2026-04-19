@@ -77,6 +77,16 @@ All notable changes to this project are documented in this file.
   `application/octet-stream` now return their actual MIME type;
   validators with allow-lists may need to include the newly-detected
   types.
+- Configurable temp directory via `tempDirectory(Path)` on
+  `FileUploadService.Builder`, `FileTransferService.Builder`, and
+  `FileDownloadService.Builder`. `null` (default) uses the system temp
+  directory — existing behavior unchanged. `TempFileBuffer.create(Path, String)`
+  overload exposed for any caller that needs the same capability.
+  `DecryptionHelper.decryptToStream(..., Path)` three-arg overload added
+  so the decryption temp file honors the download service's configured
+  directory. Enables per-test isolation via JUnit `@TempDir` and
+  production deployments with dedicated temp partitions (SSD/tmpfs,
+  Docker volumes, disk-quota-controlled mounts).
 - `ImageRotator` / `ImageCropper` SPIs with `ImageIORotator` / `ImageIOCropper`
   default implementations. Rotation supports 90° / 180° / 270° via
   `RotateAngle` enum; cropping takes a pixel-coordinate region via

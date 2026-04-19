@@ -22,6 +22,7 @@ import io.github.dornol.filekit.storage.FileUploadCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -31,10 +32,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -493,9 +494,11 @@ class FileUploadServiceTest {
         }
 
         @Test
-        void ingestIoException_propagates_andCleansTempFile() throws IOException {
-            Path tempDir = Path.of(System.getProperty("java.io.tmpdir"));
-            long before = countUploadTempFiles(tempDir);
+        void ingestIoException_propagates_andCleansTempFile(@TempDir Path tempDir) throws IOException {
+            FileUploadService svc = FileUploadService.builder(
+                    checksumCalculator, metadataRepository, formatExtractor, storageResolver)
+                    .tempDirectory(tempDir)
+                    .build();
 
             InputStream throwing = new InputStream() {
                 @Override public int read() throws IOException {
@@ -506,23 +509,12 @@ class FileUploadServiceTest {
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
 
             assertThrows(IOException.class,
-                    () -> service.upload(fileSource, StorageType.LOCAL, "bucket"));
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket"));
 
-            long after = countUploadTempFiles(tempDir);
-            assertEquals(before, after, "tempFile must be deleted after ingest failure");
-        }
-
-        private long countUploadTempFiles(Path tempDir) throws IOException {
-            // glob pushed to the OS-level filter — faster than full listing + Java filter
-            // on busy CI hosts where the tmp dir can hold thousands of entries.
-            long count = 0;
-            try (DirectoryStream<Path> entries = Files.newDirectoryStream(
-                    tempDir, FileUploadService.TEMP_UPLOAD_PREFIX + "*")) {
-                for (Path ignored : entries) {
-                    count++;
-                }
+            try (Stream<Path> entries = Files.list(tempDir)) {
+                assertEquals(0L, entries.count(),
+                        "tempFile must be deleted after ingest failure");
             }
-            return count;
         }
 
         @Test

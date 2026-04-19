@@ -1,5 +1,6 @@
 package io.github.dornol.filekit.io;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,15 +38,38 @@ public final class TempFileBuffer implements Closeable {
     private boolean closed = false;
 
     /**
-     * Creates a new temporary file with the given prefix and a {@code .tmp} suffix.
+     * Creates a new temporary file in the system temp directory with the given
+     * prefix and a {@code .tmp} suffix.
      *
      * @param prefix temp file name prefix (must not be null)
      * @throws IOException          if the file cannot be created
      * @throws NullPointerException if {@code prefix} is null
      */
     public static TempFileBuffer create(String prefix) throws IOException {
+        return create(null, prefix);
+    }
+
+    /**
+     * Creates a new temporary file in the given directory with the given prefix
+     * and a {@code .tmp} suffix. When {@code directory} is {@code null}, the
+     * system temp directory is used (same as {@link #create(String)}).
+     *
+     * <p>If {@code directory} does not exist, {@link Files#createTempFile(Path, String, String, java.nio.file.attribute.FileAttribute[])}
+     * will raise {@link java.nio.file.NoSuchFileException} — the caller is
+     * expected to ensure the directory is prepared.</p>
+     *
+     * @param directory directory to create the temp file in, or {@code null} for system temp
+     * @param prefix    temp file name prefix (must not be null)
+     * @throws IOException          if the file cannot be created
+     * @throws NullPointerException if {@code prefix} is null
+     * @since 0.1.25
+     */
+    public static TempFileBuffer create(@Nullable Path directory, String prefix) throws IOException {
         Objects.requireNonNull(prefix, "prefix");
-        return new TempFileBuffer(Files.createTempFile(prefix, SUFFIX));
+        Path path = directory != null
+                ? Files.createTempFile(directory, prefix, SUFFIX)
+                : Files.createTempFile(prefix, SUFFIX);
+        return new TempFileBuffer(path);
     }
 
     private TempFileBuffer(Path path) {
