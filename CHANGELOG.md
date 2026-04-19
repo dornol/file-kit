@@ -23,6 +23,10 @@ All notable changes to this project are documented in this file.
   for external bookkeeping (quota counter decrement, audit log, failure metric)
   instead of catching `FileStorageException#CALLBACK_FAILED` manually.
 - `FileEventPublisher.fireUploadFailed(metadata, cause)` public method.
+- `TempFileBuffer.release()`: transfers ownership of the underlying file to the
+  caller, making subsequent `close()` a no-op. Enables try-with-resources for
+  patterns where the temp file must outlive the block (e.g. wrapping into a
+  `DeleteOnCloseInputStream`). Used internally by `DecryptionHelper`.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
@@ -58,6 +62,11 @@ All notable changes to this project are documented in this file.
   both callback and save failures — the metadata delivered to the listener is
   the in-memory instance (not persisted). Listeners must not re-delete from
   storage.
+- `DecryptionHelper.decryptToStream`: manual null-check + finally-block
+  cleanup replaced with `TempFileBuffer` + `release()` in a try-with-resources.
+  Behavior is unchanged: on success the temp file is owned by the returned
+  `DeleteOnCloseInputStream`; on failure the temp file is deleted best-effort
+  and `FileStorageException(DECRYPTION_FAILED)` is thrown.
 
 ### Changed
 - `FileDownloadService.download()`: when a `ChecksumCalculator` is configured, the returned

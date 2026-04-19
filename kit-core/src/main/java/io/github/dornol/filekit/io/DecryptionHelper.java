@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
 
 /**
  * Decrypts an encrypted input stream to a temporary file and returns
@@ -33,22 +32,13 @@ public final class DecryptionHelper {
      * @throws FileStorageException if decryption fails
      */
     public static InputStream decryptToStream(InputStream encryptedContent, FileEncryptor fileEncryptor) {
-        Path decryptedFile = null;
-        try {
-            decryptedFile = Files.createTempFile("file-kit-decrypted-", ".tmp");
+        try (TempFileBuffer buf = TempFileBuffer.create("file-kit-decrypted-")) {
             try (InputStream in = encryptedContent;
-                 OutputStream out = Files.newOutputStream(decryptedFile)) {
+                 OutputStream out = Files.newOutputStream(buf.path())) {
                 fileEncryptor.decrypt(in, out);
             }
-            return new DeleteOnCloseInputStream(decryptedFile);
+            return new DeleteOnCloseInputStream(buf.release());
         } catch (IOException e) {
-            if (decryptedFile != null) {
-                try {
-                    Files.deleteIfExists(decryptedFile);
-                } catch (IOException deleteEx) {
-                    e.addSuppressed(deleteEx);
-                }
-            }
             throw new FileStorageException(FileStorageException.DECRYPTION_FAILED,
                     "Failed to decrypt file content", e);
         }

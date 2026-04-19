@@ -125,4 +125,67 @@ class TempFileBufferTest {
         assertEquals(p.getFileName(), buf.path().getFileName());
         assertFalse(Files.exists(buf.path()));
     }
+
+    // ── release() ─────────────────────────────────────────────────────
+
+    // R1
+    @Test
+    void release_returnsSamePathInstance() throws IOException {
+        TempFileBuffer buf = TempFileBuffer.create("test-release-");
+        try {
+            Path p = buf.release();
+            assertSame(buf.path(), p);
+        } finally {
+            Files.deleteIfExists(buf.path());
+        }
+    }
+
+    // R2
+    @Test
+    void release_keepsFileAfterTryWithResources() throws IOException {
+        Path captured;
+        try (TempFileBuffer buf = TempFileBuffer.create("test-release-twr-")) {
+            captured = buf.release();
+        }
+        try {
+            assertTrue(Files.exists(captured),
+                    "file must survive try-with-resources when released");
+        } finally {
+            Files.deleteIfExists(captured);
+        }
+    }
+
+    // R3
+    @Test
+    void release_thenExplicitClose_isNoop() throws IOException {
+        TempFileBuffer buf = TempFileBuffer.create("test-release-close-");
+        try {
+            Path p = buf.release();
+            buf.close();
+            assertTrue(Files.exists(p),
+                    "close after release must not delete the file");
+        } finally {
+            Files.deleteIfExists(buf.path());
+        }
+    }
+
+    // R4
+    @Test
+    void doubleRelease_throws() throws IOException {
+        TempFileBuffer buf = TempFileBuffer.create("test-release-double-");
+        try {
+            buf.release();
+            assertThrows(IllegalStateException.class, buf::release);
+        } finally {
+            Files.deleteIfExists(buf.path());
+        }
+    }
+
+    // R5
+    @Test
+    void releaseAfterClose_throws() throws IOException {
+        TempFileBuffer buf = TempFileBuffer.create("test-release-after-close-");
+        buf.close();
+        assertThrows(IllegalStateException.class, buf::release);
+    }
 }

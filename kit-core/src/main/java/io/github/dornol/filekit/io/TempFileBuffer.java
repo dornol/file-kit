@@ -58,10 +58,45 @@ public final class TempFileBuffer implements Closeable {
     }
 
     /**
+     * Transfers ownership of the underlying file to the caller. After this
+     * call, {@link #close()} is a no-op — the file is <b>not</b> deleted on
+     * try-with-resources exit. The caller becomes responsible for the file's
+     * lifecycle.
+     *
+     * <p>Intended for cases where the temp file must outlive the
+     * {@code try-with-resources} block, typically by wrapping it into a
+     * {@link DeleteOnCloseInputStream} that deletes on stream close.</p>
+     *
+     * <p>Usage:
+     * <pre>{@code
+     * try (TempFileBuffer buf = TempFileBuffer.create("prefix-")) {
+     *     // ... populate buf.path() ...
+     *     return new DeleteOnCloseInputStream(buf.release());
+     * }
+     * // On exception here, buf.close() fires and deletes the file
+     * // (because release() was not reached).
+     * }</pre>
+     *
+     * @return the underlying {@link Path} — same instance as {@link #path()}
+     * @throws IllegalStateException if this buffer is already closed or released
+     * @since 0.1.15
+     */
+    public Path release() {
+        if (closed) {
+            throw new IllegalStateException("TempFileBuffer already closed or released");
+        }
+        closed = true;
+        return path;
+    }
+
+    /**
      * Deletes the file best-effort. Safe to call more than once.
      *
      * <p>Any {@link IOException} from the delete is logged at WARN level
      * and swallowed — {@code close()} never throws.</p>
+     *
+     * <p>If {@link #release()} was called, this is a no-op and the file is
+     * left in place.</p>
      */
     @Override
     public void close() {
