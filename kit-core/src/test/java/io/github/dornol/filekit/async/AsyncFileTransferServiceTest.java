@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -99,6 +100,79 @@ class AsyncFileTransferServiceTest {
     void builder_nullExecutor_throws() {
         assertThrows(NullPointerException.class,
                 () -> AsyncFileTransferService.builder(sync).executor(null));
+    }
+
+    // P1
+    @Test
+    void copyAllParallelAsync_allSucceed() throws Exception {
+        when(sync.copy("a", StorageType.S3, "dest")).thenReturn(metadata);
+        when(sync.copy("b", StorageType.S3, "dest")).thenReturn(metadata);
+        when(sync.copy("c", StorageType.S3, "dest")).thenReturn(metadata);
+
+        AsyncFileTransferService svc = AsyncFileTransferService.builder(sync).build();
+
+        BatchTransferResult result = svc.copyAllParallelAsync(
+                List.of("a", "b", "c"), StorageType.S3, "dest").get();
+
+        assertEquals(3, result.succeeded().size());
+        assertEquals(0, result.failed().size());
+    }
+
+    // P2
+    @Test
+    void copyAllParallelAsync_mixedOutcomes() throws Exception {
+        when(sync.copy("ok1", StorageType.S3, "dest")).thenReturn(metadata);
+        when(sync.copy("ok2", StorageType.S3, "dest")).thenReturn(metadata);
+        when(sync.copy("bad", StorageType.S3, "dest")).thenThrow(
+                new FileStorageException(FileStorageException.FILE_NOT_FOUND, "gone"));
+
+        AsyncFileTransferService svc = AsyncFileTransferService.builder(sync).build();
+
+        BatchTransferResult result = svc.copyAllParallelAsync(
+                List.of("ok1", "bad", "ok2"), StorageType.S3, "dest").get();
+
+        assertEquals(2, result.succeeded().size());
+        assertEquals(1, result.failed().size());
+        assertEquals("gone", result.failed().get("bad"));
+    }
+
+    // P3
+    @Test
+    void copyAllParallelAsync_emptyInput_emptyResult() throws Exception {
+        AsyncFileTransferService svc = AsyncFileTransferService.builder(sync).build();
+
+        BatchTransferResult result = svc.copyAllParallelAsync(
+                List.of(), StorageType.S3, "dest").get();
+
+        assertEquals(0, result.succeeded().size());
+        assertTrue(result.allSucceeded());
+    }
+
+    // P4
+    @Test
+    void copyAllParallelAsync_failureMessage_unwrapped() throws Exception {
+        when(sync.copy("bad", StorageType.S3, "dest")).thenThrow(
+                new IllegalStateException("custom cause"));
+
+        AsyncFileTransferService svc = AsyncFileTransferService.builder(sync).build();
+
+        BatchTransferResult result = svc.copyAllParallelAsync(
+                List.of("bad"), StorageType.S3, "dest").get();
+
+        assertEquals("custom cause", result.failed().get("bad"));
+    }
+
+    // P5 — move parallel also works
+    @Test
+    void moveAllParallelAsync_allSucceed() throws Exception {
+        when(sync.move(any(), any(), any())).thenReturn(metadata);
+
+        AsyncFileTransferService svc = AsyncFileTransferService.builder(sync).build();
+
+        BatchTransferResult result = svc.moveAllParallelAsync(
+                List.of("a", "b"), StorageType.S3, "dest").get();
+
+        assertEquals(2, result.succeeded().size());
     }
 
     // T7

@@ -76,6 +76,60 @@ class AsyncFileDeleteServiceTest {
                 () -> AsyncFileDeleteService.builder(sync).executor(null));
     }
 
+    // P1
+    @Test
+    void deleteAllParallelAsync_allSucceed() throws Exception {
+        doNothing().when(sync).delete("a");
+        doNothing().when(sync).delete("b");
+        doNothing().when(sync).delete("c");
+
+        AsyncFileDeleteService svc = AsyncFileDeleteService.builder(sync).build();
+
+        BatchDeleteResult result = svc.deleteAllParallelAsync(List.of("a", "b", "c")).get();
+
+        assertEquals(3, result.succeeded().size());
+        assertEquals(0, result.failed().size());
+    }
+
+    // P2
+    @Test
+    void deleteAllParallelAsync_mixedOutcomes() throws Exception {
+        doNothing().when(sync).delete("ok1");
+        doNothing().when(sync).delete("ok2");
+        doThrow(new FileStorageException(FileStorageException.FILE_NOT_FOUND, "gone"))
+                .when(sync).delete("bad");
+
+        AsyncFileDeleteService svc = AsyncFileDeleteService.builder(sync).build();
+
+        BatchDeleteResult result = svc.deleteAllParallelAsync(List.of("ok1", "bad", "ok2")).get();
+
+        assertEquals(2, result.succeeded().size());
+        assertEquals(1, result.failed().size());
+        assertEquals("gone", result.failed().get("bad"));
+    }
+
+    // P3
+    @Test
+    void deleteAllParallelAsync_emptyInput() throws Exception {
+        AsyncFileDeleteService svc = AsyncFileDeleteService.builder(sync).build();
+
+        BatchDeleteResult result = svc.deleteAllParallelAsync(List.of()).get();
+
+        assertEquals(0, result.succeeded().size());
+    }
+
+    // P4
+    @Test
+    void deleteAllParallelAsync_failureMessageUnwrapped() throws Exception {
+        doThrow(new IllegalStateException("conn refused")).when(sync).delete("bad");
+
+        AsyncFileDeleteService svc = AsyncFileDeleteService.builder(sync).build();
+
+        BatchDeleteResult result = svc.deleteAllParallelAsync(List.of("bad")).get();
+
+        assertEquals("conn refused", result.failed().get("bad"));
+    }
+
     // D5
     @Test
     void injectedExecutor_runsOnThatExecutor() throws Exception {

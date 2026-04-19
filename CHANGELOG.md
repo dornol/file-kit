@@ -57,6 +57,17 @@ All notable changes to this project are documented in this file.
   existing call sites are unchanged. Users who need other algorithms can now
   write `new MessageDigestChecksumCalculator(ChecksumAlgorithm.MD5)` instead
   of reimplementing the `ChecksumCalculator` SPI.
+- `AsyncFileTransferService.copyAllParallelAsync` /
+  `moveAllParallelAsync` and `AsyncFileDeleteService.deleteAllParallelAsync`
+  — parallel batch methods that submit each item as an independent task on
+  the configured executor. Sibling to the sequential `xxxAllAsync` methods
+  which remain unchanged. Individual failures land in the result's `failed`
+  map without failing the overall future; failure messages unwrap
+  `CompletionException` to match the sync-batch format. Result order is
+  not guaranteed to match input order (documented). Upload is intentionally
+  excluded because parallel execution amplifies the existing dedup
+  TOCTOU (`findByChecksum` → `save`) — addressing it requires
+  per-checksum coordination that is out of this cycle's scope.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
