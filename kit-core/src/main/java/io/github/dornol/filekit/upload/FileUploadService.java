@@ -204,16 +204,26 @@ public class FileUploadService {
      * Uploads a file and runs a callback before persisting metadata.
      *
      * <p>If the callback throws, the uploaded file is deleted from storage
-     * and the exception is wrapped in a {@link RuntimeException} (or re-thrown as-is
-     * if it is already unchecked).</p>
+     * and the exception is wrapped in a
+     * {@link FileStorageException#CALLBACK_FAILED}. If metadata persistence
+     * fails, the uploaded file is also deleted from storage and the
+     * repository's exception is re-thrown as-is.</p>
      *
-     * <p><strong>Quota note:</strong> If the callback fails, the file is removed from
-     * storage but the quota usage is <em>not</em> automatically rolled back.
-     * If your {@link io.github.dornol.filekit.spi.QuotaUsageProvider} tracks usage
-     * independently (e.g. via a database counter), you must compensate the usage
-     * in your error-handling logic. For example, wrap the upload in a try-catch
-     * and decrement the quota counter on {@link FileStorageException} with
-     * {@link FileStorageException#CALLBACK_FAILED}.</p>
+     * <p><strong>Failure handling:</strong> On either callback failure or
+     * metadata persistence failure, {@link io.github.dornol.filekit.spi.FileEventListener#onUploadFailed}
+     * fires after storage cleanup. For external bookkeeping (quota counters,
+     * audit logs, metrics) the recommended pattern is to subscribe to that
+     * event rather than catching {@link FileStorageException#CALLBACK_FAILED}
+     * around the upload call — a single listener path handles both failure
+     * modes. The {@code metadata} delivered to the listener is the in-memory
+     * instance and has <em>not</em> been persisted; its key will not be
+     * retrievable via {@link io.github.dornol.filekit.spi.FileMetadataRepository#getByKey}.</p>
+     *
+     * <p>If the {@link io.github.dornol.filekit.quota.QuotaChecker} was configured
+     * with a counter-based
+     * {@link io.github.dornol.filekit.spi.QuotaUsageProvider} (one that tracks
+     * usage independently rather than deriving from storage/metadata),
+     * decrement the counter inside {@code onUploadFailed}.</p>
      *
      * @param fileSource  the file to upload
      * @param storageType storage backend to use
@@ -313,9 +323,23 @@ public class FileUploadService {
 
                 FileMetadata metadata = new FileMetadata(key, name, bytesWritten, checksum, format, location);
 
-                executeCallback(callback, metadata, storage);
+                try {
+                    executeCallback(callback, metadata, storage);
+                } catch (FileStorageException cbFailure) {
+                    // executeCallback already attempted storage.delete (see its impl).
+                    eventPublisher.fireUploadFailed(metadata, cbFailure);
+                    throw cbFailure;
+                }
 
-                FileMetadata saved = metadataRepository.save(metadata);
+                FileMetadata saved;
+                try {
+                    saved = metadataRepository.save(metadata);
+                } catch (RuntimeException saveFailure) {
+                    cleanupStorageBestEffort(storage, metadata, saveFailure);
+                    eventPublisher.fireUploadFailed(metadata, saveFailure);
+                    throw saveFailure;
+                }
+
                 log.info("File uploaded: key={}, size={}, bucket={}, storageType={}",
                         saved.key(), saved.size(), bucket, storageType);
                 eventPublisher.fireUploaded(saved);
@@ -411,9 +435,22 @@ public class FileUploadService {
         try {
             callback.onUploaded(metadata);
         } catch (Exception e) {
-            storage.delete(metadata);
-            throw new FileStorageException(FileStorageException.CALLBACK_FAILED,
+            FileStorageException wrapped = new FileStorageException(FileStorageException.CALLBACK_FAILED,
                     "Upload callback failed, file has been deleted: " + metadata.key(), e);
+            cleanupStorageBestEffort(storage, metadata, wrapped);
+            throw wrapped;
+        }
+    }
+
+    private static void cleanupStorageBestEffort(FileStorage storage,
+                                                 FileMetadata metadata,
+                                                 Throwable primary) {
+        try {
+            storage.delete(metadata);
+        } catch (RuntimeException cleanupEx) {
+            log.warn("Storage cleanup failed after upload failure for key={}: {}",
+                    metadata.key(), cleanupEx.getMessage());
+            primary.addSuppressed(cleanupEx);
         }
     }
 

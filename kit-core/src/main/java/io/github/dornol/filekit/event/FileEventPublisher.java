@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
@@ -50,6 +49,10 @@ public class FileEventPublisher {
 
     public void fireRenamed(FileMetadata before, FileMetadata after) {
         dispatch("onRenamed", listener -> listener.onRenamed(before, after));
+    }
+
+    public void fireUploadFailed(FileMetadata metadata, Throwable cause) {
+        dispatch("onUploadFailed", listener -> listener.onUploadFailed(metadata, cause));
     }
 
     private void dispatch(String eventName, Consumer<FileEventListener> action) {

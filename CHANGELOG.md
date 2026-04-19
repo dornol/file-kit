@@ -16,6 +16,13 @@ All notable changes to this project are documented in this file.
   try-with-resources for automatic best-effort cleanup. Used internally by
   `FileUploadService` and `FileTransferService`; available in `io/` for any
   caller that needs the same pattern.
+- `FileEventListener.onUploadFailed(metadata, cause)` default method: fires
+  when an upload fails after the content was written to storage. By the time
+  it fires, file-kit has already attempted to delete the file. Covers both
+  callback failure and metadata-save failure paths. Subscribe to this event
+  for external bookkeeping (quota counter decrement, audit log, failure metric)
+  instead of catching `FileStorageException#CALLBACK_FAILED` manually.
+- `FileEventPublisher.fireUploadFailed(metadata, cause)` public method.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
@@ -39,6 +46,18 @@ All notable changes to this project are documented in this file.
   dedup-hit) via a nested try-with-resources block. `IOException` raised by
   `Files.deleteIfExists` is now logged at WARN and swallowed uniformly across
   both services (previously the Upload path could propagate it).
+- **Upload failure cleanup**: `FileUploadService.doUpload()` now deletes the
+  uploaded file from storage when `FileMetadataRepository.save` fails (previously
+  a save failure left an orphan in storage). The original save exception is
+  re-thrown unchanged; any cleanup failure is recorded via `addSuppressed`.
+- **Callback failure cleanup**: `executeCallback` similarly records any
+  `storage.delete` failure via `addSuppressed` on the wrapped
+  `FileStorageException(CALLBACK_FAILED)` (previously the delete failure was
+  unobservable).
+- **Failure observability**: `onUploadFailed` fires after storage cleanup for
+  both callback and save failures — the metadata delivered to the listener is
+  the in-memory instance (not persisted). Listeners must not re-delete from
+  storage.
 
 ### Changed
 - `FileDownloadService.download()`: when a `ChecksumCalculator` is configured, the returned

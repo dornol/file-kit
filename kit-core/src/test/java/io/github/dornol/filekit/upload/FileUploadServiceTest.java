@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -37,11 +38,13 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -619,6 +622,174 @@ class FileUploadServiceTest {
 
             assertTrue(ex.getMessage().contains("callback failed"),
                     "Message should indicate callback failure");
+        }
+    }
+
+    // ── Upload-failure event integration ────────────────────────────
+
+    @Nested
+    class UploadFailureEvent {
+
+        FileEventListener listener = mock(FileEventListener.class);
+        FileUploadService svc = FileUploadService.builder(
+                checksumCalculator, metadataRepository, formatExtractor, storageResolver)
+                .eventPublisher(new FileEventPublisher(List.of(listener)))
+                .build();
+
+        // U1
+        @Test
+        void successfulUpload_doesNotFireOnUploadFailed() throws IOException {
+            setupSuccessfulUpload("test.txt");
+
+            svc.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            verify(listener).onUploaded(any());
+            verify(listener, never()).onUploadFailed(any(), any());
+        }
+
+        // U2
+        @Test
+        void callbackFailure_firesOnUploadFailedWithCallbackFailedKey() throws Exception {
+            setupSuccessfulUpload("test.txt");
+            UploadCallback callback = mock(UploadCallback.class);
+            doThrow(new RuntimeException("business error")).when(callback).onUploaded(any());
+
+            assertThrows(FileStorageException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket", callback));
+
+            ArgumentCaptor<Throwable> causeCap = ArgumentCaptor.forClass(Throwable.class);
+            verify(listener).onUploadFailed(any(), causeCap.capture());
+            Throwable cause = causeCap.getValue();
+            assertTrue(cause instanceof FileStorageException);
+            assertEquals(FileStorageException.CALLBACK_FAILED,
+                    ((FileStorageException) cause).getMessageKey());
+        }
+
+        // U3
+        @Test
+        void callbackFailure_deleteCalledBeforeEvent() throws Exception {
+            setupSuccessfulUpload("test.txt");
+            UploadCallback callback = mock(UploadCallback.class);
+            doThrow(new RuntimeException("business error")).when(callback).onUploaded(any());
+
+            assertThrows(FileStorageException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket", callback));
+
+            InOrder order = inOrder(fileStorage, listener);
+            order.verify(fileStorage).delete(any());
+            order.verify(listener).onUploadFailed(any(), any());
+        }
+
+        // U4 + U6
+        @Test
+        void saveFailure_callsStorageDeleteAndPropagatesOriginalException() throws IOException {
+            setupSuccessfulUpload("test.txt");
+            RuntimeException saveEx = new IllegalStateException("db down");
+            doThrow(saveEx).when(metadataRepository).save(any());
+
+            RuntimeException thrown = assertThrows(IllegalStateException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            assertSame(saveEx, thrown, "save exception must propagate as-is, unwrapped");
+            verify(fileStorage).delete(any());
+        }
+
+        // U5
+        @Test
+        void saveFailure_firesOnUploadFailedWithOriginalCause() throws IOException {
+            setupSuccessfulUpload("test.txt");
+            RuntimeException saveEx = new IllegalStateException("db down");
+            doThrow(saveEx).when(metadataRepository).save(any());
+
+            assertThrows(IllegalStateException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            ArgumentCaptor<Throwable> causeCap = ArgumentCaptor.forClass(Throwable.class);
+            verify(listener).onUploadFailed(any(), causeCap.capture());
+            assertSame(saveEx, causeCap.getValue());
+        }
+
+        // U7
+        @Test
+        void callbackFailure_whenStorageDeleteAlsoFails_recordsSuppressed() throws Exception {
+            setupSuccessfulUpload("test.txt");
+            UploadCallback callback = mock(UploadCallback.class);
+            doThrow(new RuntimeException("callback err")).when(callback).onUploaded(any());
+            RuntimeException deleteEx = new IllegalStateException("storage unreachable");
+            doThrow(deleteEx).when(fileStorage).delete(any());
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket", callback));
+
+            assertEquals(FileStorageException.CALLBACK_FAILED, ex.getMessageKey());
+            assertTrue(ex.getSuppressed().length > 0, "cleanup exception must be suppressed");
+            assertSame(deleteEx, ex.getSuppressed()[0]);
+        }
+
+        // U8
+        @Test
+        void saveFailure_whenStorageDeleteAlsoFails_recordsSuppressed() throws IOException {
+            setupSuccessfulUpload("test.txt");
+            RuntimeException saveEx = new IllegalStateException("db down");
+            doThrow(saveEx).when(metadataRepository).save(any());
+            RuntimeException deleteEx = new IllegalStateException("storage unreachable");
+            doThrow(deleteEx).when(fileStorage).delete(any());
+
+            RuntimeException thrown = assertThrows(IllegalStateException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            assertSame(saveEx, thrown);
+            assertTrue(thrown.getSuppressed().length > 0, "cleanup exception must be suppressed");
+            assertSame(deleteEx, thrown.getSuppressed()[0]);
+        }
+
+        // U9
+        @Test
+        void listenerException_doesNotInterfereWithOriginalException() throws IOException {
+            setupSuccessfulUpload("test.txt");
+            RuntimeException saveEx = new IllegalStateException("db down");
+            doThrow(saveEx).when(metadataRepository).save(any());
+            doThrow(new RuntimeException("listener broken"))
+                    .when(listener).onUploadFailed(any(), any());
+
+            RuntimeException thrown = assertThrows(IllegalStateException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            assertSame(saveEx, thrown, "listener failure must not mask original exception");
+        }
+
+        // U10
+        @Test
+        void saveFailure_withoutCallback_stillFiresEventAndCleansStorage() throws IOException {
+            setupSuccessfulUpload("test.txt");
+            RuntimeException saveEx = new IllegalStateException("db down");
+            doThrow(saveEx).when(metadataRepository).save(any());
+
+            // Using upload without callback overload
+            assertThrows(IllegalStateException.class,
+                    () -> svc.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            verify(fileStorage).delete(any());
+            verify(listener).onUploadFailed(any(), any());
+        }
+
+        // U11
+        @Test
+        void dedupHit_doesNotFireOnUploadFailed() throws IOException {
+            byte[] content = "hello".getBytes();
+            FileMetadata existing = new FileMetadata("existing-key", "test.txt", 5, "abc123",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "key", StorageType.LOCAL));
+
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
+
+            svc.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            verify(listener, never()).onUploadFailed(any(), any());
+            verify(listener, never()).onUploaded(any());
         }
     }
 
