@@ -50,6 +50,13 @@ All notable changes to this project are documented in this file.
   into an immutable `Map<String, Integer>` of reason → count. Complements the
   existing per-file `failed` map for cases where many files fail for the same
   underlying reason (e.g. storage outage) and the per-file view becomes noise.
+- `ChecksumAlgorithm` enum (MD5, SHA-1, SHA-256, SHA-384, SHA-512) and
+  `MessageDigestChecksumCalculator(ChecksumAlgorithm)` — generic
+  `MessageDigest`-backed calculator. `Sha256ChecksumCalculator` is retained
+  as a no-arg convenience subclass that calls `super(ChecksumAlgorithm.SHA_256)`;
+  existing call sites are unchanged. Users who need other algorithms can now
+  write `new MessageDigestChecksumCalculator(ChecksumAlgorithm.MD5)` instead
+  of reimplementing the `ChecksumCalculator` SPI.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
