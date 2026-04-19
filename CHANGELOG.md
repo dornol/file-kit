@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+- Streaming checksum verification on download (`ChecksumVerifyingInputStream`)
+- New SPI: `ChecksumComputation` (incremental checksum state)
+- `ChecksumCalculator.newComputation()` default method with buffering fallback (backward compatible)
+- `Sha256ChecksumCalculator` override uses `MessageDigest` directly (true streaming, no buffering)
+
+### Changed
+- `FileDownloadService.download()`: when a `ChecksumCalculator` is configured, the returned
+  `InputStream` now verifies the checksum on-the-fly as it is read. Memory footprint is
+  O(buffer) regardless of file size (previously O(file) via `readAllBytes()`).
+- **Behavioral**: `CHECKSUM_MISMATCH` is now thrown from the `read()` call that reaches EOF,
+  not from `download()` itself. Callers must consume the stream to completion to receive
+  the mismatch exception. Closing the stream before EOF skips verification (WARN logged).
+- **Event semantics**: `FileEventListener.onDownloaded` now fires when the download stream
+  is returned to the caller, not after the checksum has been fully verified. A subsequent
+  `CHECKSUM_MISMATCH` during stream consumption will therefore be preceded by a successful
+  `onDownloaded` event. Consumers that treat this event as "integrity-verified" must
+  either (a) verify via `Sha256ChecksumCalculator#checksum(InputStream)` themselves after
+  consumption, or (b) wait for stream close without exception as the integrity signal.
+
+### Migration notes
+- Custom `ChecksumCalculator` implementations continue to work via the default buffering
+  fallback, but the fallback buffers the entire input in memory — override
+  `newComputation()` with a streaming implementation (e.g. wrap `MessageDigest`) to avoid
+  OOM on large files. A WARN is logged once per JVM when the fallback is first used.
+- Consumers that relied on `download()` throwing `CHECKSUM_MISMATCH` synchronously must
+  move their `try/catch` around the stream consumption (`readAllBytes`, `transferTo`, etc).
+
 ## [0.1.10] - 2025-07-12
 
 ### Added

@@ -220,14 +220,16 @@ class EncryptionIntegrationTest {
             repo.deleteByKey(tampered.key());
             repo.save(faked);
 
-            // Download with checksum verification — should detect mismatch
+            // Download with checksum verification — mismatch is detected when the
+            // returned stream is consumed to EOF (streaming verification, v0.1.11+).
             FileDownloadService download = FileDownloadService.builder(repo, resolver)
                     .fileEncryptor(encryptor2)
                     .checksumCalculator(calc)
                     .build();
 
+            var result = download.download(faked.key());
             FileStorageException ex = assertThrows(FileStorageException.class,
-                    () -> download.download(faked.key()));
+                    () -> result.content().readAllBytes());
             assertEquals(FileStorageException.CHECKSUM_MISMATCH, ex.getMessageKey());
         }
     }

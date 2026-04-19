@@ -34,4 +34,19 @@ public interface ChecksumCalculator {
         }
     }
 
+    /**
+     * Returns a new incremental {@link ChecksumComputation} for streaming use.
+     *
+     * <p>The default implementation buffers all updates in memory and delegates to
+     * {@link #checksum(byte[])} on {@link ChecksumComputation#finish()}. Override
+     * this method for a true streaming implementation that does not retain file
+     * content in memory — essential for large or untrusted inputs.</p>
+     *
+     * @return a fresh, non-thread-safe computation instance
+     * @since 0.1.11
+     */
+    default ChecksumComputation newComputation() {
+        return new BufferingComputation(this);
+    }
+
 }

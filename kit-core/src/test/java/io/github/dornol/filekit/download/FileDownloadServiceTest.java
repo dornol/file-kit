@@ -487,7 +487,7 @@ class FileDownloadServiceTest {
         }
 
         @Test
-        void checksumMismatch_throws() {
+        void checksumMismatch_throwsOnReadToEof() {
             FileMetadata meta = new FileMetadata(
                     "file-key", "test.txt", 5, "wrong-checksum",
                     new FileFormat("text/plain", "txt", "text"),
@@ -500,8 +500,11 @@ class FileDownloadServiceTest {
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
             when(fileStorage.load(meta)).thenReturn(new ByteArrayInputStream("hello".getBytes()));
 
+            // download() itself no longer throws — the verifying stream is lazy.
+            DownloadResult result = svc.download("file-key");
+
             FileStorageException ex = assertThrows(FileStorageException.class,
-                    () -> svc.download("file-key"));
+                    () -> result.content().readAllBytes());
             assertEquals(FileStorageException.CHECKSUM_MISMATCH, ex.getMessageKey());
         }
 

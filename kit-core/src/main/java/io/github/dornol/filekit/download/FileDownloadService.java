@@ -3,6 +3,7 @@ package io.github.dornol.filekit.download;
 import io.github.dornol.filekit.domain.DownloadResult;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.io.ChecksumVerifyingInputStream;
 import io.github.dornol.filekit.io.IoUtils;
 import io.github.dornol.filekit.io.DecryptionHelper;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
@@ -16,7 +17,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.List;
@@ -123,10 +123,20 @@ public class FileDownloadService extends AbstractFileOperationService {
      * Downloads a file by key.
      *
      * <p>If a {@link ChecksumCalculator} was configured via
-     * {@link Builder#checksumCalculator(ChecksumCalculator)}, the downloaded
-     * content is fully read into a temporary file and its checksum is verified
-     * against the stored checksum before returning. This detects storage
-     * corruption at the cost of an extra read pass.</p>
+     * {@link Builder#checksumCalculator(ChecksumCalculator)}, the returned
+     * {@link InputStream} transparently verifies the checksum while being read.
+     * Verification completes when the consumer reads to EOF; if the stored
+     * checksum does not match the actual content, a
+     * {@link FileStorageException} with
+     * {@link FileStorageException#CHECKSUM_MISMATCH} is thrown from the
+     * {@code read()} call that would otherwise return {@code -1}.
+     *
+     * <p>Closing the returned stream before EOF skips verification (a warning
+     * is logged) — this accommodates partial reads such as preview or range
+     * transfers. Callers that require strict end-to-end verification must
+     * consume the stream to completion.</p>
+     *
+     * <p>Memory footprint is O(buffer), independent of file size.</p>
      */
     public DownloadResult download(String fileKey) {
         Objects.requireNonNull(fileKey, "fileKey");
@@ -177,21 +187,12 @@ public class FileDownloadService extends AbstractFileOperationService {
     }
 
     private InputStream verifyChecksum(InputStream content, FileMetadata metadata) {
-        try {
-            byte[] bytes = content.readAllBytes();
-            String actual = checksumCalculator.checksum(bytes);
-            if (!actual.equals(metadata.checksum())) {
-                throw new FileStorageException(FileStorageException.CHECKSUM_MISMATCH,
-                        "Checksum mismatch for key=" + metadata.key()
-                                + ": expected=" + metadata.checksum() + ", actual=" + actual);
-            }
-            return new java.io.ByteArrayInputStream(bytes);
-        } catch (FileStorageException e) {
-            throw e;
-        } catch (IOException e) {
-            throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
-                    "Failed to verify checksum for key=" + metadata.key(), e);
-        }
+        return new ChecksumVerifyingInputStream(
+                content,
+                checksumCalculator.newComputation(),
+                metadata.checksum(),
+                metadata.key()
+        );
     }
 
     private InputStream decryptToStream(InputStream encryptedContent) {
