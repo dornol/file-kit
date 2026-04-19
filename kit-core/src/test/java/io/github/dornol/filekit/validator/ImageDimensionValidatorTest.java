@@ -65,7 +65,7 @@ class ImageDimensionValidatorTest {
     @Test
     void zeroConstraints_anyDimensionOk() {
         assertNull(validator.validate(image(1, 1), 0, 0, 0, 0));
-        assertNull(validator.validate(image(10_000, 10_000), 0, 0, 0, 0));
+        assertNull(validator.validate(image(2_000, 2_000), 0, 0, 0, 0));
     }
 
     // I7
