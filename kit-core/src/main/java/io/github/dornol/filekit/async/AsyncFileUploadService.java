@@ -101,8 +101,9 @@ public final class AsyncFileUploadService {
         }
 
         /**
-         * Sets the executor used to run async operations.
-         * See {@link AsyncFileUploadService} class JavaDoc for selection guidance.
+         * Sets the executor used to run async operations. See
+         * {@linkplain io.github.dornol.filekit.async package docs} for
+         * selection guidance.
          *
          * @throws NullPointerException if {@code executor} is null
          */

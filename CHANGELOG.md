@@ -34,6 +34,12 @@ All notable changes to this project are documented in this file.
   `Executors.newVirtualThreadPerTaskExecutor()` for blocking file I/O. No new
   runtime dependencies. Checked `IOException`s surface as the cause of
   `CompletionException`.
+- `AsyncFileTransferService`, `AsyncFileDeleteService`, `AsyncFileRenameService`:
+  async wrappers covering the remaining sync services. `deleteAsync` returns
+  `CompletableFuture<Void>`; all others mirror their sync signatures. No
+  checked exceptions to wrap (all three sync services only throw unchecked
+  `FileStorageException`), so exception propagation is direct via
+  `CompletionException.getCause()`.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
