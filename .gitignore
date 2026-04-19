@@ -44,3 +44,6 @@ gradle.properties
 
 # Claude
 .claude
+
+# bkit session state
+.bkit/
