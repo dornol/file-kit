@@ -25,3 +25,11 @@ jobs:
 
       - name: Build & Test
         run: ./gradlew build -x :example:test -x :example:bootJar -x :example:jar --no-daemon
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: '**/build/reports/tests/'
+          retention-days: 14
