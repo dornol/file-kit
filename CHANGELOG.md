@@ -77,6 +77,16 @@ All notable changes to this project are documented in this file.
   `application/octet-stream` now return their actual MIME type;
   validators with allow-lists may need to include the newly-detected
   types.
+- `SignedUrlSigner` (new `io.github.dornol.filekit.url` package) — HMAC-SHA256
+  helper for generating and verifying time-limited download URLs against
+  local-storage file servers. Produces `"exp=...&sig=..."` query fragments;
+  verification uses constant-time comparison
+  (`MessageDigest.isEqual`). Secret key must be at least 16 bytes.
+  Accompanying exceptions: `SignedUrlException` (base),
+  `SignedUrlExpiredException`, `SignedUrlInvalidSignatureException`.
+  The helper deliberately does not build full URLs or authorize users —
+  authorization remains an application concern; a valid signature only
+  proves the URL originated from the app.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
