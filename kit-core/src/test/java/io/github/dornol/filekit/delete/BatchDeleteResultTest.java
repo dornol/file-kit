@@ -132,4 +132,44 @@ class BatchDeleteResultTest {
                     () -> result.failed().put("key2", "error2"));
         }
     }
+
+    @Nested
+    class FailureReasons {
+
+        @Test
+        void emptyFailed_returnsEmptyMap() {
+            BatchDeleteResult result = new BatchDeleteResult(List.of("k1"), Map.of());
+            assertTrue(result.failureReasons().isEmpty());
+        }
+
+        @Test
+        void singleReason_countsAll() {
+            BatchDeleteResult result = new BatchDeleteResult(
+                    List.of(),
+                    Map.of("k1", "not found",
+                           "k2", "not found",
+                           "k3", "not found"));
+            assertEquals(Map.of("not found", 3), result.failureReasons());
+        }
+
+        @Test
+        void mixedReasons_perReasonCounts() {
+            BatchDeleteResult result = new BatchDeleteResult(
+                    List.of(),
+                    Map.of("k1", "not found",
+                           "k2", "access denied",
+                           "k3", "not found"));
+            Map<String, Integer> reasons = result.failureReasons();
+            assertEquals(2, reasons.get("not found"));
+            assertEquals(1, reasons.get("access denied"));
+        }
+
+        @Test
+        void returnedMapIsImmutable() {
+            BatchDeleteResult result = new BatchDeleteResult(
+                    List.of(), Map.of("k1", "error"));
+            assertThrows(UnsupportedOperationException.class,
+                    () -> result.failureReasons().put("x", 1));
+        }
+    }
 }

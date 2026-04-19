@@ -45,6 +45,11 @@ All notable changes to this project are documented in this file.
   need. `FileValidationHelper` is retained as a facade delegating to these
   two validators — its public API is unchanged. Heavy logic moves out of the
   ~281-line helper into focused ~60–90 line classes with their own unit tests.
+- `BatchUploadResult.failureReasons()`, `BatchTransferResult.failureReasons()`,
+  `BatchDeleteResult.failureReasons()`: aggregate per-file failure messages
+  into an immutable `Map<String, Integer>` of reason → count. Complements the
+  existing per-file `failed` map for cases where many files fail for the same
+  underlying reason (e.g. storage outage) and the per-file view becomes noise.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into

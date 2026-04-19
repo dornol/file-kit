@@ -141,4 +141,44 @@ class BatchTransferResultTest {
                     () -> result.failed().put("k2", "error2"));
         }
     }
+
+    @Nested
+    class FailureReasons {
+
+        @Test
+        void emptyFailed_returnsEmptyMap() {
+            BatchTransferResult result = new BatchTransferResult(List.of(meta1), Map.of());
+            assertTrue(result.failureReasons().isEmpty());
+        }
+
+        @Test
+        void singleReason_countsAll() {
+            BatchTransferResult result = new BatchTransferResult(
+                    List.of(),
+                    Map.of("k1", "storage unreachable",
+                           "k2", "storage unreachable",
+                           "k3", "storage unreachable"));
+            assertEquals(Map.of("storage unreachable", 3), result.failureReasons());
+        }
+
+        @Test
+        void mixedReasons_perReasonCounts() {
+            BatchTransferResult result = new BatchTransferResult(
+                    List.of(),
+                    Map.of("k1", "source missing",
+                           "k2", "target bucket full",
+                           "k3", "source missing"));
+            Map<String, Integer> reasons = result.failureReasons();
+            assertEquals(2, reasons.get("source missing"));
+            assertEquals(1, reasons.get("target bucket full"));
+        }
+
+        @Test
+        void returnedMapIsImmutable() {
+            BatchTransferResult result = new BatchTransferResult(
+                    List.of(), Map.of("k1", "error"));
+            assertThrows(UnsupportedOperationException.class,
+                    () -> result.failureReasons().put("x", 1));
+        }
+    }
 }
