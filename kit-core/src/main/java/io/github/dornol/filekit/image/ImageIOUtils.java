@@ -16,8 +16,9 @@ import java.io.IOException;
 import java.util.Iterator;
 
 /**
- * Shared utility for writing images via ImageIO.
- * Used by {@link ImageIOResizer} and {@link ImageIOWatermarker}.
+ * Shared ImageIO helpers for reading image bytes, resolving the output
+ * format, and writing with optional quality control. Used by every
+ * {@code ImageIO*} operation in this package.
  */
 final class ImageIOUtils {
 

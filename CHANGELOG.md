@@ -77,6 +77,14 @@ All notable changes to this project are documented in this file.
   `application/octet-stream` now return their actual MIME type;
   validators with allow-lists may need to include the newly-detected
   types.
+- `ImageRotator` / `ImageCropper` SPIs with `ImageIORotator` / `ImageIOCropper`
+  default implementations. Rotation supports 90° / 180° / 270° via
+  `RotateAngle` enum; cropping takes a pixel-coordinate region via
+  `CropOption` with up-front boundary validation (out-of-range →
+  `IllegalArgumentException`). Option/Result records mirror the existing
+  resize / watermark shape. Reuses `ImageIOUtils` for read / write /
+  output-format resolution so JPEG RGB conversion and quality handling
+  stay consistent across image operations.
 - `SignedUrlSigner` (new `io.github.dornol.filekit.url` package) — HMAC-SHA256
   helper for generating and verifying time-limited download URLs against
   local-storage file servers. Produces `"exp=...&sig=..."` query fragments;
