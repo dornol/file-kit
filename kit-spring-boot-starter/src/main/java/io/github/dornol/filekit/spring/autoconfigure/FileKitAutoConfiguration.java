@@ -15,7 +15,11 @@ import io.github.dornol.filekit.image.ImageIOMetadataExtractor;
 import io.github.dornol.filekit.image.ImageIOResizer;
 import io.github.dornol.filekit.image.ImageIOWatermarker;
 import io.github.dornol.filekit.image.ImageMetadataExtractor;
+import io.github.dornol.filekit.image.ImageCropper;
+import io.github.dornol.filekit.image.ImageIOCropper;
+import io.github.dornol.filekit.image.ImageIORotator;
 import io.github.dornol.filekit.image.ImageResizer;
+import io.github.dornol.filekit.image.ImageRotator;
 import io.github.dornol.filekit.image.ImageWatermarker;
 import io.github.dornol.filekit.image.ThumbnailGenerator;
 import io.github.dornol.filekit.quota.QuotaChecker;
@@ -262,6 +266,20 @@ public class FileKitAutoConfiguration {
     public ImageWatermarker imageWatermarker(ImageMetadataExtractor metadataExtractor) {
         log.debug("Registering default ImageIOWatermarker");
         return new ImageIOWatermarker(metadataExtractor);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ImageRotator imageRotator(ImageMetadataExtractor metadataExtractor) {
+        log.debug("Registering default ImageIORotator");
+        return new ImageIORotator(metadataExtractor);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ImageCropper imageCropper(ImageMetadataExtractor metadataExtractor) {
+        log.debug("Registering default ImageIOCropper");
+        return new ImageIOCropper(metadataExtractor);
     }
 
     @Bean

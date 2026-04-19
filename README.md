@@ -697,6 +697,8 @@ The following beans are registered automatically when their dependencies are pre
 | `ImageMetadataExtractor` | Always (`ImageIOMetadataExtractor` default, overridable) |
 | `ImageResizer` | Always (`ImageIOResizer` default, overridable) |
 | `ImageWatermarker` | Always (`ImageIOWatermarker` default, overridable) |
+| `ImageRotator` | Always (`ImageIORotator` default, overridable) |
+| `ImageCropper` | Always (`ImageIOCropper` default, overridable) |
 | `ThumbnailGenerator` | Always (`DefaultThumbnailGenerator` default, overridable) |
 | `PdfMetadataExtractor` | When Apache PDFBox is on the classpath (`PdfBoxMetadataExtractor` default, overridable) |
 | `ArchiveMetadataExtractor` | Always (`ZipArchiveMetadataExtractor` default, overridable) |
@@ -1298,17 +1300,45 @@ boolean validName = helper.isValidFilename(source);
 
 Or use `@ValidFile` with Jakarta Validation and `FileSourceValidator`.
 
-Image processing, thumbnail, watermark, PDF metadata extraction, EXIF stripping, format conversion, and archive listing can also be used standalone without Spring:
+Image processing, thumbnail, watermark, rotate, crop, PDF metadata extraction, EXIF stripping, format conversion, and archive listing can also be used standalone without Spring:
 
 ```java
 ImageResizer resizer = new ImageIOResizer();
 ImageWatermarker watermarker = new ImageIOWatermarker();
+ImageRotator rotator = new ImageIORotator();
+ImageCropper cropper = new ImageIOCropper();
 ThumbnailGenerator thumbnailGenerator = new DefaultThumbnailGenerator(resizer);
 PdfMetadataExtractor pdfExtractor = new PdfBoxMetadataExtractor();
 ExifStripper exifStripper = new ImageIOExifStripper();
 ImageFormatConverter formatConverter = new ImageIOFormatConverter();
 ArchiveMetadataExtractor archiveExtractor = new ZipArchiveMetadataExtractor();
 FileEncryptor encryptor = new NoOpFileEncryptor(); // or your custom implementation
+```
+
+### Async adapters
+
+`CompletableFuture`-based wrappers around each sync service. On JDK 21+ inject a virtual-thread executor for efficient blocking I/O:
+
+```java
+AsyncFileUploadService asyncUpload = AsyncFileUploadService.builder(syncUpload)
+        .executor(Executors.newVirtualThreadPerTaskExecutor())
+        .build();
+
+CompletableFuture<FileMetadata> result = asyncUpload.uploadAsync(src, type, bucket);
+```
+
+Siblings: `AsyncFileDownloadService`, `AsyncFileTransferService` (+`copyAllParallelAsync`/`moveAllParallelAsync`), `AsyncFileDeleteService` (+`deleteAllParallelAsync`), `AsyncFileRenameService`.
+
+### Signed URLs
+
+Generate and verify HMAC-SHA256 time-limited fragments for local-storage download endpoints (authorization still app-level):
+
+```java
+SignedUrlSigner signer = new SignedUrlSigner(secretBytes);
+String fragment = signer.sign(fileKey, Instant.now().plus(Duration.ofHours(1)));
+// → "exp=...&sig=..."
+
+signer.verify(fileKey, exp, sig);  // throws SignedUrlExpiredException / InvalidSignatureException
 ```
 
 ## Running the Example
