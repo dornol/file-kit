@@ -5,10 +5,12 @@ import io.github.dornol.filekit.domain.FileLocation;
 import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.domain.FileSource;
 import io.github.dornol.filekit.event.FileEventPublisher;
+import io.github.dornol.filekit.io.MagicByteBuffer;
 import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
+import io.github.dornol.filekit.spi.ChecksumComputation;
 import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -27,7 +29,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -59,6 +60,9 @@ public class FileUploadService {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadService.class);
 
+    static final String TEMP_UPLOAD_PREFIX = "file-kit-upload-";
+    static final String TEMP_ENCRYPTED_PREFIX = "file-kit-encrypted-";
+
     private final ChecksumCalculator checksumCalculator;
     private final FileMetadataRepository metadataRepository;
     private final FileFormatExtractor formatExtractor;
@@ -68,6 +72,7 @@ public class FileUploadService {
     private final FileEncryptor fileEncryptor;
     private final @Nullable QuotaChecker quotaChecker;
     private final FileEventPublisher eventPublisher;
+    private final int formatHeaderBufferSize;
 
     /**
      * Creates a builder with the four required dependencies.
@@ -95,6 +100,7 @@ public class FileUploadService {
         this.fileEncryptor = Objects.requireNonNull(b.fileEncryptor, "fileEncryptor");
         this.quotaChecker = b.quotaChecker;
         this.eventPublisher = Objects.requireNonNull(b.eventPublisher, "eventPublisher");
+        this.formatHeaderBufferSize = b.formatHeaderBufferSize;
     }
 
     public static final class Builder {
@@ -109,6 +115,7 @@ public class FileUploadService {
         private FileEncryptor fileEncryptor = new NoOpFileEncryptor();
         private @Nullable QuotaChecker quotaChecker;
         private FileEventPublisher eventPublisher = new FileEventPublisher(List.of());
+        private int formatHeaderBufferSize = MagicByteBuffer.DEFAULT_SIZE;
 
         private Builder(ChecksumCalculator checksumCalculator,
                         FileMetadataRepository metadataRepository,
@@ -150,6 +157,25 @@ public class FileUploadService {
         /** @param eventPublisher publisher for file lifecycle events */
         public Builder eventPublisher(FileEventPublisher eventPublisher) {
             this.eventPublisher = eventPublisher;
+            return this;
+        }
+
+        /**
+         * Sets the size of the header buffer used for format detection during ingest.
+         * A larger buffer improves detection for formats that require a longer
+         * magic-byte prefix (e.g. some XML wrappers) at the cost of per-upload
+         * memory. Default: {@link MagicByteBuffer#DEFAULT_SIZE} (16 KiB).
+         *
+         * @throws IllegalArgumentException if {@code bytes < MagicByteBuffer.MIN_SIZE}
+         * @since 0.1.12
+         */
+        public Builder formatHeaderBufferSize(int bytes) {
+            if (bytes < MagicByteBuffer.MIN_SIZE) {
+                throw new IllegalArgumentException(
+                        "formatHeaderBufferSize must be at least "
+                                + MagicByteBuffer.MIN_SIZE + ", got " + bytes);
+            }
+            this.formatHeaderBufferSize = bytes;
             return this;
         }
 
@@ -243,31 +269,26 @@ public class FileUploadService {
         validateFileSize(fileSource);
         validateFilename(fileSource.getOriginalFilename());
 
-        Path tempFile = Files.createTempFile("file-kit-upload-", ".tmp");
+        Path tempFile = Files.createTempFile(TEMP_UPLOAD_PREFIX, ".tmp");
         Path encryptedFile = null;
         try {
-            long bytesWritten;
-            try (InputStream is = fileSource.getInputStream()) {
-                bytesWritten = Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
-            }
+            MagicByteBuffer header = new MagicByteBuffer(formatHeaderBufferSize);
+            ChecksumComputation computation = checksumCalculator.newComputation();
+            long bytesWritten = teeIngest(fileSource, tempFile, computation, header);
+            String checksum = computation.finish();
 
+            // Virus scan runs on every upload (including would-be duplicates) to
+            // defend against signature-DB updates since a prior ingest.
             scanForVirus(tempFile);
-
-            String checksum;
-            try (InputStream is = Files.newInputStream(tempFile)) {
-                checksum = checksumCalculator.checksum(is);
-            }
 
             FileMetadata existing = metadataRepository.findByChecksum(checksum);
             if (existing != null) {
-                log.info("Duplicate file detected (checksum={}), returning existing metadata: {}", checksum, existing.key());
+                log.info("Duplicate file detected (checksum={}), returning existing metadata: {}",
+                        checksum, existing.key());
                 return existing;
             }
 
-            FileFormat format;
-            try (InputStream is = Files.newInputStream(tempFile)) {
-                format = formatExtractor.extract(is);
-            }
+            FileFormat format = formatExtractor.extract(header.asInputStream());
 
             String key = UUID.randomUUID().toString();
             String name = fileSource.getOriginalFilename() != null
@@ -275,7 +296,7 @@ public class FileUploadService {
                     : key + "." + format.extension();
 
             // Encrypt content to a separate temp file
-            encryptedFile = Files.createTempFile("file-kit-encrypted-", ".tmp");
+            encryptedFile = Files.createTempFile(TEMP_ENCRYPTED_PREFIX, ".tmp");
             encryptFile(tempFile, encryptedFile);
             long encryptedSize = Files.size(encryptedFile);
 
@@ -306,6 +327,31 @@ public class FileUploadService {
                 Files.deleteIfExists(encryptedFile);
             }
         }
+    }
+
+    /**
+     * Copies the source stream to {@code tempFile} while simultaneously updating
+     * the incremental checksum computation and capturing the leading bytes into
+     * {@code header} for later format detection.
+     *
+     * @return total bytes written
+     */
+    private static long teeIngest(FileSource fileSource, Path tempFile,
+                                  ChecksumComputation computation,
+                                  MagicByteBuffer header) throws IOException {
+        byte[] buf = new byte[8192];
+        long total = 0;
+        try (InputStream is = fileSource.getInputStream();
+             OutputStream out = Files.newOutputStream(tempFile)) {
+            int n;
+            while ((n = is.read(buf)) != -1) {
+                out.write(buf, 0, n);
+                computation.update(buf, 0, n);
+                header.observe(buf, 0, n);
+                total += n;
+            }
+        }
+        return total;
     }
 
     private void validateFileSize(FileSource fileSource) {

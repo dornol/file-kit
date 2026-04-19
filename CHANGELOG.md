@@ -9,6 +9,26 @@ All notable changes to this project are documented in this file.
 - New SPI: `ChecksumComputation` (incremental checksum state)
 - `ChecksumCalculator.newComputation()` default method with buffering fallback (backward compatible)
 - `Sha256ChecksumCalculator` override uses `MessageDigest` directly (true streaming, no buffering)
+- `MagicByteBuffer`: captures the first N bytes of an upload stream for format detection
+- `FileUploadService.Builder.formatHeaderBufferSize(int)`: configurable header buffer
+  (default 16 KiB, minimum 1 KiB)
+
+### Changed (upload pipeline I/O reduction)
+- `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
+  tempFile + `ChecksumComputation` + `MagicByteBuffer` in a single read, eliminating
+  two separate tempFile re-reads (checksum pass, format-detection pass).
+  tempFile is now read twice (virus scan + encrypt), down from four times.
+- **Pipeline order**: virus scan now runs before dedup check. Duplicate-file detection
+  happens after virus scan but before format extraction / encryption / upload, so
+  dedup hits still skip format/encrypt/upload as before.
+- **Format detection**: `FileFormatExtractor.extract()` is now invoked with an
+  `InputStream` backed by the header buffer (up to 16 KiB by default) instead of
+  the full tempFile. Detectors relying on bytes beyond the buffer must increase
+  `formatHeaderBufferSize` via the builder.
+- **Infected files**: checksum is now computed during ingest regardless of virus
+  status (consequence of the tee pattern). Previous behavior skipped checksum on
+  infected files; the savings from eliminating tempFile re-reads on clean files
+  (the common path) outweigh the marginal cost on infected files.
 
 ### Changed
 - `FileDownloadService.download()`: when a `ChecksumCalculator` is configured, the returned

@@ -9,6 +9,8 @@ import io.github.dornol.filekit.quota.QuotaChecker;
 import io.github.dornol.filekit.scan.ScanResult;
 import io.github.dornol.filekit.scan.VirusScanner;
 import io.github.dornol.filekit.spi.ChecksumCalculator;
+import io.github.dornol.filekit.spi.ChecksumComputation;
+import io.github.dornol.filekit.spi.FileEncryptor;
 import io.github.dornol.filekit.spi.FileEventListener;
 import io.github.dornol.filekit.spi.FileFormatExtractor;
 import io.github.dornol.filekit.spi.FileMetadataRepository;
@@ -25,8 +27,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,6 +63,15 @@ class FileUploadServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Stub newComputation() so the streaming ingest path delegates back to
+        // the mock's checksum(byte[]) stubs (which individual tests set up).
+        when(checksumCalculator.newComputation()).thenAnswer(inv -> {
+            ByteArrayOutputStream buf = new ByteArrayOutputStream();
+            return new ChecksumComputation() {
+                @Override public void update(byte[] b, int o, int l) { buf.write(b, o, l); }
+                @Override public String finish() { return checksumCalculator.checksum(buf.toByteArray()); }
+            };
+        });
         service = FileUploadService.builder(checksumCalculator, metadataRepository,
                 formatExtractor, storageResolver).build();
         serviceLimited = FileUploadService.builder(checksumCalculator, metadataRepository,
@@ -110,6 +125,41 @@ class FileUploadServiceTest {
         void zeroMaxUploadSize_allowed() {
             FileUploadService svc = FileUploadService.builder(checksumCalculator, metadataRepository,
                     formatExtractor, storageResolver).maxUploadSize(0).build();
+            assertNotNull(svc);
+        }
+
+        @Test
+        void formatHeaderBufferSize_belowMin_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> FileUploadService.builder(checksumCalculator, metadataRepository,
+                            formatExtractor, storageResolver).formatHeaderBufferSize(100));
+        }
+
+        @Test
+        void formatHeaderBufferSize_zero_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> FileUploadService.builder(checksumCalculator, metadataRepository,
+                            formatExtractor, storageResolver).formatHeaderBufferSize(0));
+        }
+
+        @Test
+        void formatHeaderBufferSize_negative_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> FileUploadService.builder(checksumCalculator, metadataRepository,
+                            formatExtractor, storageResolver).formatHeaderBufferSize(-1));
+        }
+
+        @Test
+        void formatHeaderBufferSize_atMin_allowed() {
+            FileUploadService svc = FileUploadService.builder(checksumCalculator, metadataRepository,
+                    formatExtractor, storageResolver).formatHeaderBufferSize(1024).build();
+            assertNotNull(svc);
+        }
+
+        @Test
+        void formatHeaderBufferSize_large_allowed() {
+            FileUploadService svc = FileUploadService.builder(checksumCalculator, metadataRepository,
+                    formatExtractor, storageResolver).formatHeaderBufferSize(64 * 1024).build();
             assertNotNull(svc);
         }
     }
@@ -238,7 +288,7 @@ class FileUploadServiceTest {
 
             when(fileSource.getOriginalFilename()).thenReturn(null);
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
             when(formatExtractor.extract(any())).thenReturn(format);
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
@@ -336,7 +386,7 @@ class FileUploadServiceTest {
             when(fileSource.getSize()).thenReturn(Long.MAX_VALUE);
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
             when(formatExtractor.extract(any())).thenReturn(format);
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
@@ -371,7 +421,7 @@ class FileUploadServiceTest {
 
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
             when(formatExtractor.extract(any())).thenReturn(format);
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
@@ -406,7 +456,7 @@ class FileUploadServiceTest {
 
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
 
             FileMetadata result = service.upload(fileSource, StorageType.LOCAL, "my-bucket");
@@ -415,6 +465,61 @@ class FileUploadServiceTest {
             verify(formatExtractor, never()).extract(any());
             verify(storageResolver, never()).resolve(any());
             verify(metadataRepository, never()).save(any());
+        }
+
+        @Test
+        void duplicateChecksum_doesNotInvokeEncryptor() throws IOException {
+            FileEncryptor encryptor = mock(FileEncryptor.class);
+            FileUploadService svc = FileUploadService.builder(checksumCalculator, metadataRepository,
+                    formatExtractor, storageResolver).fileEncryptor(encryptor).build();
+
+            byte[] content = "hello".getBytes();
+            FileMetadata existing = new FileMetadata("existing-key", "test.txt", 5, "abc123",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "key", StorageType.LOCAL));
+
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
+
+            FileMetadata result = svc.upload(fileSource, StorageType.LOCAL, "my-bucket");
+
+            assertEquals(existing, result);
+            verify(encryptor, never()).encrypt(any(), any());
+        }
+
+        @Test
+        void ingestIoException_propagates_andCleansTempFile() throws IOException {
+            Path tempDir = Path.of(System.getProperty("java.io.tmpdir"));
+            long before = countUploadTempFiles(tempDir);
+
+            InputStream throwing = new InputStream() {
+                @Override public int read() throws IOException {
+                    throw new IOException("ingest failed");
+                }
+            };
+            when(fileSource.getInputStream()).thenReturn(throwing);
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+
+            assertThrows(IOException.class,
+                    () -> service.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            long after = countUploadTempFiles(tempDir);
+            assertEquals(before, after, "tempFile must be deleted after ingest failure");
+        }
+
+        private long countUploadTempFiles(Path tempDir) throws IOException {
+            // glob pushed to the OS-level filter — faster than full listing + Java filter
+            // on busy CI hosts where the tmp dir can hold thousands of entries.
+            long count = 0;
+            try (DirectoryStream<Path> entries = Files.newDirectoryStream(
+                    tempDir, FileUploadService.TEMP_UPLOAD_PREFIX + "*")) {
+                for (Path ignored : entries) {
+                    count++;
+                }
+            }
+            return count;
         }
 
         @Test
@@ -453,7 +558,7 @@ class FileUploadServiceTest {
 
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
             when(fileSource.getOriginalFilename()).thenReturn("report.txt");
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
             when(formatExtractor.extract(any())).thenReturn(format);
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
@@ -545,19 +650,6 @@ class FileUploadServiceTest {
         }
 
         @Test
-        void infected_doesNotComputeChecksum() throws IOException {
-            byte[] content = "hello".getBytes();
-            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
-            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
-            when(virusScanner.scan(any(InputStream.class))).thenReturn(ScanResult.infected("Trojan.Gen"));
-
-            assertThrows(FileStorageException.class,
-                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket"));
-
-            verify(checksumCalculator, never()).checksum(any(InputStream.class));
-        }
-
-        @Test
         void infected_withCallback_callbackNotInvoked() throws Exception {
             byte[] content = "hello".getBytes();
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
@@ -581,7 +673,7 @@ class FileUploadServiceTest {
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
             when(virusScanner.scan(any(InputStream.class))).thenReturn(ScanResult.clean());
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
             when(formatExtractor.extract(any())).thenReturn(format);
             when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
@@ -606,7 +698,7 @@ class FileUploadServiceTest {
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
             when(virusScanner.scan(any(InputStream.class))).thenReturn(ScanResult.clean());
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
 
             FileMetadata result = serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket");
@@ -630,19 +722,6 @@ class FileUploadServiceTest {
             assertTrue(ex.getMessage().contains("Scan service unavailable"));
             verify(storageResolver, never()).resolve(any());
             verify(metadataRepository, never()).save(any());
-        }
-
-        @Test
-        void error_doesNotComputeChecksum() throws IOException {
-            byte[] content = "hello".getBytes();
-            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
-            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
-            when(virusScanner.scan(any(InputStream.class))).thenReturn(ScanResult.error("timeout"));
-
-            assertThrows(FileStorageException.class,
-                    () -> serviceWithScanner.upload(fileSource, StorageType.LOCAL, "bucket"));
-
-            verify(checksumCalculator, never()).checksum(any(InputStream.class));
         }
 
         @Test
@@ -696,7 +775,7 @@ class FileUploadServiceTest {
             byte[] content = "hello".getBytes();
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
             doThrow(new FileStorageException(FileStorageException.QUOTA_EXCEEDED, "Quota exceeded"))
                     .when(quotaChecker).check(StorageType.LOCAL, "bucket", content.length);
@@ -728,7 +807,7 @@ class FileUploadServiceTest {
 
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
 
             FileMetadata result = serviceWithQuota.upload(fileSource, StorageType.LOCAL, "bucket");
@@ -776,7 +855,7 @@ class FileUploadServiceTest {
 
             when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
             when(fileSource.getOriginalFilename()).thenReturn("test.txt");
-            when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+            when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
             when(metadataRepository.findByChecksum("abc123")).thenReturn(existing);
 
             serviceWithEvents.upload(fileSource, StorageType.LOCAL, "bucket");
@@ -848,7 +927,7 @@ class FileUploadServiceTest {
 
         when(fileSource.getOriginalFilename()).thenReturn(filename);
         when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
-        when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+        when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
         when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
         when(formatExtractor.extract(any())).thenReturn(format);
         when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
@@ -864,7 +943,7 @@ class FileUploadServiceTest {
         when(fileSource.getSize()).thenReturn(size);
         when(fileSource.getOriginalFilename()).thenReturn("test.txt");
         when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream(content));
-        when(checksumCalculator.checksum(any(InputStream.class))).thenReturn("abc123");
+        when(checksumCalculator.checksum(any(byte[].class))).thenReturn("abc123");
         when(metadataRepository.findByChecksum("abc123")).thenReturn(null);
         when(formatExtractor.extract(any())).thenReturn(format);
         when(storageResolver.resolve(StorageType.LOCAL)).thenReturn(fileStorage);
