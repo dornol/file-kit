@@ -68,6 +68,15 @@ All notable changes to this project are documented in this file.
   excluded because parallel execution amplifies the existing dedup
   TOCTOU (`findByChecksum` → `save`) — addressing it requires
   per-checksum coordination that is out of this cycle's scope.
+- `DefaultMediaTypeDetector` now runs a magic-byte sniff as its first
+  detection pass, before the JDK `URLConnection` probes. Covers PDF,
+  ZIP (incl. JAR / DOCX / XLSX / PPTX / APK), PNG, JPEG, GIF, BMP,
+  WebP, MP4, OGG, and Zstandard — formats the JDK detector returned
+  `application/octet-stream` for. No new runtime dependencies.
+  Observable change: inputs that previously fell through to
+  `application/octet-stream` now return their actual MIME type;
+  validators with allow-lists may need to include the newly-detected
+  types.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into
