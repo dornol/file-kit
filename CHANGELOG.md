@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-19
+
+Fifteen-cycle PDCA sweep that addresses every outstanding item from the
+internal library review, introduces async and reactive-friendly APIs,
+and extends the image-processing surface. No breaking changes —
+everything is either additive or preserves prior call-site semantics
+via default-method / null-fallback overloads.
+
 ### Added
 - Streaming checksum verification on download (`ChecksumVerifyingInputStream`)
 - New SPI: `ChecksumComputation` (incremental checksum state)

@@ -2,6 +2,30 @@
 
 A lightweight Java library for file validation, upload, download, and deletion. Validates uploaded files by media type, file size, filename safety, and extension-content consistency. Provides a pluggable storage abstraction for uploading and downloading files with checksum-based deduplication.
 
+## What's New in 0.2.0
+
+Fifteen focused PDCA cycles that close every outstanding item from the internal library review. Full entry list is in the [CHANGELOG](CHANGELOG.md); highlights:
+
+- **Streaming checksum verification on download** — `ChecksumVerifyingInputStream` + `ChecksumComputation` SPI. Memory footprint is O(buffer) regardless of file size (previously O(file)). Enable with `FileDownloadService.Builder.checksumCalculator(...)`.
+- **Upload pipeline I/O reduction** — single-pass tee ingest (write + checksum + header-buffer) cuts tempFile re-reads from 4 to 2 per upload.
+- **`TempFileBuffer`** (`io/`) — `Closeable` temp-file helper for `try-with-resources` cleanup, with `release()` for ownership-transfer cases (`DecryptionHelper`).
+- **Configurable temp directory** — `tempDirectory(Path)` on Upload/Transfer/Download builders. Null default keeps system `java.io.tmpdir`; set for dedicated SSD/tmpfs mounts, Docker volumes, or per-test `@TempDir` isolation.
+- **`onUploadFailed` event** — `FileEventListener.onUploadFailed(metadata, cause)` fires after storage cleanup on callback or save failures. Subscribe instead of catching `CALLBACK_FAILED` manually; single listener handles both failure modes. Save-failure orphan-cleanup bug fixed in the same pass.
+- **Async adapters** (new `async/` package) — `CompletableFuture`-returning wrappers around all five sync services (Upload, Download, Transfer, Delete, Rename). Injectable `Executor` (default `ForkJoinPool.commonPool()`); inject `Executors.newVirtualThreadPerTaskExecutor()` on JDK 21+ for blocking I/O. Parallel batch variants (`copyAllParallelAsync` / `moveAllParallelAsync` / `deleteAllParallelAsync`) submit each item individually via `allOf`.
+  ```java
+  // WebFlux integration: one-liner to Mono/Flux
+  Mono.fromFuture(asyncUpload.uploadAsync(src, type, bucket))
+      .subscribeOn(Schedulers.boundedElastic());
+  ```
+- **`ChecksumAlgorithm` enum** — `MessageDigestChecksumCalculator(ChecksumAlgorithm.MD5)` / `SHA_1` / `SHA_256` / `SHA_384` / `SHA_512`. `Sha256ChecksumCalculator` is retained as a no-arg convenience subclass.
+- **Magic-byte MIME fallback** — `DefaultMediaTypeDetector` runs a magic-byte sniff before the JDK probes. Covers PDF, ZIP / DOCX / XLSX / PPTX / APK, PNG, JPEG, GIF, BMP, WebP, MP4, OGG, Zstandard. No new dependencies.
+- **`SignedUrlSigner`** (new `url/` package) — HMAC-SHA256 helper for time-limited local-storage download URLs. Produces `"exp=...&sig=..."` fragments; `verify()` raises `SignedUrlExpiredException` or `SignedUrlInvalidSignatureException`. Constant-time comparison via `MessageDigest.isEqual`. Authorization remains the app's job.
+- **Image rotate / crop** — `ImageRotator` (90°/180°/270° via `RotateAngle` enum) and `ImageCropper` (pixel region with boundary validation), completing the image operation set alongside the existing resize / watermark / thumbnail / format-convert / EXIF-strip / metadata.
+- **Batch failure aggregation** — `BatchUploadResult.failureReasons()` / `BatchTransferResult.failureReasons()` / `BatchDeleteResult.failureReasons()` return `Map<String, Integer>` of reason → count. Complements the per-file `failed` map for outage scenarios.
+- **Validation helper split** — `MediaTypeValidator` and `ImageDimensionValidator` extracted as public final classes so callers can depend on just the validator they need; `FileValidationHelper` is retained as a backward-compatible facade.
+
+**No breaking API changes** across any of the fifteen cycles. All additions are either new classes, new methods, or new default-method overloads with null-fallback defaults.
+
 ## Modules
 
 | Module | Artifact | Description |
@@ -15,7 +39,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.1.10'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.2.0'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -29,7 +53,7 @@ implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.1.10</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
