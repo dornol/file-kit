@@ -40,6 +40,11 @@ All notable changes to this project are documented in this file.
   checked exceptions to wrap (all three sync services only throw unchecked
   `FileStorageException`), so exception propagation is direct via
   `CompletionException.getCause()`.
+- `MediaTypeValidator`, `ImageDimensionValidator`: public final classes extracted
+  from `FileValidationHelper` so callers can depend on just the validator they
+  need. `FileValidationHelper` is retained as a facade delegating to these
+  two validators — its public API is unchanged. Heavy logic moves out of the
+  ~281-line helper into focused ~60–90 line classes with their own unit tests.
 
 ### Changed (upload pipeline I/O reduction)
 - `FileUploadService.doUpload()`: consolidated ingest pass. Source is now teed into

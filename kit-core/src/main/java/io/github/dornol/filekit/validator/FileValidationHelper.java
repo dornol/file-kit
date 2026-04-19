@@ -5,32 +5,31 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Iterator;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
 /**
  * Helper that performs individual file validation checks against a {@link FileSource}.
  *
- * <p>Used by both core validators ({@link FileSourceValidator}) and
- * Spring validators to share validation logic.</p>
+ * <p>Used by both core validators ({@link FileSourceValidator}) and Spring validators
+ * to share validation logic.</p>
+ *
+ * <p>Since 0.1.18 this class is a thin facade. The heavy lifting lives in
+ * {@link MediaTypeValidator} and {@link ImageDimensionValidator}; callers that
+ * only need one of those concerns can depend on them directly. The facade is
+ * retained for backward compatibility and for composite validation flows that
+ * need several checks together.</p>
  */
 public class FileValidationHelper {
 
     private static final Logger log = LoggerFactory.getLogger(FileValidationHelper.class);
 
-    private final MediaTypeDetector detector;
+    private final MediaTypeValidator mediaType;
+    private final ImageDimensionValidator imageDim = new ImageDimensionValidator();
 
     /** @param detector media type detector for MIME type identification */
     public FileValidationHelper(MediaTypeDetector detector) {
-        this.detector = Objects.requireNonNull(detector, "detector");
+        this.mediaType = new MediaTypeValidator(detector);
     }
 
     /**
@@ -41,48 +40,7 @@ public class FileValidationHelper {
      * @return {@code null} if valid, or the message key for the failed check
      */
     public @Nullable String validateMediaTypeAndExtension(FileSource value, Set<SafeMediaType> allowed) {
-        Objects.requireNonNull(value, "value");
-        Objects.requireNonNull(allowed, "allowed");
-        String originalFilename = value.getOriginalFilename();
-
-        String detected;
-        try (InputStream is = value.getInputStream()) {
-            detected = detector.detect(originalFilename, is);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to detect media type", e);
-        }
-
-        // Check media type
-        boolean typeValid = false;
-        for (SafeMediaType type : allowed) {
-            if (detected.equals(type.getMediaType())) {
-                typeValid = true;
-                break;
-            }
-        }
-        if (!typeValid) {
-            log.warn("Detected media type '{}' is not in the allowed list: {}", detected, allowed);
-            return ValidationMessageKeys.UNSUPPORTED_MEDIA_TYPE;
-        }
-
-        // Check extension
-        if (originalFilename == null) {
-            return ValidationMessageKeys.INVALID_EXTENSION;
-        }
-        String extension = getExtension(originalFilename).toLowerCase(Locale.ENGLISH);
-        if (extension.isEmpty()) {
-            log.debug("File has no extension: '{}'", originalFilename);
-            return ValidationMessageKeys.INVALID_EXTENSION;
-        }
-
-        for (SafeMediaType safe : allowed) {
-            if (safe.getMediaType().equalsIgnoreCase(detected) && safe.getExtensions().contains(extension)) {
-                return null;
-            }
-        }
-
-        log.debug("Extension '{}' does not match detected media type '{}'", extension, detected);
-        return ValidationMessageKeys.INVALID_EXTENSION;
+        return mediaType.validate(value, allowed);
     }
 
     /**
@@ -133,61 +91,15 @@ public class FileValidationHelper {
     }
 
     /**
-     * Validates image dimensions against the given constraints.
-     * Uses ImageIO to read only the image header (width/height) without decoding the full image.
+     * Validates image dimensions against the given constraints. Uses ImageIO to read
+     * only the image header (width/height) without decoding the full image.
      *
-     * @param value     the file to check
-     * @param minWidth  minimum width in pixels (0 = no limit)
-     * @param maxWidth  maximum width in pixels (0 = no limit)
-     * @param minHeight minimum height in pixels (0 = no limit)
-     * @param maxHeight maximum height in pixels (0 = no limit)
      * @return {@code null} if valid, or the message key for the failed check
      */
     public @Nullable String validateImageDimensions(FileSource value,
                                                      int minWidth, int maxWidth,
                                                      int minHeight, int maxHeight) {
-        Objects.requireNonNull(value, "value");
-        try (InputStream is = value.getInputStream();
-             ImageInputStream iis = ImageIO.createImageInputStream(is)) {
-            if (iis == null) {
-                log.debug("Unable to create image input stream for dimension validation");
-                return ValidationMessageKeys.IMAGE_NOT_READABLE;
-            }
-            Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
-            if (!readers.hasNext()) {
-                log.debug("No suitable image reader found for dimension validation");
-                return ValidationMessageKeys.IMAGE_NOT_READABLE;
-            }
-            ImageReader reader = readers.next();
-            try {
-                reader.setInput(iis);
-                int width = reader.getWidth(0);
-                int height = reader.getHeight(0);
-
-                if (minWidth > 0 && width < minWidth) {
-                    log.debug("Image width {} is below minimum {}", width, minWidth);
-                    return ValidationMessageKeys.IMAGE_WIDTH_TOO_SMALL;
-                }
-                if (maxWidth > 0 && width > maxWidth) {
-                    log.debug("Image width {} exceeds maximum {}", width, maxWidth);
-                    return ValidationMessageKeys.IMAGE_WIDTH_TOO_LARGE;
-                }
-                if (minHeight > 0 && height < minHeight) {
-                    log.debug("Image height {} is below minimum {}", height, minHeight);
-                    return ValidationMessageKeys.IMAGE_HEIGHT_TOO_SMALL;
-                }
-                if (maxHeight > 0 && height > maxHeight) {
-                    log.debug("Image height {} exceeds maximum {}", height, maxHeight);
-                    return ValidationMessageKeys.IMAGE_HEIGHT_TOO_LARGE;
-                }
-            } finally {
-                reader.dispose();
-            }
-        } catch (IOException e) {
-            log.debug("Failed to read image dimensions", e);
-            return ValidationMessageKeys.IMAGE_NOT_READABLE;
-        }
-        return null;
+        return imageDim.validate(value, minWidth, maxWidth, minHeight, maxHeight);
     }
 
     /**
@@ -198,14 +110,7 @@ public class FileValidationHelper {
     public @Nullable String validateAllImageDimensions(Iterable<? extends FileSource> files,
                                                         int minWidth, int maxWidth,
                                                         int minHeight, int maxHeight) {
-        Objects.requireNonNull(files, "files");
-        for (FileSource file : files) {
-            String result = validateImageDimensions(file, minWidth, maxWidth, minHeight, maxHeight);
-            if (result != null) {
-                return result;
-            }
-        }
-        return null;
+        return imageDim.validateAll(files, minWidth, maxWidth, minHeight, maxHeight);
     }
 
     // --- Batch validation methods for array/collection validators ---
@@ -256,26 +161,7 @@ public class FileValidationHelper {
      */
     public @Nullable String validateAllMediaTypeAndExtension(Iterable<? extends FileSource> files,
                                                               Set<SafeMediaType> allowed) {
-        Objects.requireNonNull(files, "files");
-        Objects.requireNonNull(allowed, "allowed");
-        for (FileSource file : files) {
-            String result = validateMediaTypeAndExtension(file, allowed);
-            if (result != null) {
-                return result;
-            }
-        }
-        return null;
-    }
-
-    private static String getExtension(String filename) {
-        if (filename == null) {
-            return "";
-        }
-        int dotIndex = filename.lastIndexOf('.');
-        if (dotIndex < 0 || dotIndex == filename.length() - 1) {
-            return "";
-        }
-        return filename.substring(dotIndex + 1);
+        return mediaType.validateAll(files, allowed);
     }
 
 }
