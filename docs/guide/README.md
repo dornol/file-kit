@@ -19,6 +19,7 @@ Topic-focused references. Each page = one concern.
 - [encryption.md](encryption.md) — `FileEncryptor` SPI, at-rest encryption, dedup preservation.
 - [lifecycle-events.md](lifecycle-events.md) — `FileEventListener` events (upload / download / delete / copy / move / rename + `onUploadFailed`).
 - [validation-and-errors.md](validation-and-errors.md) — validation check matrix, i18n message keys (validation + storage).
+- [maintenance-review.md](maintenance-review.md) — internal follow-up notes from code review, including hardening and test backlog.
 
 ## Media processing
 

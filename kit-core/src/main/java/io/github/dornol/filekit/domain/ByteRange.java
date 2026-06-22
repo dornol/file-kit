@@ -82,6 +82,10 @@ public record ByteRange(long start, long end, long totalSize) {
                 end = totalSize - 1;
             } else {
                 String[] parts = rangeSpec.split("-", 2);
+                if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+                    throw new FileStorageException(FileStorageException.RANGE_NOT_SATISFIABLE,
+                            "Invalid Range header format: " + rangeHeader);
+                }
                 start = Long.parseLong(parts[0]);
                 end = Long.parseLong(parts[1]);
             }
@@ -95,7 +99,7 @@ public record ByteRange(long start, long end, long totalSize) {
             end = Math.min(end, totalSize - 1);
 
             return new ByteRange(start, end, totalSize);
-        } catch (NumberFormatException e) {
+        } catch (IllegalArgumentException e) {
             throw new FileStorageException(FileStorageException.RANGE_NOT_SATISFIABLE,
                     "Invalid Range header format: " + rangeHeader, e);
         }

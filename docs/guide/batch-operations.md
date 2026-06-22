@@ -124,6 +124,15 @@ ArchiveMetadataExtractor strict = new ZipArchiveMetadataExtractor(
 
 Archives exceeding either limit throw `FileStorageException(ARCHIVE_PROCESSING_FAILED)` immediately — remaining entries are not processed.
 
+### Memory note
+
+`ArchiveMetadataExtractor.extract(InputStream)` defaults to reading the full
+archive into memory before delegating to `extract(byte[])`. For large archives,
+prefer calling `ZipArchiveMetadataExtractor.extract(byte[])` only after your
+application has already bounded the byte array size, or provide a custom
+streaming extractor that enforces compressed-size, uncompressed-size, and entry
+count limits while reading.
+
 ## File existence check
 
 Check existence without downloading:

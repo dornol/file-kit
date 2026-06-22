@@ -10,9 +10,9 @@ The core service-level flow. `FileUploadService`, `FileDownloadService`, and `Fi
 
 ## Upload flow
 
-1. Validate file size against `max-upload-size` config.
+1. Validate the reported file size against `max-upload-size` config.
 2. Validate filename (length ≤ 200, no `..` / `/` / `\`).
-3. Buffer content to a temp file (memory-safe for large files).
+3. Copy content to a temp file while enforcing the actual byte count against `max-upload-size`.
 4. Virus scan if a `VirusScanner` bean is registered — reject if `INFECTED` or `ERROR`.
 5. Compute streaming checksum; if a file with the same checksum exists, return the existing metadata (dedup — **no quota consumed, no `onUploaded` event fired**).
 6. Quota check (if `QuotaChecker` configured) — reject with `QUOTA_EXCEEDED`.
@@ -90,6 +90,10 @@ public class ClamAvVirusScanner implements VirusScanner {
 | `ERROR` | Reject with `FileStorageException(VIRUS_SCAN_ERROR)` — **fail-closed** default |
 
 For **fail-open**: return `ScanResult.clean()` from your error handling. If no `VirusScanner` bean is registered, scanning is skipped entirely.
+
+### Memory note
+
+The `VirusScanner.scan(InputStream)` default reads the full stream into memory and delegates to `scan(byte[])`. Override it for large or untrusted uploads, for example by piping the stream directly to ClamAV INSTREAM or another streaming scanner protocol.
 
 ## Pre-signed URLs
 

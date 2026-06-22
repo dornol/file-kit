@@ -36,6 +36,35 @@ public class MyFileMetadataRepository implements FileMetadataRepository {
 
 ## Built-in implementations
 
+## Checksum streaming
+
+The starter auto-registers `Sha256ChecksumCalculator`, which is backed by
+`MessageDigestChecksumCalculator` and supports incremental checksum computation.
+This keeps upload checksum work O(buffer).
+
+If you provide your own `ChecksumCalculator`, override
+`newComputation()` for large or untrusted files. The interface default returns a
+fallback that buffers all updates in memory before calling `checksum(byte[])`;
+that is convenient for small test fixtures, but not appropriate for production
+large-file paths.
+
+```java
+public final class StreamingChecksumCalculator implements ChecksumCalculator {
+
+    @Override
+    public String checksum(byte[] bytes) {
+        return new MessageDigestChecksumCalculator(ChecksumAlgorithm.SHA_256)
+                .checksum(bytes);
+    }
+
+    @Override
+    public ChecksumComputation newComputation() {
+        return new MessageDigestChecksumCalculator(ChecksumAlgorithm.SHA_256)
+                .newComputation();
+    }
+}
+```
+
 ### `LocalFileStorage`
 
 Stores files on the local filesystem with a configurable directory layout:

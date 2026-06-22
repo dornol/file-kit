@@ -299,7 +299,7 @@ public class FileUploadService {
         try (TempFileBuffer tempFile = TempFileBuffer.create(tempDirectory, TEMP_UPLOAD_PREFIX)) {
             MagicByteBuffer header = new MagicByteBuffer(formatHeaderBufferSize);
             ChecksumComputation computation = checksumCalculator.newComputation();
-            long bytesWritten = teeIngest(fileSource, tempFile.path(), computation, header);
+            long bytesWritten = teeIngest(fileSource, tempFile.path(), computation, header, maxUploadSize);
             String checksum = computation.finish();
 
             // Virus scan runs on every upload (including would-be duplicates) to
@@ -373,13 +373,18 @@ public class FileUploadService {
      */
     private static long teeIngest(FileSource fileSource, Path tempFile,
                                   ChecksumComputation computation,
-                                  MagicByteBuffer header) throws IOException {
+                                  MagicByteBuffer header,
+                                  long maxUploadSize) throws IOException {
         byte[] buf = new byte[8192];
         long total = 0;
         try (InputStream is = fileSource.getInputStream();
              OutputStream out = Files.newOutputStream(tempFile)) {
             int n;
             while ((n = is.read(buf)) != -1) {
+                if (maxUploadSize > 0 && total > maxUploadSize - n) {
+                    throw new FileStorageException(FileStorageException.FILE_TOO_LARGE,
+                            "File size exceeds maximum allowed size " + maxUploadSize);
+                }
                 out.write(buf, 0, n);
                 computation.update(buf, 0, n);
                 header.observe(buf, 0, n);

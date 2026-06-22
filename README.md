@@ -179,7 +179,9 @@ All domain records (`FileFormat`, `FileLocation`, `FileMetadata`) and command ob
 
 ### Streaming upload
 
-The upload service buffers file content to a temporary file on disk, then streams from it for each processing step (virus scan, checksum, format detection, storage). This ensures that arbitrarily large files can be uploaded without loading the entire content into memory.
+The upload service copies file content to a temporary file on disk while computing the checksum and capturing the format-detection header. It then streams from disk for virus scanning, encryption, and storage. With the built-in `Sha256ChecksumCalculator` / `MessageDigestChecksumCalculator`, memory usage stays O(buffer) for large uploads.
+
+If you provide custom SPIs, keep their `InputStream` methods streaming as well. Convenience defaults such as `ChecksumCalculator.newComputation()`, `VirusScanner.scan(InputStream)`, `PdfMetadataExtractor.extract(InputStream)`, and `ArchiveMetadataExtractor.extract(InputStream)` may buffer the full input unless overridden.
 
 ### Filename safety
 

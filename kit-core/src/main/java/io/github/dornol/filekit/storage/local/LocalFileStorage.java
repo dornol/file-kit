@@ -81,6 +81,7 @@ public class LocalFileStorage implements FileStorage {
         Path target = validatePath(baseDir.resolve(command.bucket()).resolve(objectKey));
         try {
             Files.createDirectories(target.getParent());
+            validateExistingParentPath(target.getParent());
             Path tmp = Files.createTempFile(target.getParent(), ".upload-", ".tmp");
             try {
                 Files.copy(command.content(), tmp, StandardCopyOption.REPLACE_EXISTING);
@@ -175,6 +176,21 @@ public class LocalFileStorage implements FileStorage {
         } catch (IOException e) {
             throw new FileStorageException(FileStorageException.DOWNLOAD_FAILED,
                     "Failed to resolve file path", e);
+        }
+    }
+
+    private void validateExistingParentPath(Path path) {
+        try {
+            Path realPath = path.toRealPath();
+            if (!realPath.startsWith(baseDir.toRealPath())) {
+                throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
+                        "Path traversal detected");
+            }
+        } catch (FileStorageException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new FileStorageException(FileStorageException.UPLOAD_FAILED,
+                    "Failed to resolve upload path", e);
         }
     }
 

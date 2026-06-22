@@ -291,6 +291,20 @@ class ByteRangeTest {
         }
 
         @Test
+        void missingDash_throwsRangeNotSatisfiable() {
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> ByteRange.parse("bytes=500", 1000));
+            assertEquals(FileStorageException.RANGE_NOT_SATISFIABLE, ex.getMessageKey());
+        }
+
+        @Test
+        void endBeforeStart_throwsRangeNotSatisfiable() {
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> ByteRange.parse("bytes=5-3", 1000));
+            assertEquals(FileStorageException.RANGE_NOT_SATISFIABLE, ex.getMessageKey());
+        }
+
+        @Test
         void floatingPoint_throws() {
             assertThrows(FileStorageException.class,
                     () -> ByteRange.parse("bytes=0.5-499.5", 1000));

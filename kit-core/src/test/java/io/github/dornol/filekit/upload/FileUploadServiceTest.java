@@ -382,6 +382,20 @@ class FileUploadServiceTest {
         }
 
         @Test
+        void actualStreamSizeExceedsLimit_throwsBeforeStorageUpload() throws IOException {
+            when(fileSource.getSize()).thenReturn(0L);
+            when(fileSource.getOriginalFilename()).thenReturn("test.txt");
+            when(fileSource.getInputStream()).thenReturn(new ByteArrayInputStream("hello world".getBytes()));
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> serviceLimited.upload(fileSource, StorageType.LOCAL, "bucket"));
+
+            assertEquals(FileStorageException.FILE_TOO_LARGE, ex.getMessageKey());
+            verify(storageResolver, never()).resolve(any());
+            verify(fileStorage, never()).upload(any());
+        }
+
+        @Test
         void unlimitedSize_allowsLargeFiles() throws IOException {
             byte[] content = "hello".getBytes();
             FileFormat format = new FileFormat("text/plain", "txt", "text");

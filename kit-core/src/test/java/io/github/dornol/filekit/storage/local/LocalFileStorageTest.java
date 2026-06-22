@@ -163,6 +163,28 @@ class LocalFileStorageTest {
     }
 
     @Test
+    void upload_symlinkBucketOutsideBaseDir_rejected() throws IOException {
+        Path outsideDir = Files.createTempDirectory("file-kit-outside");
+        Path bucketLink = tempDir.resolve("linked-bucket");
+        Files.createSymbolicLink(bucketLink, outsideDir);
+        try {
+            FileUploadCommand command = FileUploadCommand.ofBytes(
+                    "key", "f.txt", "data".getBytes(),
+                    "text/plain", "txt", "linked-bucket");
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> storage.upload(command));
+
+            assertEquals(FileStorageException.UPLOAD_FAILED, ex.getMessageKey());
+            assertFalse(Files.exists(outsideDir.resolve("key.txt")));
+        } finally {
+            Files.deleteIfExists(bucketLink);
+            Files.deleteIfExists(outsideDir.resolve("key.txt"));
+            Files.deleteIfExists(outsideDir);
+        }
+    }
+
+    @Test
     void upload_errorMessageDoesNotExposeInternalPath() {
         FileUploadCommand command = FileUploadCommand.ofBytes(
                 "../../../escape", "f.txt", "data".getBytes(),

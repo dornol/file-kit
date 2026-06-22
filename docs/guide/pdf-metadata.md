@@ -37,6 +37,14 @@ try (InputStream is = Files.newInputStream(Path.of("document.pdf"))) {
 }
 ```
 
+## Memory note
+
+The `PdfMetadataExtractor.extract(InputStream)` default reads the full stream
+into memory and delegates to `extract(byte[])`. The built-in
+`PdfBoxMetadataExtractor` implements byte-array extraction, so use it for files
+that are already bounded by your upload limits. For very large or untrusted PDFs,
+provide a custom extractor that controls buffering and parser limits explicitly.
+
 ## Custom implementation
 
 `PdfMetadataExtractor` is an SPI — override with your own `@Bean`:

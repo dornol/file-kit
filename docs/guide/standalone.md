@@ -119,6 +119,12 @@ ChecksumCalculator sha256 = new MessageDigestChecksumCalculator(ChecksumAlgorith
 ```
 
 `Sha256ChecksumCalculator` is retained as a no-arg convenience subclass (default).
+Both classes implement `newComputation()` with an incremental `MessageDigest`,
+so uploads and checksum verification do not retain the full file in memory.
+
+When writing a custom `ChecksumCalculator`, implement `newComputation()` for
+streaming paths. The interface default buffers all updates in memory and is only
+appropriate when inputs are known to be small.
 
 ## Running the example app
 
