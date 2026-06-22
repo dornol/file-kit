@@ -4,7 +4,16 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 
 **Deep-dive documentation:** [docs/guide/](docs/guide/README.md). AI agents: see [llms.txt](llms.txt).
 
-## What's New in 0.2.0
+## What's New in 0.2.1
+
+Patch release focused on upload and range-request hardening:
+
+- Enforces `maxUploadSize` against the actual upload stream, not only the reported `FileSource.getSize()`.
+- Rejects local-storage uploads whose real parent path escapes `baseDir` through symlinks.
+- Normalizes malformed Range headers to `RANGE_NOT_SATISFIABLE`.
+- Documents streaming SPI memory expectations for checksum, virus scan, PDF, and archive extraction paths.
+
+## 0.2.0 Highlights
 
 Fifteen focused PDCA cycles that close every outstanding item from the internal library review. Full entry list is in the [CHANGELOG](CHANGELOG.md); highlights:
 
@@ -40,7 +49,7 @@ Fifteen focused PDCA cycles that close every outstanding item from the internal 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.2.0'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.2.1'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.1.0'
@@ -54,7 +63,7 @@ implementation 'org.apache.pdfbox:pdfbox:3.0.4'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
 </dependency>
 ```
 

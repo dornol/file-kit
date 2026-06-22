@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-22
+
+Patch release focused on hardening upload, local storage, and range-request
+edge cases. No breaking API changes.
+
+### Fixed
+- `FileUploadService` now enforces `maxUploadSize` while reading the actual
+  upload stream, preventing under-reported `FileSource.getSize()` values from
+  bypassing the size limit.
+- `LocalFileStorage.upload` now validates the real parent path before writing,
+  preventing symlinked bucket/object directories from escaping `baseDir`.
+- `ByteRange.parse` now consistently reports malformed ranges such as
+  `bytes=500` and `bytes=5-3` as
+  `FileStorageException(RANGE_NOT_SATISFIABLE)`.
+
+### Documentation
+- Added maintenance review notes for the hardening follow-up.
+- Clarified streaming SPI memory expectations for custom
+  `ChecksumCalculator`, `VirusScanner`, `PdfMetadataExtractor`, and
+  `ArchiveMetadataExtractor` implementations.
+
 ## [0.2.0] - 2026-04-19
 
 Fifteen-cycle PDCA sweep that addresses every outstanding item from the
