@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.spring.validator;
 
 import io.github.dornol.filekit.domain.FileSource;
+import io.github.dornol.filekit.storage.FileStorageException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.codec.multipart.FilePart;
 import reactor.core.publisher.Mono;
@@ -55,11 +56,27 @@ public class FilePartSource implements FileSource, Closeable {
      * @return a {@code Mono} that emits the buffered {@code FilePartSource}
      */
     public static Mono<FilePartSource> from(FilePart filePart) {
+        return from(filePart, 0);
+    }
+
+    /**
+     * Creates a source and rejects it when the buffered size exceeds the limit.
+     * A value of {@code 0} means unlimited.
+     */
+    public static Mono<FilePartSource> from(FilePart filePart, long maxSize) {
+        if (maxSize < 0) {
+            return Mono.error(new IllegalArgumentException("maxSize must not be negative"));
+        }
         return Mono.fromCallable(() -> Files.createTempFile("file-kit-", ".tmp"))
                 .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
                 .flatMap(temp -> filePart.transferTo(temp)
                         .then(Mono.fromCallable(() -> {
                             long size = Files.size(temp);
+                            if (maxSize > 0 && size > maxSize) {
+                                deleteSilently(temp);
+                                throw new FileStorageException(FileStorageException.FILE_TOO_LARGE,
+                                        "File size exceeds maximum allowed size " + maxSize);
+                            }
                             return new FilePartSource(filePart.filename(), temp, size);
                         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()))
                         .onErrorResume(e -> Mono.fromRunnable(() -> deleteSilently(temp))

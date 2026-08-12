@@ -9,7 +9,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +32,20 @@ class FileResponseBuilderTest {
 
     @Nested
     class DownloadFactory {
+
+        @Test
+        void rangeBody_containsOnlyRequestedBytes() throws Exception {
+            Resource resource = new ByteArrayResource("0123456789".getBytes(StandardCharsets.UTF_8));
+
+            ResponseEntity<Resource> response = FileResponseBuilder.download("file.txt")
+                    .contentLength(10)
+                    .range("bytes=2-5")
+                    .body(resource);
+
+            assertThat(response.getStatusCode().value()).isEqualTo(206);
+            assertThat(new String(response.getBody().getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+                    .isEqualTo("2345");
+        }
 
         @Test
         void setsAttachmentDisposition() {

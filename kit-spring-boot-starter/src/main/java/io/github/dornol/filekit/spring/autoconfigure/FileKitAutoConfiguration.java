@@ -35,6 +35,7 @@ import io.github.dornol.filekit.spi.QuotaPolicy;
 import io.github.dornol.filekit.spi.QuotaUsageProvider;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
+import io.github.dornol.filekit.spring.upload.ReactiveFileUploadService;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileCollectionValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileValidator;
@@ -105,20 +106,20 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public MultipartFileValidator multipartFileValidator(FileValidationHelper helper) {
-        return new MultipartFileValidator(helper);
+    public MultipartFileValidator multipartFileValidator(FileValidationHelper helper, FileKitProperties properties) {
+        return new MultipartFileValidator(helper, properties.getMaxUploadSize());
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public MultipartFileArrayValidator multipartFileArrayValidator(FileValidationHelper helper) {
-        return new MultipartFileArrayValidator(helper);
+    public MultipartFileArrayValidator multipartFileArrayValidator(FileValidationHelper helper, FileKitProperties properties) {
+        return new MultipartFileArrayValidator(helper, properties.getMaxUploadSize());
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public MultipartFileCollectionValidator multipartFileCollectionValidator(FileValidationHelper helper) {
-        return new MultipartFileCollectionValidator(helper);
+    public MultipartFileCollectionValidator multipartFileCollectionValidator(FileValidationHelper helper, FileKitProperties properties) {
+        return new MultipartFileCollectionValidator(helper, properties.getMaxUploadSize());
     }
 
     @Bean
@@ -190,6 +191,15 @@ public class FileKitAutoConfiguration {
                 .quotaChecker(quotaChecker)
                 .eventPublisher(eventPublisher)
                 .build();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "org.springframework.http.codec.multipart.FilePart")
+    @ConditionalOnBean(FileUploadService.class)
+    public ReactiveFileUploadService reactiveFileUploadService(FileUploadService fileUploadService,
+                                                               FileKitProperties properties) {
+        return new ReactiveFileUploadService(fileUploadService, properties.getMaxUploadSize());
     }
 
     @Bean

@@ -23,7 +23,11 @@ public abstract class AbstractMultipartFileValidator<T> implements ConstraintVal
     protected final BaseFileValidationSupport<T> support;
 
     protected AbstractMultipartFileValidator() {
-        this.support = new BaseFileValidationSupport<>(this);
+        this(0);
+    }
+
+    protected AbstractMultipartFileValidator(long defaultMaxSize) {
+        this.support = new BaseFileValidationSupport<>(this, defaultMaxSize);
     }
 
     @Override
