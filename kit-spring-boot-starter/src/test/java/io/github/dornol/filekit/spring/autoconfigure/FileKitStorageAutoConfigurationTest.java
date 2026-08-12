@@ -16,6 +16,7 @@ import io.github.dornol.filekit.spi.FileMetadataRepository;
 import io.github.dornol.filekit.spi.QuotaPolicy;
 import io.github.dornol.filekit.spi.QuotaUsageProvider;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
+import io.github.dornol.filekit.spring.actuate.FileKitStorageHealthIndicator;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageResolver;
 import io.github.dornol.filekit.storage.FileUploadCommand;
@@ -46,6 +47,7 @@ class FileKitStorageAutoConfigurationTest {
             assertThat(context).doesNotHaveBean(FileDownloadService.class);
             assertThat(context).doesNotHaveBean(FileDeleteService.class);
             assertThat(context).doesNotHaveBean(SpringDownloadService.class);
+            assertThat(context).doesNotHaveBean(FileKitStorageHealthIndicator.class);
         });
     }
 
@@ -72,6 +74,7 @@ class FileKitStorageAutoConfigurationTest {
                     assertThat(context).hasSingleBean(FileDownloadService.class);
                     assertThat(context).hasSingleBean(FileDeleteService.class);
                     assertThat(context).hasSingleBean(SpringDownloadService.class);
+                    assertThat(context).hasSingleBean(FileKitStorageHealthIndicator.class);
                 });
     }
 

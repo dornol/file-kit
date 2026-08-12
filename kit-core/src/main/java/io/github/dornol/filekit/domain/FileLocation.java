@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.domain;
 
 import io.github.dornol.filekit.validator.BucketNameValidator;
+import io.github.dornol.filekit.validator.StorageKeyValidator;
 
 import java.util.Objects;
 
@@ -21,5 +22,6 @@ public record FileLocation(
         Objects.requireNonNull(objectKey, "objectKey");
         Objects.requireNonNull(storageType, "storageType");
         BucketNameValidator.validate(bucket);
+        StorageKeyValidator.validate(objectKey);
     }
 }

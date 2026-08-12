@@ -10,6 +10,8 @@ import io.github.dornol.filekit.storage.FileStorageException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -128,6 +130,15 @@ class FileRenameServiceTest {
         void nullNewName_throws() {
             assertThrows(NullPointerException.class,
                     () -> service.rename("file-key", null));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"", " ", "   "})
+        void blankFilename_throws(String filename) {
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> service.rename("file-key", filename));
+            assertEquals(FileStorageException.INVALID_FILENAME, ex.getMessageKey());
+            verify(metadataRepository, never()).update(any());
         }
 
         @Test

@@ -351,6 +351,17 @@ public class FileUploadService {
                 try {
                     saved = metadataRepository.save(metadata);
                 } catch (RuntimeException saveFailure) {
+                    // A unique checksum constraint may mean another concurrent
+                    // upload committed the same content between findByChecksum
+                    // and save. Reuse that metadata after deleting our object.
+                    FileMetadata concurrent = metadataRepository.findByChecksum(checksum);
+                    if (concurrent != null) {
+                        cleanupStorageBestEffort(storage, metadata, saveFailure);
+                        log.info("Concurrent duplicate upload detected (checksum={}), "
+                                        + "returning existing metadata: {}",
+                                checksum, concurrent.key());
+                        return concurrent;
+                    }
                     cleanupStorageBestEffort(storage, metadata, saveFailure);
                     eventPublisher.fireUploadFailed(metadata, saveFailure);
                     throw saveFailure;
@@ -405,13 +416,9 @@ public class FileUploadService {
         if (filename == null) {
             return;
         }
-        if (filename.length() > FilenameValidator.MAX_FILENAME_LENGTH) {
+        if (!FilenameValidator.isSafe(filename)) {
             throw new FileStorageException(FileStorageException.INVALID_FILENAME,
-                    "Filename exceeds " + FilenameValidator.MAX_FILENAME_LENGTH + " characters");
-        }
-        if (FilenameValidator.containsTraversalCharacters(filename)) {
-            throw new FileStorageException(FileStorageException.INVALID_FILENAME,
-                    "Filename contains illegal characters: " + filename);
+                    "Filename is blank, too long, or contains illegal characters");
         }
     }
 

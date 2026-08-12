@@ -2,14 +2,18 @@ package io.github.dornol.filekit.spring.download;
 
 import io.github.dornol.filekit.domain.ByteRange;
 import io.github.dornol.filekit.domain.FileMetadata;
+import io.github.dornol.filekit.io.BoundedInputStream;
 import io.github.dornol.filekit.storage.FileStorageException;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.io.AbstractResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -201,7 +205,52 @@ public final class FileResponseBuilder {
      * @return complete ResponseEntity
      */
     public <T> ResponseEntity<T> body(T body) {
+        if (body instanceof Resource resource && rangeHeaderValue != null && contentLength != null) {
+            try {
+                ByteRange range = ByteRange.parse(rangeHeaderValue, contentLength);
+                @SuppressWarnings("unchecked")
+                T ranged = (T) new RangeResource(resource, range);
+                return toResponseBuilder().body(ranged);
+            } catch (FileStorageException ignored) {
+                // toResponseBuilder() creates the 416 response.
+            }
+        }
         return toResponseBuilder().body(body);
+    }
+
+    private static final class RangeResource extends AbstractResource {
+        private final Resource delegate;
+        private final ByteRange range;
+
+        private RangeResource(Resource delegate, ByteRange range) {
+            this.delegate = delegate;
+            this.range = range;
+        }
+
+        @Override
+        public String getDescription() {
+            return "Byte range " + range.start() + "-" + range.end()
+                    + " of " + delegate.getDescription();
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            InputStream input = delegate.getInputStream();
+            long remaining = range.start();
+            while (remaining > 0) {
+                long skipped = input.skip(remaining);
+                if (skipped > 0) {
+                    remaining -= skipped;
+                    continue;
+                }
+                if (input.read() == -1) {
+                    input.close();
+                    throw new IOException("Unable to seek to requested byte range");
+                }
+                remaining--;
+            }
+            return new BoundedInputStream(input, range.length());
+        }
     }
 
     private String buildContentDisposition() {

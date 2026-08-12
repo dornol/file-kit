@@ -79,13 +79,9 @@ public class FileRenameService {
     }
 
     private static void validateFilename(String filename) {
-        if (filename.length() > FilenameValidator.MAX_FILENAME_LENGTH) {
+        if (!FilenameValidator.isSafe(filename)) {
             throw new FileStorageException(FileStorageException.INVALID_FILENAME,
-                    "Filename exceeds " + FilenameValidator.MAX_FILENAME_LENGTH + " characters");
-        }
-        if (FilenameValidator.containsTraversalCharacters(filename)) {
-            throw new FileStorageException(FileStorageException.INVALID_FILENAME,
-                    "Filename contains illegal characters: " + filename);
+                    "Filename is blank, too long, or contains illegal characters");
         }
     }
 }

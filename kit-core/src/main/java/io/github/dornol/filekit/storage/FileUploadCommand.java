@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.storage;
 
 import io.github.dornol.filekit.validator.BucketNameValidator;
+import io.github.dornol.filekit.validator.StorageKeyValidator;
 
 import org.jspecify.annotations.Nullable;
 
@@ -38,6 +39,11 @@ public record FileUploadCommand(
         Objects.requireNonNull(extension, "extension");
         Objects.requireNonNull(bucket, "bucket");
         BucketNameValidator.validate(bucket);
+        StorageKeyValidator.validate(key);
+        if (extension.isBlank() || extension.contains("/") || extension.contains("\\")
+                || extension.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException("Invalid file extension: " + extension);
+        }
     }
 
     /**

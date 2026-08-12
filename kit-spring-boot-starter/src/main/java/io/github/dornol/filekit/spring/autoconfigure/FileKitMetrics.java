@@ -30,9 +30,15 @@ public class FileKitMetrics implements FileEventListener {
     private static final String PREFIX = "file.kit.";
 
     private final MeterRegistry registry;
+    private final boolean includeBucket;
 
     public FileKitMetrics(MeterRegistry registry) {
+        this(registry, false);
+    }
+
+    public FileKitMetrics(MeterRegistry registry, boolean includeBucket) {
         this.registry = registry;
+        this.includeBucket = includeBucket;
     }
 
     @Override
@@ -62,18 +68,18 @@ public class FileKitMetrics implements FileEventListener {
     }
 
     private Counter counter(String name, FileMetadata metadata) {
-        return Counter.builder(PREFIX + name)
-                .tag("storageType", metadata.location().storageType().name())
-                .tag("bucket", metadata.location().bucket())
-                .register(registry);
+        Counter.Builder builder = Counter.builder(PREFIX + name)
+                .tag("storageType", metadata.location().storageType().name());
+        if (includeBucket) builder.tag("bucket", metadata.location().bucket());
+        return builder.register(registry);
     }
 
     private DistributionSummary uploadSize(FileMetadata metadata) {
-        return DistributionSummary.builder(PREFIX + "upload.size")
+        DistributionSummary.Builder builder = DistributionSummary.builder(PREFIX + "upload.size")
                 .tag("storageType", metadata.location().storageType().name())
-                .tag("bucket", metadata.location().bucket())
-                .baseUnit("bytes")
-                .register(registry);
+                .baseUnit("bytes");
+        if (includeBucket) builder.tag("bucket", metadata.location().bucket());
+        return builder.register(registry);
     }
 
 }

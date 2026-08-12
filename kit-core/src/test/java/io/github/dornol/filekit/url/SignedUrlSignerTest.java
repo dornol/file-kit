@@ -146,6 +146,19 @@ class SignedUrlSignerTest {
         );
     }
 
+    @Test
+    void sign_invalidFileKey_throws() {
+        SignedUrlSigner signer = newSigner();
+        assertAll(
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> signer.sign("", FIXED_NOW.plus(Duration.ofHours(1)))),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> signer.sign("file|123", FIXED_NOW.plus(Duration.ofHours(1)))),
+                () -> assertThrows(IllegalArgumentException.class,
+                        () -> signer.sign("file\n123", FIXED_NOW.plus(Duration.ofHours(1))))
+        );
+    }
+
     // S11
     @Test
     void verify_nullArgs_throw() {

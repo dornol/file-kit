@@ -34,10 +34,20 @@ public class BaseFileValidationSupport<T> {
     private int maxWidth;
     private int minHeight;
     private int maxHeight;
+    private final long defaultMaxSize;
 
     /** @param callbacks delegate that implements the actual validation checks */
     public BaseFileValidationSupport(FileValidationCallbacks<T> callbacks) {
+        this(callbacks, 0);
+    }
+
+    /** Creates validation support with a default size used when the annotation leaves maxSize at zero. */
+    public BaseFileValidationSupport(FileValidationCallbacks<T> callbacks, long defaultMaxSize) {
         this.callbacks = callbacks;
+        if (defaultMaxSize < 0) {
+            throw new IllegalArgumentException("defaultMaxSize must not be negative");
+        }
+        this.defaultMaxSize = defaultMaxSize;
     }
 
     /**
@@ -77,7 +87,7 @@ public class BaseFileValidationSupport<T> {
         }
 
         this.allowedMediaTypes = Collections.unmodifiableSet(safeMediaTypes);
-        this.maxSize = maxSize;
+        this.maxSize = maxSize > 0 ? maxSize : defaultMaxSize;
 
         if (minWidth < 0 || maxWidth < 0 || minHeight < 0 || maxHeight < 0) {
             throw new IllegalArgumentException(

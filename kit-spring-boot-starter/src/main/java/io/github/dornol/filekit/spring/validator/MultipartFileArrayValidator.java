@@ -19,6 +19,11 @@ public class MultipartFileArrayValidator extends AbstractMultipartFileValidator<
 
     /** @param helper validation helper for file checks */
     public MultipartFileArrayValidator(FileValidationHelper helper) {
+        this(helper, 0);
+    }
+
+    public MultipartFileArrayValidator(FileValidationHelper helper, long defaultMaxSize) {
+        super(defaultMaxSize);
         this.helper = Objects.requireNonNull(helper, "helper");
     }
 

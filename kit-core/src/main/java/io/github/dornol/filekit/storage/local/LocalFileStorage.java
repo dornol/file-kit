@@ -5,6 +5,7 @@ import io.github.dornol.filekit.domain.FileMetadata;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileUploadCommand;
+import io.github.dornol.filekit.storage.StorageHealthCheck;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +35,7 @@ import java.nio.file.StandardCopyOption;
  * }
  * }</pre>
  */
-public class LocalFileStorage implements FileStorage {
+public class LocalFileStorage implements FileStorage, StorageHealthCheck {
 
     private static final Logger log = LoggerFactory.getLogger(LocalFileStorage.class);
 
@@ -73,6 +74,13 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public Enum<?> getStorageType() {
         return storageType;
+    }
+
+    @Override
+    public void check() {
+        if (!Files.isDirectory(baseDir) || !Files.isReadable(baseDir) || !Files.isWritable(baseDir)) {
+            throw new IllegalStateException("Local storage directory is unavailable: " + baseDir);
+        }
     }
 
     @Override

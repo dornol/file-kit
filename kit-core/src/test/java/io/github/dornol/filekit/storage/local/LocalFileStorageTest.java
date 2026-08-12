@@ -147,6 +147,20 @@ class LocalFileStorageTest {
     }
 
     @Test
+    void check_succeedsWhenBaseDirectoryIsAvailable() {
+        storage.check();
+    }
+
+    @Test
+    void check_failsWhenBaseDirectoryIsUnavailable() throws IOException {
+        Path missingDirectory = tempDir.resolve("missing");
+        LocalFileStorage unavailable = new LocalFileStorage(missingDirectory, StorageType.LOCAL);
+        Files.delete(missingDirectory);
+
+        assertThrows(IllegalStateException.class, unavailable::check);
+    }
+
+    @Test
     void upload_pathTraversalInBucket_rejected() {
         assertThrows(IllegalArgumentException.class, () ->
                 FileUploadCommand.ofBytes("key", "f.txt", "data".getBytes(),
@@ -156,10 +170,9 @@ class LocalFileStorageTest {
     @Test
     void upload_pathTraversalInObjectKey_rejected() {
         // key that escapes baseDir: baseDir/bucket/../../escape.txt -> baseDir/../escape.txt
-        FileUploadCommand command = FileUploadCommand.ofBytes(
+        assertThrows(IllegalArgumentException.class, () -> FileUploadCommand.ofBytes(
                 "../../escape", "f.txt", "data".getBytes(),
-                "text/plain", "txt", "bucket");
-        assertThrows(FileStorageException.class, () -> storage.upload(command));
+                "text/plain", "txt", "bucket"));
     }
 
     @Test
@@ -186,11 +199,9 @@ class LocalFileStorageTest {
 
     @Test
     void upload_errorMessageDoesNotExposeInternalPath() {
-        FileUploadCommand command = FileUploadCommand.ofBytes(
-                "../../../escape", "f.txt", "data".getBytes(),
-                "text/plain", "txt", "bucket");
-        FileStorageException ex = assertThrows(FileStorageException.class,
-                () -> storage.upload(command));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> FileUploadCommand.ofBytes("../../../escape", "f.txt", "data".getBytes(),
+                        "text/plain", "txt", "bucket"));
         assertFalse(ex.getMessage().contains(tempDir.toString()),
                 "Error message should not contain internal path");
     }

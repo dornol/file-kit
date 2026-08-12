@@ -25,6 +25,8 @@ dependencies {
     compileOnly(libs.spring.boot.autoconfigure)
     compileOnly(libs.tika.core)
     compileOnly(libs.micrometer.core)
+    compileOnly("org.springframework.boot:spring-boot-actuator:${libs.versions.spring.boot.get()}")
+    compileOnly("org.springframework.boot:spring-boot-health:${libs.versions.spring.boot.get()}")
 
     annotationProcessor(libs.spring.boot.configuration.processor)
 
@@ -38,6 +40,8 @@ dependencies {
     testImplementation(libs.spring.web)
     testImplementation(libs.spring.webflux)
     testImplementation(libs.spring.boot.autoconfigure)
+    testImplementation("org.springframework.boot:spring-boot-actuator:${libs.versions.spring.boot.get()}")
+    testImplementation("org.springframework.boot:spring-boot-health:${libs.versions.spring.boot.get()}")
     testImplementation(libs.spring.boot.test)
     testImplementation(libs.assertj.core)
     testImplementation(libs.tika.core)
@@ -57,6 +61,28 @@ tasks.jacocoTestReport {
     reports {
         csv.required = true
     }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.90".toBigDecimal()
+            }
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
 }
 
 tasks.withType<Javadoc>().configureEach {

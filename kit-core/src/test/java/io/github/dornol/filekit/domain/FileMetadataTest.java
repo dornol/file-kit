@@ -41,18 +41,21 @@ class FileMetadataTest {
         }
 
         @Test
-        void emptyName_allowed() {
-            assertDoesNotThrow(() -> new FileMetadata("key", "", 0, "checksum", format, location));
+        void emptyName_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new FileMetadata("key", "", 0, "checksum", format, location));
         }
 
         @Test
-        void emptyKey_allowed() {
-            assertDoesNotThrow(() -> new FileMetadata("", "file.txt", 0, "checksum", format, location));
+        void emptyKey_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new FileMetadata("", "file.txt", 0, "checksum", format, location));
         }
 
         @Test
-        void emptyChecksum_allowed() {
-            assertDoesNotThrow(() -> new FileMetadata("key", "file.txt", 0, "", format, location));
+        void emptyChecksum_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new FileMetadata("key", "file.txt", 0, "", format, location));
         }
     }
 

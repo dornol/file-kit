@@ -34,13 +34,15 @@ class FileFormatTest {
         }
 
         @Test
-        void validConstruction_emptyExtension() {
-            assertDoesNotThrow(() -> new FileFormat("application/octet-stream", "", "application"));
+        void emptyExtension_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new FileFormat("application/octet-stream", "", "application"));
         }
 
         @Test
-        void validConstruction_emptyMimeType() {
-            assertDoesNotThrow(() -> new FileFormat("", "bin", ""));
+        void emptyMimeType_throws() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new FileFormat("", "bin", ""));
         }
     }
 

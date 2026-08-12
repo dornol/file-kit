@@ -35,6 +35,8 @@ import io.github.dornol.filekit.spi.QuotaPolicy;
 import io.github.dornol.filekit.spi.QuotaUsageProvider;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
+import io.github.dornol.filekit.spring.upload.ReactiveFileUploadService;
+import io.github.dornol.filekit.spring.actuate.FileKitStorageHealthIndicator;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileCollectionValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileValidator;
@@ -105,20 +107,20 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public MultipartFileValidator multipartFileValidator(FileValidationHelper helper) {
-        return new MultipartFileValidator(helper);
+    public MultipartFileValidator multipartFileValidator(FileValidationHelper helper, FileKitProperties properties) {
+        return new MultipartFileValidator(helper, properties.getMaxUploadSize());
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public MultipartFileArrayValidator multipartFileArrayValidator(FileValidationHelper helper) {
-        return new MultipartFileArrayValidator(helper);
+    public MultipartFileArrayValidator multipartFileArrayValidator(FileValidationHelper helper, FileKitProperties properties) {
+        return new MultipartFileArrayValidator(helper, properties.getMaxUploadSize());
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public MultipartFileCollectionValidator multipartFileCollectionValidator(FileValidationHelper helper) {
-        return new MultipartFileCollectionValidator(helper);
+    public MultipartFileCollectionValidator multipartFileCollectionValidator(FileValidationHelper helper, FileKitProperties properties) {
+        return new MultipartFileCollectionValidator(helper, properties.getMaxUploadSize());
     }
 
     @Bean
@@ -138,7 +140,11 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public FileEncryptor fileEncryptor() {
+    public FileEncryptor fileEncryptor(FileKitProperties properties) {
+        if (properties.isEncryptionRequired()) {
+            throw new IllegalStateException("file-kit.encryption-required=true but no FileEncryptor bean is configured");
+        }
+        log.warn("File-kit at-rest encryption is disabled; configure a FileEncryptor or set encryption-required=false explicitly");
         log.debug("Registering default NoOpFileEncryptor");
         return new NoOpFileEncryptor();
     }
@@ -186,6 +192,15 @@ public class FileKitAutoConfiguration {
                 .quotaChecker(quotaChecker)
                 .eventPublisher(eventPublisher)
                 .build();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "org.springframework.http.codec.multipart.FilePart")
+    @ConditionalOnBean(FileUploadService.class)
+    public ReactiveFileUploadService reactiveFileUploadService(FileUploadService fileUploadService,
+                                                               FileKitProperties properties) {
+        return new ReactiveFileUploadService(fileUploadService, properties.getMaxUploadSize());
     }
 
     @Bean
@@ -332,11 +347,24 @@ public class FileKitAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         @ConditionalOnBean(type = "io.micrometer.core.instrument.MeterRegistry")
-        public FileKitMetrics fileKitMetrics(io.micrometer.core.instrument.MeterRegistry meterRegistry) {
-            log.info("Registering FileKitMetrics (Micrometer)");
-            return new FileKitMetrics(meterRegistry);
+        public FileKitMetrics fileKitMetrics(io.micrometer.core.instrument.MeterRegistry meterRegistry,
+                                             FileKitProperties properties) {
+            log.info("Registering FileKitMetrics (Micrometer, includeBucket={})", properties.isMetricsIncludeBucket());
+            return new FileKitMetrics(meterRegistry, properties.isMetricsIncludeBucket());
         }
 
+    }
+
+    @Configuration
+    @ConditionalOnClass(name = "org.springframework.boot.health.contributor.HealthIndicator")
+    static class StorageHealthConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(FileKitStorageHealthIndicator.class)
+        @ConditionalOnBean(FileStorage.class)
+        public FileKitStorageHealthIndicator fileKitStorageHealthIndicator(List<FileStorage> storages) {
+            return new FileKitStorageHealthIndicator(storages);
+        }
     }
 
 }

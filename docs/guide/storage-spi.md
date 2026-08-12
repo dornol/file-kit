@@ -134,6 +134,21 @@ Full example: [s3-storage.md](s3-storage.md).
 
 Register multiple `FileStorage` beans — `FileStorageResolver` routes by `storageType`. Each `storageType` must be unique; duplicates throw `IllegalArgumentException` at startup.
 
+## Optional health checks
+
+Implement `StorageHealthCheck` alongside `FileStorage` when the backend supports an active availability probe:
+
+```java
+public final class MyStorage implements FileStorage, StorageHealthCheck {
+    @Override
+    public void check() {
+        // Probe the configured backend and throw RuntimeException when unavailable.
+    }
+}
+```
+
+With the Spring Boot starter and Actuator, these probes are exposed through the standard health endpoint. Storages that do not implement the SPI remain supported and are reported as passive checks. File-kit does not perform automatic orphan cleanup because deletion requires application-specific metadata lifecycle and object-listing policies.
+
 ```java
 public enum StorageType { LOCAL, S3 }
 

@@ -36,6 +36,12 @@ public class FileKitProperties {
      */
     private @Nullable Duration maxPresignedExpiration;
 
+    /** Whether the metrics bucket tag is enabled; disabled by default to avoid high cardinality. */
+    private boolean metricsIncludeBucket = false;
+
+    /** Whether startup must fail unless a real encryptor bean is supplied. */
+    private boolean encryptionRequired = false;
+
     public long getMaxUploadSize() {
         return maxUploadSize;
     }
@@ -61,6 +67,18 @@ public class FileKitProperties {
 
     public void setMaxPresignedExpiration(@Nullable Duration maxPresignedExpiration) {
         this.maxPresignedExpiration = maxPresignedExpiration;
+    }
+
+    public boolean isMetricsIncludeBucket() { return metricsIncludeBucket; }
+
+    public void setMetricsIncludeBucket(boolean metricsIncludeBucket) {
+        this.metricsIncludeBucket = metricsIncludeBucket;
+    }
+
+    public boolean isEncryptionRequired() { return encryptionRequired; }
+
+    public void setEncryptionRequired(boolean encryptionRequired) {
+        this.encryptionRequired = encryptionRequired;
     }
 
 }

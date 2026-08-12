@@ -52,10 +52,10 @@ Fifteen focused PDCA cycles that close every outstanding item from the internal 
 implementation 'io.github.dornol:file-kit-spring-boot-starter:0.2.1'
 
 // Optional: for better MIME detection
-implementation 'org.apache.tika:tika-core:3.1.0'
+implementation 'org.apache.tika:tika-core:3.3.1'
 
 // Optional: for PDF metadata extraction
-implementation 'org.apache.pdfbox:pdfbox:3.0.4'
+implementation 'org.apache.pdfbox:pdfbox:3.0.7'
 ```
 
 ```xml
@@ -115,6 +115,8 @@ file-kit:
   max-upload-size: 10485760              # 10MB, 0 = unlimited (default)
   verify-checksum-on-download: false     # verify integrity on download (default: false)
   max-presigned-expiration: 24h          # maximum pre-signed URL lifetime (default: no limit)
+  encryption-required: false             # fail startup without a custom FileEncryptor
+  metrics-include-bucket: false          # include bucket in metric tags (default: false)
 ```
 
 ## Features
@@ -165,7 +167,7 @@ Registered by `kit-spring-boot-starter` when the listed conditions are met. All 
 
 ## Micrometer metrics
 
-When `spring-boot-starter-actuator` is on the classpath, file-kit automatically records metrics via `FileKitMetrics`:
+When `spring-boot-starter-actuator` is on the classpath, file-kit automatically records metrics via `FileKitMetrics`. Bucket tags are disabled by default to prevent high-cardinality metrics; enable `file-kit.metrics-include-bucket` only when bucket names are from a small fixed set:
 
 | Metric | Type | Description |
 |--------|------|-------------|
@@ -179,6 +181,12 @@ When `spring-boot-starter-actuator` is on the classpath, file-kit automatically 
 No configuration needed — just add the actuator dependency. Exported to any configured Micrometer backend (Prometheus, Datadog, CloudWatch, etc.).
 
 > **Cardinality warning:** metrics are tagged by `storageType` and `bucket`. Large numbers of distinct bucket names (e.g. per-user buckets) cause high cardinality. Prefer a fixed set of bucket names.
+
+## Storage health checks
+
+When `spring-boot-starter-actuator` is on the classpath, file-kit registers a `fileKitStorage` health indicator for `FileStorage` beans. Storages implementing the optional `StorageHealthCheck` SPI are actively probed; other storages are reported as available without an active probe. The built-in local storage checks that its base directory exists and is readable/writable. The example S3 storage uses `ListBuckets`, so its IAM role needs permission for that operation.
+
+The library does not automatically delete orphaned objects. Safe cleanup requires a repository lifecycle/status contract and a storage listing contract, which are intentionally left to an application-specific maintenance job.
 
 ## Security Considerations
 

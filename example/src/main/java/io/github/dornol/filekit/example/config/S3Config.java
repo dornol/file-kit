@@ -2,7 +2,7 @@ package io.github.dornol.filekit.example.config;
 
 import io.github.dornol.filekit.example.infra.S3FileStorage;
 import io.github.dornol.filekit.storage.FileStorage;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -14,34 +14,27 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import java.net.URI;
 
 @Configuration
+@EnableConfigurationProperties(S3Properties.class)
 public class S3Config {
 
-    @Bean
-    public S3Client s3Client(
-            @Value("${app.s3.endpoint}") String endpoint,
-            @Value("${app.s3.region}") String region,
-            @Value("${app.s3.access-key}") String accessKey,
-            @Value("${app.s3.secret-key}") String secretKey) {
+    @Bean(destroyMethod = "close")
+    public S3Client s3Client(S3Properties properties) {
         return S3Client.builder()
-                .endpointOverride(URI.create(endpoint))
-                .region(Region.of(region))
+                .endpointOverride(URI.create(properties.getEndpoint()))
+                .region(Region.of(properties.getRegion()))
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)))
-                .forcePathStyle(true)
+                        AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey())))
+                .forcePathStyle(properties.isForcePathStyle())
                 .build();
     }
 
-    @Bean
-    public S3Presigner s3Presigner(
-            @Value("${app.s3.endpoint}") String endpoint,
-            @Value("${app.s3.region}") String region,
-            @Value("${app.s3.access-key}") String accessKey,
-            @Value("${app.s3.secret-key}") String secretKey) {
+    @Bean(destroyMethod = "close")
+    public S3Presigner s3Presigner(S3Properties properties) {
         return S3Presigner.builder()
-                .endpointOverride(URI.create(endpoint))
-                .region(Region.of(region))
+                .endpointOverride(URI.create(properties.getEndpoint()))
+                .region(Region.of(properties.getRegion()))
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)))
+                        AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey())))
                 .build();
     }
 

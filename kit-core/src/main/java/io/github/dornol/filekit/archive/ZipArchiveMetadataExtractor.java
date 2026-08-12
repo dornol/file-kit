@@ -45,7 +45,17 @@ public class ZipArchiveMetadataExtractor implements ArchiveMetadataExtractor {
 
     @Override
     public ArchiveMetadata extract(byte[] archiveBytes) {
-        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(archiveBytes))) {
+        return extract(new ByteArrayInputStream(archiveBytes));
+    }
+
+    /**
+     * Extracts metadata directly from a stream without first buffering the archive.
+     * The caller remains responsible for closing the supplied stream.
+     */
+    @Override
+    public ArchiveMetadata extract(java.io.InputStream archiveStream) {
+        try {
+            ZipInputStream zis = new ZipInputStream(archiveStream);
             List<ArchiveEntry> entries = new ArrayList<>();
             long totalUncompressedSize = 0;
 
@@ -56,32 +66,20 @@ public class ZipArchiveMetadataExtractor implements ArchiveMetadataExtractor {
                             "ZIP archive exceeds maximum entry count: " + maxEntries);
                 }
 
-                // Read through the entry to calculate sizes when not available from central directory
-                long uncompressedSize = zipEntry.getSize();
-                if (uncompressedSize < 0) {
-                    // Size unknown from local header; consume entry to determine size
-                    long count = 0;
-                    byte[] buffer = new byte[8192];
-                    int read;
-                    while ((read = zis.read(buffer)) != -1) {
-                        count += read;
-                        if (totalUncompressedSize + count > maxUncompressedSize) {
-                            throw new FileStorageException(FileStorageException.ARCHIVE_PROCESSING_FAILED,
-                                    "ZIP archive exceeds maximum uncompressed size: " + maxUncompressedSize);
-                        }
+                // Always consume the entry and count actual bytes. ZIP header sizes
+                // are attacker-controlled and must not be trusted for bomb protection.
+                long uncompressedSize = 0;
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = zis.read(buffer)) != -1) {
+                    if (read > maxUncompressedSize - totalUncompressedSize - uncompressedSize) {
+                        throw new FileStorageException(FileStorageException.ARCHIVE_PROCESSING_FAILED,
+                                "ZIP archive exceeds maximum uncompressed size: " + maxUncompressedSize);
                     }
-                    uncompressedSize = count;
+                    uncompressedSize += read;
                 }
 
-                try {
-                    totalUncompressedSize = Math.addExact(totalUncompressedSize, uncompressedSize);
-                } catch (ArithmeticException e) {
-                    totalUncompressedSize = Long.MAX_VALUE;
-                }
-                if (totalUncompressedSize > maxUncompressedSize) {
-                    throw new FileStorageException(FileStorageException.ARCHIVE_PROCESSING_FAILED,
-                            "ZIP archive exceeds maximum uncompressed size: " + maxUncompressedSize);
-                }
+                totalUncompressedSize += uncompressedSize;
 
                 long compressedSize = Math.max(zipEntry.getCompressedSize(), 0);
                 Instant lastModified = zipEntry.getLastModifiedTime() != null

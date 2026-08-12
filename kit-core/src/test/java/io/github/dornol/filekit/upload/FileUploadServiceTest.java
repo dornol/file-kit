@@ -264,6 +264,16 @@ class FileUploadServiceTest {
             assertEquals(FileStorageException.INVALID_FILENAME, ex.getMessageKey());
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {"", " ", "   "})
+        void blankFilename_throws(String filename) {
+            when(fileSource.getOriginalFilename()).thenReturn(filename);
+
+            FileStorageException ex = assertThrows(FileStorageException.class,
+                    () -> service.upload(fileSource, StorageType.LOCAL, "bucket"));
+            assertEquals(FileStorageException.INVALID_FILENAME, ex.getMessageKey());
+        }
+
         @Test
         void filenameExactly200_allowed() throws IOException {
             String name = "a".repeat(196) + ".txt"; // 200 chars
@@ -698,6 +708,22 @@ class FileUploadServiceTest {
 
             assertSame(saveEx, thrown, "save exception must propagate as-is, unwrapped");
             verify(fileStorage).delete(any());
+        }
+
+        @Test
+        void uniqueChecksumRace_returnsConcurrentMetadataAndCleansNewObject() throws IOException {
+            setupSuccessfulUpload("test.txt");
+            FileMetadata concurrent = new FileMetadata("other-key", "test.txt", 5, "abc123",
+                    new FileFormat("text/plain", "txt", "text"),
+                    new FileLocation("bucket", "other-key.txt", StorageType.LOCAL));
+            when(metadataRepository.findByChecksum("abc123")).thenReturn(null, concurrent);
+            doThrow(new IllegalStateException("unique checksum constraint")).when(metadataRepository).save(any());
+
+            FileMetadata result = svc.upload(fileSource, StorageType.LOCAL, "bucket");
+
+            assertSame(concurrent, result);
+            verify(fileStorage).delete(any());
+            verify(listener, never()).onUploadFailed(any(), any());
         }
 
         // U5
