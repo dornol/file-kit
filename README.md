@@ -52,10 +52,10 @@ Fifteen focused PDCA cycles that close every outstanding item from the internal 
 implementation 'io.github.dornol:file-kit-spring-boot-starter:0.2.1'
 
 // Optional: for better MIME detection
-implementation 'org.apache.tika:tika-core:3.1.0'
+implementation 'org.apache.tika:tika-core:3.3.1'
 
 // Optional: for PDF metadata extraction
-implementation 'org.apache.pdfbox:pdfbox:3.0.4'
+implementation 'org.apache.pdfbox:pdfbox:3.0.7'
 ```
 
 ```xml

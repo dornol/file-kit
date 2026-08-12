@@ -12,7 +12,7 @@ Extract metadata from PDF documents via Apache PDFBox. Auto-configured when PDFB
 Add PDFBox to your dependencies:
 
 ```groovy
-implementation 'org.apache.pdfbox:pdfbox:3.0.4'
+implementation 'org.apache.pdfbox:pdfbox:3.0.7'
 ```
 
 The Spring Boot starter auto-registers `PdfBoxMetadataExtractor` as the default `PdfMetadataExtractor` bean when PDFBox is present.
