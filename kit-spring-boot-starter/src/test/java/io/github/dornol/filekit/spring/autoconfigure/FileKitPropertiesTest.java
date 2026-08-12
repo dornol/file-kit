@@ -117,6 +117,22 @@ class FileKitPropertiesTest {
                 .run(context -> {
                     FileKitProperties props = context.getBean(FileKitProperties.class);
                     assertThat(props.getMaxPresignedExpiration()).isEqualTo(Duration.ofHours(1));
-                });
+        });
+    }
+
+    @Test
+    void securityAndMetricsDefaults_areSafe() {
+        FileKitProperties props = new FileKitProperties();
+        assertThat(props.isEncryptionRequired()).isFalse();
+        assertThat(props.isMetricsIncludeBucket()).isFalse();
+    }
+
+    @Test
+    void securityAndMetricsOptions_bindFromConfig() {
+        FileKitProperties props = new FileKitProperties();
+        props.setEncryptionRequired(true);
+        props.setMetricsIncludeBucket(true);
+        assertThat(props.isEncryptionRequired()).isTrue();
+        assertThat(props.isMetricsIncludeBucket()).isTrue();
     }
 }

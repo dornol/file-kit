@@ -4,7 +4,41 @@ Internal review notes for follow-up hardening work. These items are not public A
 promises; they are concrete places where behavior, tests, or documentation can be
 improved.
 
-Last reviewed: 2026-06-22
+Last reviewed: 2026-08-12
+
+## Operational safeguards
+
+### Domain value validation
+
+Status: implemented on 2026-08-12.
+
+`FileMetadata`, `FileLocation`, `FileFormat`, and `FileUploadCommand` reject
+blank/control-character values and unsafe relative object keys. Hierarchical
+keys remain supported for date- and hash-based storage strategies.
+
+### Metrics cardinality
+
+Status: implemented on 2026-08-12.
+
+Bucket is no longer a metric tag by default. Set
+`file-kit.metrics-include-bucket=true` only when bucket names are from a small,
+fixed set.
+
+### Concurrent checksum deduplication
+
+The checksum lookup and metadata save are not an atomic operation. Repository
+implementations should put a unique constraint on the checksum column. When a
+constraint violation occurs, applications should re-read the existing metadata
+by checksum and return it, while cleaning up the newly uploaded storage object.
+
+### Streaming SPI implementations
+
+The compatibility defaults on `ChecksumCalculator`, `VirusScanner`,
+`PdfMetadataExtractor`, and `ArchiveMetadataExtractor` may buffer an entire
+stream. Production implementations handling untrusted or large files should
+override the stream method (and `ChecksumCalculator.newComputation()`) with a
+bounded streaming implementation. The upload pipeline itself remains
+streaming and enforces the configured upload limit while reading.
 
 ## Priority Items
 

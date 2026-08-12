@@ -45,7 +45,17 @@ public class ZipArchiveMetadataExtractor implements ArchiveMetadataExtractor {
 
     @Override
     public ArchiveMetadata extract(byte[] archiveBytes) {
-        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(archiveBytes))) {
+        return extract(new ByteArrayInputStream(archiveBytes));
+    }
+
+    /**
+     * Extracts metadata directly from a stream without first buffering the archive.
+     * The caller remains responsible for closing the supplied stream.
+     */
+    @Override
+    public ArchiveMetadata extract(java.io.InputStream archiveStream) {
+        try {
+            ZipInputStream zis = new ZipInputStream(archiveStream);
             List<ArchiveEntry> entries = new ArrayList<>();
             long totalUncompressedSize = 0;
 

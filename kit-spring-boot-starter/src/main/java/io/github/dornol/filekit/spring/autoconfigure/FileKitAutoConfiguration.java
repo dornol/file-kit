@@ -138,7 +138,11 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public FileEncryptor fileEncryptor() {
+    public FileEncryptor fileEncryptor(FileKitProperties properties) {
+        if (properties.isEncryptionRequired()) {
+            throw new IllegalStateException("file-kit.encryption-required=true but no FileEncryptor bean is configured");
+        }
+        log.warn("File-kit at-rest encryption is disabled; configure a FileEncryptor or set encryption-required=false explicitly");
         log.debug("Registering default NoOpFileEncryptor");
         return new NoOpFileEncryptor();
     }
@@ -332,9 +336,10 @@ public class FileKitAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         @ConditionalOnBean(type = "io.micrometer.core.instrument.MeterRegistry")
-        public FileKitMetrics fileKitMetrics(io.micrometer.core.instrument.MeterRegistry meterRegistry) {
-            log.info("Registering FileKitMetrics (Micrometer)");
-            return new FileKitMetrics(meterRegistry);
+        public FileKitMetrics fileKitMetrics(io.micrometer.core.instrument.MeterRegistry meterRegistry,
+                                             FileKitProperties properties) {
+            log.info("Registering FileKitMetrics (Micrometer, includeBucket={})", properties.isMetricsIncludeBucket());
+            return new FileKitMetrics(meterRegistry, properties.isMetricsIncludeBucket());
         }
 
     }

@@ -36,6 +36,15 @@ Register as a `@Bean` — the default `NoOpFileEncryptor` is replaced automatica
 - **Download**: encrypted bytes are loaded from storage, then decrypted before returning to the caller.
 - **No encryptor registered** (`NoOpFileEncryptor` default): pass-through, zero overhead.
 
+For environments where plaintext storage is not acceptable, set:
+
+```yaml
+file-kit:
+  encryption-required: true
+```
+
+Startup then fails unless the application provides a real `FileEncryptor` bean.
+
 ## Size semantics
 
 - `FileMetadata.size` stores the **original plaintext size** (for user-facing display).

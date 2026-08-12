@@ -115,6 +115,8 @@ file-kit:
   max-upload-size: 10485760              # 10MB, 0 = unlimited (default)
   verify-checksum-on-download: false     # verify integrity on download (default: false)
   max-presigned-expiration: 24h          # maximum pre-signed URL lifetime (default: no limit)
+  encryption-required: false             # fail startup without a custom FileEncryptor
+  metrics-include-bucket: false          # include bucket in metric tags (default: false)
 ```
 
 ## Features
@@ -165,7 +167,7 @@ Registered by `kit-spring-boot-starter` when the listed conditions are met. All 
 
 ## Micrometer metrics
 
-When `spring-boot-starter-actuator` is on the classpath, file-kit automatically records metrics via `FileKitMetrics`:
+When `spring-boot-starter-actuator` is on the classpath, file-kit automatically records metrics via `FileKitMetrics`. Bucket tags are disabled by default to prevent high-cardinality metrics; enable `file-kit.metrics-include-bucket` only when bucket names are from a small fixed set:
 
 | Metric | Type | Description |
 |--------|------|-------------|

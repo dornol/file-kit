@@ -156,10 +156,9 @@ class LocalFileStorageTest {
     @Test
     void upload_pathTraversalInObjectKey_rejected() {
         // key that escapes baseDir: baseDir/bucket/../../escape.txt -> baseDir/../escape.txt
-        FileUploadCommand command = FileUploadCommand.ofBytes(
+        assertThrows(IllegalArgumentException.class, () -> FileUploadCommand.ofBytes(
                 "../../escape", "f.txt", "data".getBytes(),
-                "text/plain", "txt", "bucket");
-        assertThrows(FileStorageException.class, () -> storage.upload(command));
+                "text/plain", "txt", "bucket"));
     }
 
     @Test
@@ -186,11 +185,9 @@ class LocalFileStorageTest {
 
     @Test
     void upload_errorMessageDoesNotExposeInternalPath() {
-        FileUploadCommand command = FileUploadCommand.ofBytes(
-                "../../../escape", "f.txt", "data".getBytes(),
-                "text/plain", "txt", "bucket");
-        FileStorageException ex = assertThrows(FileStorageException.class,
-                () -> storage.upload(command));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> FileUploadCommand.ofBytes("../../../escape", "f.txt", "data".getBytes(),
+                        "text/plain", "txt", "bucket"));
         assertFalse(ex.getMessage().contains(tempDir.toString()),
                 "Error message should not contain internal path");
     }

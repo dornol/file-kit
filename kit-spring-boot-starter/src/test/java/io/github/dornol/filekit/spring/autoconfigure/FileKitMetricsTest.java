@@ -22,7 +22,7 @@ class FileKitMetricsTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        metrics = new FileKitMetrics(registry);
+        metrics = new FileKitMetrics(registry, true);
     }
 
     private FileMetadata metadata(TestStorage storage, String bucket, long size) {
@@ -164,6 +164,15 @@ class FileKitMetricsTest {
         assertNotNull(s3);
         assertEquals(1.0, local.count());
         assertEquals(1.0, s3.count());
+    }
+
+    @Test
+    void bucketTag_isOmittedByDefault() {
+        FileKitMetrics defaultMetrics = new FileKitMetrics(registry);
+        defaultMetrics.onUploaded(metadata(TestStorage.LOCAL, "user-specific-bucket", 100));
+
+        assertNotNull(registry.find("file.kit.uploads").tag("storageType", "LOCAL").counter());
+        assertNull(registry.find("file.kit.uploads").tag("bucket", "user-specific-bucket").counter());
     }
 
 }

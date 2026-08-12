@@ -1,6 +1,7 @@
 package io.github.dornol.filekit.domain;
 
 import java.util.Objects;
+import io.github.dornol.filekit.validator.FilenameValidator;
 
 /**
  * Metadata describing a stored file.
@@ -29,6 +30,14 @@ public record FileMetadata(
         Objects.requireNonNull(checksum, "checksum");
         Objects.requireNonNull(format, "format");
         Objects.requireNonNull(location, "location");
+        if (!FilenameValidator.isSafe(name)) {
+            throw new IllegalArgumentException("Invalid metadata filename");
+        }
+        if (key.isBlank() || checksum.isBlank()
+                || key.chars().anyMatch(Character::isISOControl)
+                || checksum.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException("Metadata key and checksum must be non-blank and printable");
+        }
     }
 
     /**
