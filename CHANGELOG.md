@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-12
+
+Patch release focused on storage safety, Spring Boot integration, and
+operational visibility. No breaking API changes.
+
+### Added
+- Optional `StorageHealthCheck` SPI for active storage availability probes.
+- Spring Boot 4 Actuator health integration for registered `FileStorage` beans.
+
+### Fixed
+- Hardened filename, archive, URL, domain, and storage input validation.
+- Added concurrent duplicate-upload protection.
+- Improved Spring upload and byte-range handling.
+- Hardened the example S3 storage configuration and health probe.
+
+### Documentation
+- Documented storage health checks and the safety boundary for orphan cleanup.
+
 ## [0.2.1] - 2026-06-22
 
 Patch release focused on hardening upload, local storage, and range-request
