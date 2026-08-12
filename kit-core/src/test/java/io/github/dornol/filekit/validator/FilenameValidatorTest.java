@@ -75,7 +75,7 @@ class FilenameValidatorTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"path\\file", "a\\b"})
-        void backslash_detected(String filename) {
+    void backslash_detected(String filename) {
             assertTrue(FilenameValidator.containsTraversalCharacters(filename));
         }
 
@@ -84,5 +84,11 @@ class FilenameValidatorTest {
         void safeFilenames_notDetected(String filename) {
             assertFalse(FilenameValidator.containsTraversalCharacters(filename));
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"file\nname.txt", "file\u0000name.txt"})
+    void controlCharacters_notSafe(String filename) {
+        assertFalse(FilenameValidator.isSafe(filename));
     }
 }

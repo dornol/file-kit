@@ -194,6 +194,10 @@ public class FileDownloadService extends AbstractFileOperationService {
     public String generatePresignedUrl(String fileKey, Duration expiration) {
         Objects.requireNonNull(fileKey, "fileKey");
         Objects.requireNonNull(expiration, "expiration");
+        if (expiration.isNegative() || expiration.isZero()) {
+            throw new FileStorageException(FileStorageException.PRESIGNED_URL_FAILED,
+                    "Expiration must be positive: " + expiration);
+        }
         if (maxPresignedExpiration != null && expiration.compareTo(maxPresignedExpiration) > 0) {
             throw new FileStorageException(FileStorageException.PRESIGNED_URL_FAILED,
                     "Requested expiration " + expiration + " exceeds maximum " + maxPresignedExpiration);

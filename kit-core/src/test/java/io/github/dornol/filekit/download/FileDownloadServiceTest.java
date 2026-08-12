@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -588,10 +589,20 @@ class FileDownloadServiceTest {
         }
 
         @Test
-        void zeroMaxExpiration_throwsOnBuild() {
+    void zeroMaxExpiration_throwsOnBuild() {
             assertThrows(IllegalArgumentException.class,
                     () -> FileDownloadService.builder(metadataRepository, storageResolver)
                             .maxPresignedExpiration(Duration.ZERO));
         }
+    }
+
+    @Test
+    void nonPositiveRequestedExpiration_throws() {
+        assertAll(
+                () -> assertThrows(FileStorageException.class,
+                        () -> service.generatePresignedUrl("file-key", Duration.ZERO)),
+                () -> assertThrows(FileStorageException.class,
+                        () -> service.generatePresignedUrl("file-key", Duration.ofSeconds(-1)))
+        );
     }
 }

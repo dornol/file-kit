@@ -28,7 +28,8 @@ public final class FilenameValidator {
         if (filename.length() > MAX_FILENAME_LENGTH) {
             return false;
         }
-        return !containsTraversalCharacters(filename);
+        return !containsTraversalCharacters(filename)
+                && filename.chars().noneMatch(Character::isISOControl);
     }
 
     /**

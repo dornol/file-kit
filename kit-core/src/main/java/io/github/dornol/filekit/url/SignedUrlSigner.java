@@ -105,7 +105,7 @@ public final class SignedUrlSigner {
      * fragment {@code "exp={epochSeconds}&sig={base64url-signature}"}.
      */
     public String sign(String fileKey, Instant expiration) {
-        Objects.requireNonNull(fileKey, "fileKey");
+        validateFileKey(fileKey);
         Objects.requireNonNull(expiration, "expiration");
         long exp = expiration.getEpochSecond();
         byte[] sig = hmac(fileKey + "|" + exp);
@@ -120,7 +120,7 @@ public final class SignedUrlSigner {
      *                                             (or is malformed Base64)
      */
     public void verify(String fileKey, long exp, String sigBase64) {
-        Objects.requireNonNull(fileKey, "fileKey");
+        validateFileKey(fileKey);
         Objects.requireNonNull(sigBase64, "sigBase64");
         Instant expInstant = Instant.ofEpochSecond(exp);
         if (expInstant.isBefore(clock.instant())) {
@@ -145,6 +145,14 @@ public final class SignedUrlSigner {
             return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC-SHA256 not available", e);
+        }
+    }
+
+    private static void validateFileKey(String fileKey) {
+        Objects.requireNonNull(fileKey, "fileKey");
+        if (fileKey.isBlank() || fileKey.indexOf('|') >= 0
+                || fileKey.chars().anyMatch(Character::isISOControl)) {
+            throw new IllegalArgumentException("fileKey must be non-blank and must not contain '|'");
         }
     }
 }
