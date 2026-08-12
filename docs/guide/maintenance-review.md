@@ -26,10 +26,15 @@ fixed set.
 
 ### Concurrent checksum deduplication
 
+Status: partially implemented on 2026-08-12.
+
 The checksum lookup and metadata save are not an atomic operation. Repository
 implementations should put a unique constraint on the checksum column. When a
-constraint violation occurs, applications should re-read the existing metadata
-by checksum and return it, while cleaning up the newly uploaded storage object.
+constraint violation occurs, `FileUploadService` re-reads the existing metadata
+by checksum and returns it after cleaning up the newly uploaded storage object.
+Repositories still need to define the unique constraint and use a
+constraint-violation exception that preserves the failed `save` behavior when
+no concurrent row can be found.
 
 ### Streaming SPI implementations
 
