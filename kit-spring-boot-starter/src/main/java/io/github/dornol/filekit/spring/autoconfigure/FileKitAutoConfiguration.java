@@ -356,7 +356,7 @@ public class FileKitAutoConfiguration {
     }
 
     @Configuration
-    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+    @ConditionalOnClass(name = "org.springframework.boot.health.contributor.HealthIndicator")
     static class StorageHealthConfiguration {
 
         @Bean
