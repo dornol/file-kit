@@ -6,6 +6,7 @@ import io.github.dornol.filekit.example.config.StorageType;
 import io.github.dornol.filekit.storage.FileStorage;
 import io.github.dornol.filekit.storage.FileStorageException;
 import io.github.dornol.filekit.storage.FileUploadCommand;
+import io.github.dornol.filekit.storage.StorageHealthCheck;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -19,7 +20,7 @@ import java.io.InputStream;
 import java.time.Duration;
 import java.util.Objects;
 
-public class S3FileStorage implements FileStorage {
+public class S3FileStorage implements FileStorage, StorageHealthCheck {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
@@ -32,6 +33,15 @@ public class S3FileStorage implements FileStorage {
     @Override
     public Enum<?> getStorageType() {
         return StorageType.S3;
+    }
+
+    @Override
+    public void check() {
+        try {
+            s3Client.listBuckets();
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("S3 backend is unavailable", e);
+        }
     }
 
     @Override

@@ -182,6 +182,12 @@ No configuration needed — just add the actuator dependency. Exported to any co
 
 > **Cardinality warning:** metrics are tagged by `storageType` and `bucket`. Large numbers of distinct bucket names (e.g. per-user buckets) cause high cardinality. Prefer a fixed set of bucket names.
 
+## Storage health checks
+
+When `spring-boot-starter-actuator` is on the classpath, file-kit registers a `fileKitStorage` health indicator for `FileStorage` beans. Storages implementing the optional `StorageHealthCheck` SPI are actively probed; other storages are reported as available without an active probe. The built-in local storage checks that its base directory exists and is readable/writable. The example S3 storage uses `ListBuckets`, so its IAM role needs permission for that operation.
+
+The library does not automatically delete orphaned objects. Safe cleanup requires a repository lifecycle/status contract and a storage listing contract, which are intentionally left to an application-specific maintenance job.
+
 ## Security Considerations
 
 ### Input validation

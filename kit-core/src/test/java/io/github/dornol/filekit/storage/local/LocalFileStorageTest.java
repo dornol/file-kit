@@ -147,6 +147,20 @@ class LocalFileStorageTest {
     }
 
     @Test
+    void check_succeedsWhenBaseDirectoryIsAvailable() {
+        storage.check();
+    }
+
+    @Test
+    void check_failsWhenBaseDirectoryIsUnavailable() throws IOException {
+        Path missingDirectory = tempDir.resolve("missing");
+        LocalFileStorage unavailable = new LocalFileStorage(missingDirectory, StorageType.LOCAL);
+        Files.delete(missingDirectory);
+
+        assertThrows(IllegalStateException.class, unavailable::check);
+    }
+
+    @Test
     void upload_pathTraversalInBucket_rejected() {
         assertThrows(IllegalArgumentException.class, () ->
                 FileUploadCommand.ofBytes("key", "f.txt", "data".getBytes(),

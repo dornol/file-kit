@@ -36,6 +36,7 @@ import io.github.dornol.filekit.spi.QuotaUsageProvider;
 import io.github.dornol.filekit.spi.Sha256ChecksumCalculator;
 import io.github.dornol.filekit.spring.download.SpringDownloadService;
 import io.github.dornol.filekit.spring.upload.ReactiveFileUploadService;
+import io.github.dornol.filekit.spring.actuate.FileKitStorageHealthIndicator;
 import io.github.dornol.filekit.spring.validator.MultipartFileArrayValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileCollectionValidator;
 import io.github.dornol.filekit.spring.validator.MultipartFileValidator;
@@ -352,6 +353,18 @@ public class FileKitAutoConfiguration {
             return new FileKitMetrics(meterRegistry, properties.isMetricsIncludeBucket());
         }
 
+    }
+
+    @Configuration
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+    static class StorageHealthConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean(FileKitStorageHealthIndicator.class)
+        @ConditionalOnBean(FileStorage.class)
+        public FileKitStorageHealthIndicator fileKitStorageHealthIndicator(List<FileStorage> storages) {
+            return new FileKitStorageHealthIndicator(storages);
+        }
     }
 
 }
