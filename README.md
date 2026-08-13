@@ -2,7 +2,9 @@
 
 A lightweight Java library for file validation, upload, download, and deletion. Validates uploaded files by media type, file size, filename safety, and extension-content consistency. Provides a pluggable storage abstraction for uploading and downloading files with checksum-based deduplication.
 
-**Deep-dive documentation:** [docs/guide/](docs/guide/README.md). AI agents: see [llms.txt](llms.txt).
+**Deep-dive documentation:** [docs/guide/](docs/guide/README.md), including the
+[production operations checklist](docs/guide/production-operations.md). AI
+agents: see [llms.txt](llms.txt).
 
 ## What's New in 0.2.2
 
@@ -118,6 +120,14 @@ file-kit:
   encryption-required: false             # fail startup without a custom FileEncryptor
   metrics-include-bucket: false          # include bucket in metric tags (default: false)
 ```
+
+For a deployment-oriented configuration template, see
+[`example/src/main/resources/application-prod.yaml`](example/src/main/resources/application-prod.yaml).
+Activate it with `SPRING_PROFILES_ACTIVE=prod` and provide database/S3
+credentials through environment variables. The template deliberately keeps
+encryption mandatory and fails startup until a real `FileEncryptor` bean is
+registered. Set `FILE_KIT_ENCRYPTION_REQUIRED=false` only for a deliberate
+non-encrypted deployment.
 
 ## Features
 

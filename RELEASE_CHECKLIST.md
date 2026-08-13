@@ -20,6 +20,7 @@
 - [ ] 에러 케이스 테스트 (null, 존재하지 않는 key, 잘못된 파일명 등)
 - [ ] Builder 패턴 테스트 (null 파라미터, 기본값, chaining)
 - [ ] Javadoc 빌드 경고 없음: `./gradlew javadoc`
+- [ ] CI에서 Javadoc 검증 단계 통과
 
 ## 3. Example Module
 

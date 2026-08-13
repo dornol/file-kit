@@ -6,6 +6,21 @@ improved.
 
 Last reviewed: 2026-08-12
 
+## Production profile
+
+The example application includes `application-prod.yaml` as a production
+configuration template. Activate it with `SPRING_PROFILES_ACTIVE=prod` and
+provide database and S3 credentials through environment variables. It uses a
+finite upload limit, checksum verification on download, bounded pre-signed URL
+expiration, and `ddl-auto=validate`; it does not enable encryption until a real
+`FileEncryptor` bean is registered. In fact, the production profile fails
+startup by default until that bean is registered.
+
+The example Compose services expose configurable host ports via
+`FILEKIT_POSTGRES_PORT`, `FILEKIT_MINIO_PORT`, and
+`FILEKIT_MINIO_CONSOLE_PORT`, so local integration testing does not require
+stopping unrelated services.
+
 ## Operational safeguards
 
 ### Domain value validation

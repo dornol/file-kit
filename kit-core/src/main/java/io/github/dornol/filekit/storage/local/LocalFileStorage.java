@@ -76,6 +76,18 @@ public class LocalFileStorage implements FileStorage, StorageHealthCheck {
         return storageType;
     }
 
+    /**
+     * Returns the normalized root directory used by this storage.
+     *
+     * <p>This is useful for storage-specific maintenance jobs such as orphan
+     * detection. Callers must not write outside the normal storage methods.</p>
+     *
+     * @return local storage root directory
+     */
+    public Path baseDirectory() {
+        return baseDir;
+    }
+
     @Override
     public void check() {
         if (!Files.isDirectory(baseDir) || !Files.isReadable(baseDir) || !Files.isWritable(baseDir)) {

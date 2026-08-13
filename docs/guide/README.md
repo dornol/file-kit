@@ -11,6 +11,7 @@ Topic-focused references. Each page = one concern.
 ## Storage
 
 - [storage-spi.md](storage-spi.md) — `FileStorage` SPI contract, built-in `LocalFileStorage` / `InMemoryFileStorage`, `ObjectKeyStrategy`, multi-backend routing.
+- [production-operations.md](production-operations.md) — authorization boundary, encryption/scanning requirements, metadata consistency, orphan cleanup, and release verification.
 - [s3-storage.md](s3-storage.md) — full S3 / MinIO / R2 / Wasabi reference implementation.
 
 ## Cross-cutting concerns

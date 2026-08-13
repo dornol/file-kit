@@ -111,6 +111,18 @@ class FileKitPropertiesTest {
     }
 
     @Test
+    void maxPresignedExpiration_nonPositive_throws() {
+        FileKitProperties props = new FileKitProperties();
+
+        assertThatThrownBy(() -> props.setMaxPresignedExpiration(Duration.ZERO))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("maxPresignedExpiration must be positive");
+        assertThatThrownBy(() -> props.setMaxPresignedExpiration(Duration.ofSeconds(-1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("maxPresignedExpiration must be positive");
+    }
+
+    @Test
     void maxPresignedExpiration_boundFromConfig() {
         contextRunner
                 .withPropertyValues("file-kit.max-presigned-expiration=1h")

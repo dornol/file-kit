@@ -33,16 +33,32 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(FileStorageException.class)
     public ResponseEntity<Map<String, Object>> handleFileStorage(FileStorageException ex) {
-        log.warn("File storage error [{}]: {}", ex.getMessageKey(), ex.getMessage(), ex);
-
-        HttpStatus status = FileStorageException.FILE_NOT_FOUND.equals(ex.getMessageKey())
-                ? HttpStatus.NOT_FOUND
-                : HttpStatus.INTERNAL_SERVER_ERROR;
+        HttpStatus status = statusFor(ex.getMessageKey());
+        boolean serverError = status.value() >= 500;
+        if (serverError) {
+            log.error("File storage error [{}]", ex.getMessageKey(), ex);
+        } else {
+            log.warn("File request rejected [{}]", ex.getMessageKey());
+        }
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "error");
         body.put("messageKey", ex.getMessageKey());
-        body.put("message", ex.getMessage());
+        body.put("message", serverError
+                ? "File operation failed"
+                : "File request is invalid");
         return ResponseEntity.status(status).body(body);
+    }
+
+    private static HttpStatus statusFor(String messageKey) {
+        return switch (messageKey) {
+            case FileStorageException.FILE_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case FileStorageException.FILE_TOO_LARGE,
+                 FileStorageException.QUOTA_EXCEEDED -> HttpStatus.CONTENT_TOO_LARGE;
+            case FileStorageException.INVALID_FILENAME,
+                 FileStorageException.RANGE_NOT_SATISFIABLE,
+                 FileStorageException.PRESIGNED_URL_FAILED -> HttpStatus.BAD_REQUEST;
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
     }
 }

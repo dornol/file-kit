@@ -9,15 +9,19 @@ spring:
       max-file-size: 10MB
       max-request-size: 50MB
   datasource:
-    url: jdbc:postgresql://localhost:5432/filekit
-    username: filekit
-    password: filekit
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/filekit}
+    username: ${DATABASE_USERNAME:filekit}
+    password: ${DATABASE_PASSWORD:filekit}
   jpa:
     hibernate:
       ddl-auto: update
     open-in-view: false
 
 app:
+  clamav:
+    enabled: false
+  orphan-cleanup:
+    enabled: false
   s3:
     endpoint: ${S3_ENDPOINT:http://localhost:9000}
     region: ${S3_REGION:us-east-1}

@@ -36,6 +36,7 @@ import io.github.dornol.filekit.validator.FileValidationHelper;
 import io.github.dornol.filekit.validator.MediaTypeDetector;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,6 +61,13 @@ class FileKitAutoConfigurationTest {
             assertThat(context).hasSingleBean(MultipartFileArrayValidator.class);
             assertThat(context).hasSingleBean(MultipartFileCollectionValidator.class);
         });
+    }
+
+    @Test
+    void mvcOnlyRuntime_doesNotLoadReactiveAdapterWithoutReactor() {
+        contextRunner
+                .withClassLoader(new FilteredClassLoader("reactor.core"))
+                .run(context -> assertThat(context).hasNotFailed());
     }
 
     // ── ChecksumCalculator auto-registration ───────────────────────
@@ -240,6 +248,17 @@ class FileKitAutoConfigurationTest {
             assertThat(context.getBean(FileEncryptor.class))
                     .isInstanceOf(NoOpFileEncryptor.class);
         });
+    }
+
+    @Test
+    void encryptionRequired_withoutCustomEncryptor_failsStartup() {
+        contextRunner
+                .withPropertyValues("file-kit.encryption-required=true")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseMessage("file-kit.encryption-required=true but no FileEncryptor bean is configured");
+                });
     }
 
     @Test

@@ -2,6 +2,8 @@ package io.github.dornol.filekit.spring.validator;
 
 import io.github.dornol.filekit.validator.FileValidationHelper;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Objects;
@@ -18,7 +20,9 @@ public class MultipartFileValidator extends AbstractMultipartFileValidator<Multi
         this(helper, 0);
     }
 
-    public MultipartFileValidator(FileValidationHelper helper, long defaultMaxSize) {
+    @Autowired
+    public MultipartFileValidator(FileValidationHelper helper,
+                                  @Value("${file-kit.max-upload-size:0}") long defaultMaxSize) {
         super(defaultMaxSize);
         this.helper = Objects.requireNonNull(helper, "helper");
     }

@@ -1,0 +1,43 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: ${FILE_KIT_MAX_FILE_SIZE:10MB}
+      max-request-size: ${FILE_KIT_MAX_REQUEST_SIZE:50MB}
+
+file-kit:
+  # Keep this finite in production. The application may lower it per endpoint.
+  max-upload-size: ${FILE_KIT_MAX_UPLOAD_SIZE:10485760}
+  verify-checksum-on-download: ${FILE_KIT_VERIFY_CHECKSUM:true}
+  max-presigned-expiration: ${FILE_KIT_MAX_PRESIGNED_EXPIRATION:24h}
+  # Production fails to start until a real FileEncryptor bean is registered.
+  encryption-required: ${FILE_KIT_ENCRYPTION_REQUIRED:true}
+  metrics-include-bucket: ${FILE_KIT_METRICS_INCLUDE_BUCKET:false}
+
+app:
+  clamav:
+    enabled: ${CLAMAV_ENABLED:true}
+    host: ${CLAMAV_HOST}
+    port: ${CLAMAV_PORT:3310}
+    connect-timeout: ${CLAMAV_CONNECT_TIMEOUT:5s}
+    read-timeout: ${CLAMAV_READ_TIMEOUT:30s}
+  orphan-cleanup:
+    enabled: ${ORPHAN_CLEANUP_ENABLED:false}
+    grace-period: ${ORPHAN_CLEANUP_GRACE_PERIOD:24h}
+    fixed-delay-ms: ${ORPHAN_CLEANUP_FIXED_DELAY_MS:3600000}
+  s3:
+    endpoint: ${S3_ENDPOINT}
+    region: ${S3_REGION}
+    access-key: ${S3_ACCESS_KEY}
+    secret-key: ${S3_SECRET_KEY}
+    force-path-style: ${S3_FORCE_PATH_STYLE:false}

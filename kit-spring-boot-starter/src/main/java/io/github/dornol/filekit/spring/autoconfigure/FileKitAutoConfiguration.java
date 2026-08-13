@@ -196,7 +196,10 @@ public class FileKitAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnClass(name = "org.springframework.http.codec.multipart.FilePart")
+    @ConditionalOnClass(name = {
+            "org.springframework.http.codec.multipart.FilePart",
+            "reactor.core.publisher.Mono"
+    })
     @ConditionalOnBean(FileUploadService.class)
     public ReactiveFileUploadService reactiveFileUploadService(FileUploadService fileUploadService,
                                                                FileKitProperties properties) {

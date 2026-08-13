@@ -66,6 +66,10 @@ public class FileKitProperties {
     }
 
     public void setMaxPresignedExpiration(@Nullable Duration maxPresignedExpiration) {
+        if (maxPresignedExpiration != null
+                && (maxPresignedExpiration.isZero() || maxPresignedExpiration.isNegative())) {
+            throw new IllegalArgumentException("maxPresignedExpiration must be positive");
+        }
         this.maxPresignedExpiration = maxPresignedExpiration;
     }
 
