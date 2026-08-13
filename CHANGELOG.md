@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-13
+
 ### Added
 - Streaming `ClamAvVirusScanner` implementation with bounded I/O, timeouts,
   and fail-closed error handling.

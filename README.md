@@ -6,7 +6,7 @@ A lightweight Java library for file validation, upload, download, and deletion. 
 [production operations checklist](docs/guide/production-operations.md). AI
 agents: see [llms.txt](llms.txt).
 
-## What's New in 0.2.2
+## What's New in 0.2.3
 
 Patch release focused on storage safety, Spring Boot integration, and operational visibility:
 
@@ -14,6 +14,9 @@ Patch release focused on storage safety, Spring Boot integration, and operationa
 - Added concurrent duplicate-upload protection and safer S3 example configuration.
 - Added optional `StorageHealthCheck` support and Spring Boot 4 Actuator integration.
 - Improved Spring upload and byte-range handling, with tests and operational documentation.
+- Added a streaming `ClamAvVirusScanner` with bounded I/O, timeouts, and fail-closed errors.
+- Added a production-oriented example profile with environment-driven infrastructure settings.
+- Added opt-in local orphan cleanup guidance and hardened MVC-only auto-configuration.
 
 ## 0.2.0 Highlights
 
@@ -51,7 +54,7 @@ Fifteen focused PDCA cycles that close every outstanding item from the internal 
 
 ```groovy
 // Gradle
-implementation 'io.github.dornol:file-kit-spring-boot-starter:0.2.2'
+implementation 'io.github.dornol:file-kit-spring-boot-starter:0.2.3'
 
 // Optional: for better MIME detection
 implementation 'org.apache.tika:tika-core:3.3.1'
@@ -65,7 +68,7 @@ implementation 'org.apache.pdfbox:pdfbox:3.0.7'
 <dependency>
     <groupId>io.github.dornol</groupId>
     <artifactId>file-kit-spring-boot-starter</artifactId>
-    <version>0.2.2</version>
+    <version>0.2.3</version>
 </dependency>
 ```
 
