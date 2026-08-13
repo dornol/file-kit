@@ -125,3 +125,9 @@ mavenPublishing {
         }
     }
 }
+
+signing {
+    setRequired {
+        gradle.taskGraph.allTasks.any { it.name == "publishAndReleaseToMavenCentral" }
+    }
+}

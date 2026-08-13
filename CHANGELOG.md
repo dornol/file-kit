@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Streaming `ClamAvVirusScanner` implementation with bounded I/O, timeouts,
+  and fail-closed error handling.
+- Production-oriented example profile with environment-driven database,
+  object storage, upload limits, encryption, and ClamAV settings.
+- Opt-in local orphan cleanup example and production operations guidance.
+
+### Fixed
+- Spring Boot auto-configuration no longer loads the reactive upload adapter
+  in MVC-only applications.
+- Multipart validators now receive the configured global upload-size limit
+  when instantiated by Bean Validation.
+- Example error responses no longer expose internal exception messages.
+
 ## [0.2.2] - 2026-08-12
 
 Patch release focused on storage safety, Spring Boot integration, and
